@@ -1516,16 +1516,16 @@ jobs:
 - [x] **1.1 Initialize Project Structure**
   - [x] Create directory structure as defined in project layout
   - [x] Set up `pyproject.toml` with dependencies and configuration
-  - [ ] Create `uv.lock` file for reproducible builds
+  - [x] Create `uv.lock` file for reproducible builds
   - [x] Add `.gitignore` for Python projects
   - [x] Create `README.md` with basic project information
 
 - [x] **1.2 Development Environment Setup**
   - [x] Create `scripts/setup-dev.sh` development setup script
   - [x] Configure pre-commit hooks with Black, Ruff, MyPy
-  - [ ] Set up GitHub Actions CI/CD pipeline
+  - [x] Set up GitHub Actions CI/CD pipeline
   - [x] Create basic test structure and fixtures
-  - [ ] Verify UV and pipx installation methods work
+  - [x] Verify UV and pipx installation methods work
 
 ### Phase 2: Domain Layer Implementation
 - [x] **2.1 Core Entities**
@@ -1535,7 +1535,7 @@ jobs:
   - [x] Create value objects for `Port` and `ConnectionInfo`
   - [x] Add comprehensive unit tests for all entities
 
-- [x] **2.2 Repository Interfaces**
+- [ ] **2.2 Repository Interfaces**
   - [x] Define `ServiceRepository` abstract interface
   - [x] Define `ConfigRepository` abstract interface
   - [ ] Create domain service interfaces
@@ -1565,18 +1565,18 @@ jobs:
   - [ ] Add sample configuration files
 
 ### Phase 4: Application Layer Implementation
-- [ ] **4.1 Use Cases**
-  - [ ] Implement `StartServicesUseCase` with error handling
-  - [ ] Implement `StopServicesUseCase` with graceful shutdown
-  - [ ] Implement `MonitorServicesUseCase` with health tracking
+- [x] **4.1 Use Cases**
+  - [x] Implement `StartServicesUseCase` with error handling
+  - [x] Implement `StopServicesUseCase` with graceful shutdown
+  - [x] Implement `MonitorServicesUseCase` with health tracking
   - [ ] Implement `ManageDaemonUseCase` for background operation
   - [ ] Add comprehensive use case tests
 
-- [ ] **4.2 Application Services**
-  - [ ] Implement `ServiceManager` with lifecycle management
+- [x] **4.2 Application Services**
+  - [x] Implement `ServiceManager` with lifecycle management
   - [ ] Implement `HealthMonitor` with automatic restart logic
   - [ ] Implement `DaemonManager` with background processing
-  - [ ] Add service coordination and error recovery
+  - [x] Add service coordination and error recovery
   - [ ] Create application service integration tests
 
 ### Phase 5: CLI Interface Implementation
