@@ -1,0 +1,191 @@
+# LocalPort Configuration File
+# This is a comprehensive example showing all available configuration options
+
+version: "1.0"
+
+# Default settings applied to all services unless overridden
+defaults:
+  health_check:
+    type: tcp
+    interval: 30
+    timeout: 5.0
+    failure_threshold: 3
+    success_threshold: 1
+  restart_policy:
+    enabled: true
+    max_attempts: 5
+    backoff_multiplier: 2.0
+    initial_delay: 1
+    max_delay: 300
+
+# Service definitions
+services:
+  # PostgreSQL database service via kubectl
+  - name: postgres
+    technology: kubectl
+    local_port: 5432
+    remote_port: 5432
+    connection:
+      resource_type: service
+      resource_name: postgres
+      namespace: default
+      context: minikube
+    enabled: true
+    tags: [database, essential]
+    description: "PostgreSQL database for development"
+    health_check:
+      type: postgres
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 3
+      config:
+        database: postgres
+        user: postgres
+        password: ${POSTGRES_PASSWORD:postgres}
+        host: localhost
+        port: 5432
+    restart_policy:
+      enabled: true
+      max_attempts: 3
+      backoff_multiplier: 2.0
+      initial_delay: 2
+      max_delay: 60
+
+  # Kafka message broker via kubectl
+  - name: kafka
+    technology: kubectl
+    local_port: 9092
+    remote_port: 9092
+    connection:
+      resource_type: service
+      resource_name: kafka
+      namespace: kafka
+      context: minikube
+    enabled: true
+    tags: [messaging, essential]
+    description: "Kafka message broker"
+    health_check:
+      type: kafka
+      interval: 45
+      timeout: 15.0
+      failure_threshold: 2
+      config:
+        bootstrap_servers: "localhost:9092"
+    restart_policy:
+      enabled: true
+      max_attempts: 5
+      backoff_multiplier: 1.5
+      initial_delay: 5
+      max_delay: 120
+
+  # Redis cache via SSH tunnel
+  - name: redis
+    technology: ssh
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      host: redis-server.example.com
+      user: deploy
+      key_file: ~/.ssh/id_rsa
+      port: 22
+    enabled: true
+    tags: [cache]
+    description: "Redis cache server"
+    health_check:
+      type: tcp
+      interval: 20
+      timeout: 3.0
+      failure_threshold: 5
+    restart_policy:
+      enabled: true
+      max_attempts: 10
+      backoff_multiplier: 1.2
+      initial_delay: 1
+      max_delay: 30
+
+  # Web API service via kubectl
+  - name: api
+    technology: kubectl
+    local_port: 8080
+    remote_port: 80
+    connection:
+      resource_type: deployment
+      resource_name: api-server
+      namespace: default
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [web, api]
+    description: "Main API server"
+    health_check:
+      type: http
+      interval: 15
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8080/health"
+        method: GET
+        expected_status: 200
+        headers:
+          User-Agent: "LocalPort-HealthCheck/1.0"
+    restart_policy:
+      enabled: true
+      max_attempts: 3
+      backoff_multiplier: 2.0
+      initial_delay: 1
+      max_delay: 60
+
+  # Monitoring service (disabled by default)
+  - name: prometheus
+    technology: kubectl
+    local_port: 9090
+    remote_port: 9090
+    connection:
+      resource_type: service
+      resource_name: prometheus-server
+      namespace: monitoring
+      context: minikube
+    enabled: false
+    tags: [monitoring, optional]
+    description: "Prometheus monitoring server"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9090/-/healthy"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      enabled: false
+
+  # Development database with custom settings
+  - name: dev-postgres
+    technology: ssh
+    local_port: 5433
+    remote_port: 5432
+    connection:
+      host: ${DEV_DB_HOST:dev-db.example.com}
+      user: ${DEV_DB_USER:developer}
+      password: ${DEV_DB_PASSWORD}
+      port: 22
+    enabled: false
+    tags: [database, development]
+    description: "Development PostgreSQL database"
+    health_check:
+      type: postgres
+      interval: 60
+      timeout: 15.0
+      failure_threshold: 2
+      config:
+        database: ${DEV_DB_NAME:devdb}
+        user: ${DEV_DB_USER:developer}
+        password: ${DEV_DB_PASSWORD}
+        host: localhost
+        port: 5433
+    restart_policy:
+      enabled: true
+      max_attempts: 2
+      backoff_multiplier: 3.0
+      initial_delay: 10
+      max_delay: 300

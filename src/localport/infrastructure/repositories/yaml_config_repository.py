@@ -1,0 +1,501 @@
+"""YAML-based configuration repository implementation."""
+
+import os
+import re
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+import structlog
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
+from ...domain.repositories.config_repository import ConfigRepository
+
+logger = structlog.get_logger()
+
+
+class YamlConfigRepository(ConfigRepository):
+    """YAML file-based configuration repository with environment variable substitution."""
+    
+    def __init__(self, config_path: Optional[str] = None):
+        """Initialize YAML configuration repository.
+        
+        Args:
+            config_path: Path to YAML configuration file
+        """
+        self.config_path = Path(config_path) if config_path else self._find_config_file()
+        self._config_cache: Optional[Dict[str, Any]] = None
+        self._env_var_pattern = re.compile(r'\$\{([^}]+)\}')
+    
+    def _find_config_file(self) -> Path:
+        """Find configuration file in standard locations.
+        
+        Returns:
+            Path to configuration file
+        """
+        # Search order: current directory, home directory, /etc
+        search_paths = [
+            Path.cwd() / "localport.yaml",
+            Path.cwd() / "localport.yml",
+            Path.cwd() / ".localport.yaml",
+            Path.home() / ".localport.yaml",
+            Path.home() / ".config" / "localport" / "config.yaml",
+            Path("/etc/localport/config.yaml"),
+        ]
+        
+        for path in search_paths:
+            if path.exists():
+                logger.info("Found configuration file", path=str(path))
+                return path
+        
+        # Default to localport.yaml in current directory
+        default_path = Path.cwd() / "localport.yaml"
+        logger.debug("Using default configuration path", path=str(default_path))
+        return default_path
+    
+    async def load_configuration(self) -> Dict[str, Any]:
+        """Load configuration from YAML file.
+        
+        Returns:
+            Configuration dictionary
+            
+        Raises:
+            FileNotFoundError: If configuration file doesn't exist
+            yaml.YAMLError: If YAML parsing fails
+        """
+        if yaml is None:
+            raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
+        
+        if not self.config_path.exists():
+            logger.warning("Configuration file not found", path=str(self.config_path))
+            return await self.get_default_configuration()
+        
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Substitute environment variables
+            content = self._substitute_environment_variables(content)
+            
+            # Parse YAML
+            config = yaml.safe_load(content) or {}
+            
+            # Cache the configuration
+            self._config_cache = config
+            
+            logger.info("Loaded configuration", 
+                       path=str(self.config_path),
+                       services_count=len(config.get('services', [])))
+            
+            return config
+            
+        except yaml.YAMLError as e:
+            logger.error("Failed to parse YAML configuration", 
+                        path=str(self.config_path),
+                        error=str(e))
+            raise
+        except Exception as e:
+            logger.error("Failed to load configuration", 
+                        path=str(self.config_path),
+                        error=str(e))
+            raise
+    
+    async def save_configuration(self, config: Dict[str, Any]) -> None:
+        """Save configuration to YAML file.
+        
+        Args:
+            config: Configuration dictionary to save
+        """
+        if yaml is None:
+            raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
+        
+        try:
+            # Ensure parent directory exists
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write YAML file
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(
+                    config,
+                    f,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    indent=2,
+                    allow_unicode=True
+                )
+            
+            # Update cache
+            self._config_cache = config
+            
+            logger.info("Saved configuration", 
+                       path=str(self.config_path),
+                       services_count=len(config.get('services', [])))
+            
+        except Exception as e:
+            logger.error("Failed to save configuration", 
+                        path=str(self.config_path),
+                        error=str(e))
+            raise
+    
+    async def validate_configuration(self, config: Dict[str, Any]) -> List[str]:
+        """Validate configuration structure and content.
+        
+        Args:
+            config: Configuration to validate
+            
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+        
+        # Check required top-level fields
+        if not isinstance(config, dict):
+            errors.append("Configuration must be a dictionary")
+            return errors
+        
+        # Validate version
+        version = config.get('version')
+        if not version:
+            errors.append("Missing required field: version")
+        elif not isinstance(version, str):
+            errors.append("Version must be a string")
+        
+        # Validate services
+        services = config.get('services')
+        if not services:
+            errors.append("Missing required field: services")
+        elif not isinstance(services, list):
+            errors.append("Services must be a list")
+        else:
+            # Validate each service
+            service_names = set()
+            for i, service in enumerate(services):
+                service_errors = self._validate_service(service, i)
+                errors.extend(service_errors)
+                
+                # Check for duplicate service names
+                name = service.get('name')
+                if name:
+                    if name in service_names:
+                        errors.append(f"Duplicate service name: {name}")
+                    else:
+                        service_names.add(name)
+        
+        # Validate defaults (optional)
+        defaults = config.get('defaults')
+        if defaults is not None:
+            if not isinstance(defaults, dict):
+                errors.append("Defaults must be a dictionary")
+            else:
+                defaults_errors = self._validate_defaults(defaults)
+                errors.extend(defaults_errors)
+        
+        if errors:
+            logger.warning("Configuration validation failed", 
+                          errors=errors,
+                          error_count=len(errors))
+        else:
+            logger.debug("Configuration validation passed")
+        
+        return errors
+    
+    def _validate_service(self, service: Dict[str, Any], index: int) -> List[str]:
+        """Validate a single service configuration.
+        
+        Args:
+            service: Service configuration to validate
+            index: Index of service in list (for error messages)
+            
+        Returns:
+            List of validation errors
+        """
+        errors = []
+        prefix = f"Service {index}"
+        
+        if not isinstance(service, dict):
+            errors.append(f"{prefix}: must be a dictionary")
+            return errors
+        
+        # Required fields
+        required_fields = ['name', 'technology', 'local_port', 'remote_port', 'connection']
+        for field in required_fields:
+            if field not in service:
+                errors.append(f"{prefix}: missing required field '{field}'")
+        
+        # Validate name
+        name = service.get('name')
+        if name is not None:
+            if not isinstance(name, str) or not name.strip():
+                errors.append(f"{prefix}: name must be a non-empty string")
+        
+        # Validate technology
+        technology = service.get('technology')
+        if technology is not None:
+            valid_technologies = ['kubectl', 'ssh']
+            if technology not in valid_technologies:
+                errors.append(f"{prefix}: technology must be one of {valid_technologies}")
+        
+        # Validate ports
+        for port_field in ['local_port', 'remote_port']:
+            port = service.get(port_field)
+            if port is not None:
+                if not isinstance(port, int) or not (1 <= port <= 65535):
+                    errors.append(f"{prefix}: {port_field} must be an integer between 1 and 65535")
+        
+        # Validate connection
+        connection = service.get('connection')
+        if connection is not None:
+            if not isinstance(connection, dict):
+                errors.append(f"{prefix}: connection must be a dictionary")
+        
+        # Validate optional fields
+        enabled = service.get('enabled')
+        if enabled is not None and not isinstance(enabled, bool):
+            errors.append(f"{prefix}: enabled must be a boolean")
+        
+        tags = service.get('tags')
+        if tags is not None:
+            if not isinstance(tags, list):
+                errors.append(f"{prefix}: tags must be a list")
+            elif not all(isinstance(tag, str) for tag in tags):
+                errors.append(f"{prefix}: all tags must be strings")
+        
+        description = service.get('description')
+        if description is not None and not isinstance(description, str):
+            errors.append(f"{prefix}: description must be a string")
+        
+        # Validate health_check
+        health_check = service.get('health_check')
+        if health_check is not None:
+            health_errors = self._validate_health_check(health_check, f"{prefix}.health_check")
+            errors.extend(health_errors)
+        
+        # Validate restart_policy
+        restart_policy = service.get('restart_policy')
+        if restart_policy is not None:
+            restart_errors = self._validate_restart_policy(restart_policy, f"{prefix}.restart_policy")
+            errors.extend(restart_errors)
+        
+        return errors
+    
+    def _validate_health_check(self, health_check: Dict[str, Any], prefix: str) -> List[str]:
+        """Validate health check configuration.
+        
+        Args:
+            health_check: Health check configuration
+            prefix: Error message prefix
+            
+        Returns:
+            List of validation errors
+        """
+        errors = []
+        
+        if not isinstance(health_check, dict):
+            errors.append(f"{prefix}: must be a dictionary")
+            return errors
+        
+        # Validate type
+        check_type = health_check.get('type')
+        if not check_type:
+            errors.append(f"{prefix}: missing required field 'type'")
+        else:
+            valid_types = ['tcp', 'http', 'https', 'kafka', 'postgres', 'postgresql']
+            if check_type not in valid_types:
+                errors.append(f"{prefix}: type must be one of {valid_types}")
+        
+        # Validate numeric fields
+        numeric_fields = {
+            'interval': (1, 3600),  # 1 second to 1 hour
+            'timeout': (0.1, 300),  # 0.1 second to 5 minutes
+            'failure_threshold': (1, 100),
+            'success_threshold': (1, 100)
+        }
+        
+        for field, (min_val, max_val) in numeric_fields.items():
+            value = health_check.get(field)
+            if value is not None:
+                if not isinstance(value, (int, float)) or not (min_val <= value <= max_val):
+                    errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
+        
+        return errors
+    
+    def _validate_restart_policy(self, restart_policy: Dict[str, Any], prefix: str) -> List[str]:
+        """Validate restart policy configuration.
+        
+        Args:
+            restart_policy: Restart policy configuration
+            prefix: Error message prefix
+            
+        Returns:
+            List of validation errors
+        """
+        errors = []
+        
+        if not isinstance(restart_policy, dict):
+            errors.append(f"{prefix}: must be a dictionary")
+            return errors
+        
+        # Validate enabled
+        enabled = restart_policy.get('enabled')
+        if enabled is not None and not isinstance(enabled, bool):
+            errors.append(f"{prefix}.enabled: must be a boolean")
+        
+        # Validate numeric fields
+        numeric_fields = {
+            'max_attempts': (1, 100),
+            'initial_delay': (1, 3600),
+            'max_delay': (1, 86400),  # 1 day
+            'backoff_multiplier': (1.0, 10.0)
+        }
+        
+        for field, (min_val, max_val) in numeric_fields.items():
+            value = restart_policy.get(field)
+            if value is not None:
+                if not isinstance(value, (int, float)) or not (min_val <= value <= max_val):
+                    errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
+        
+        return errors
+    
+    def _validate_defaults(self, defaults: Dict[str, Any]) -> List[str]:
+        """Validate defaults configuration.
+        
+        Args:
+            defaults: Defaults configuration
+            
+        Returns:
+            List of validation errors
+        """
+        errors = []
+        
+        # Validate health_check defaults
+        health_check = defaults.get('health_check')
+        if health_check is not None:
+            health_errors = self._validate_health_check(health_check, "defaults.health_check")
+            errors.extend(health_errors)
+        
+        # Validate restart_policy defaults
+        restart_policy = defaults.get('restart_policy')
+        if restart_policy is not None:
+            restart_errors = self._validate_restart_policy(restart_policy, "defaults.restart_policy")
+            errors.extend(restart_errors)
+        
+        return errors
+    
+    async def get_default_configuration(self) -> Dict[str, Any]:
+        """Get default configuration template.
+        
+        Returns:
+            Default configuration dictionary
+        """
+        return {
+            'version': '1.0',
+            'services': [],
+            'defaults': {
+                'health_check': {
+                    'type': 'tcp',
+                    'interval': 30,
+                    'timeout': 5.0,
+                    'failure_threshold': 3,
+                    'success_threshold': 1
+                },
+                'restart_policy': {
+                    'enabled': True,
+                    'max_attempts': 5,
+                    'backoff_multiplier': 2.0,
+                    'initial_delay': 1,
+                    'max_delay': 300
+                }
+            }
+        }
+    
+    def _substitute_environment_variables(self, content: str) -> str:
+        """Substitute environment variables in configuration content.
+        
+        Args:
+            content: Configuration content with ${VAR} placeholders
+            
+        Returns:
+            Content with environment variables substituted
+        """
+        def replace_var(match):
+            var_expr = match.group(1)
+            
+            # Handle default values: ${VAR:default}
+            if ':' in var_expr:
+                var_name, default_value = var_expr.split(':', 1)
+                return os.getenv(var_name.strip(), default_value)
+            else:
+                var_name = var_expr.strip()
+                value = os.getenv(var_name)
+                
+                if value is None:
+                    logger.warning("Environment variable not found", 
+                                  variable=var_name,
+                                  placeholder=match.group(0))
+                    # Return the original placeholder if variable not found
+                    return match.group(0)
+                
+                return value
+        
+        # Substitute all ${VAR} and ${VAR:default} patterns
+        substituted = self._env_var_pattern.sub(replace_var, content)
+        
+        # Log substitutions for debugging
+        if substituted != content:
+            substitution_count = len(self._env_var_pattern.findall(content))
+            logger.debug("Substituted environment variables", 
+                        count=substitution_count)
+        
+        return substituted
+    
+    def get_config_path(self) -> Path:
+        """Get the path to the configuration file.
+        
+        Returns:
+            Path to configuration file
+        """
+        return self.config_path
+    
+    def clear_cache(self) -> None:
+        """Clear the configuration cache."""
+        self._config_cache = None
+        logger.debug("Cleared configuration cache")
+    
+    async def reload_configuration(self) -> Dict[str, Any]:
+        """Reload configuration from file, bypassing cache.
+        
+        Returns:
+            Reloaded configuration dictionary
+        """
+        self.clear_cache()
+        return await self.load_configuration()
+    
+    async def backup_configuration(self, backup_path: Optional[str] = None) -> str:
+        """Create a backup of the current configuration file.
+        
+        Args:
+            backup_path: Path for backup file (auto-generated if None)
+            
+        Returns:
+            Path to backup file
+        """
+        if not self.config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
+        
+        if backup_path is None:
+            timestamp = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_path = f"{self.config_path}.backup_{timestamp}"
+        
+        backup_path = Path(backup_path)
+        
+        # Copy configuration file
+        import shutil
+        shutil.copy2(self.config_path, backup_path)
+        
+        logger.info("Created configuration backup", 
+                   original=str(self.config_path),
+                   backup=str(backup_path))
+        
+        return str(backup_path)

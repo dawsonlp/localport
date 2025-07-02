@@ -2,7 +2,8 @@
 
 ## Project Purpose
 
-LocalPort is a universal port forwarding manager that provides reliable, automated port forwarding with health monitoring and auto-restart capabilities for development environments.
+LocalPort is a universal port forwarding manager that provides reliable, automated port forwarding with health monitoring and auto-restart capabilities for development environments. Initially it supports only
+kubectl port forwarding.
 
 ## What LocalPort Needs to Do
 

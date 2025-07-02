@@ -1,0 +1,23 @@
+# Minimal LocalPort Configuration
+# This shows the simplest possible configuration
+
+version: "1.0"
+
+services:
+  # Simple kubectl port forward
+  - name: postgres
+    technology: kubectl
+    local_port: 5432
+    remote_port: 5432
+    connection:
+      resource_name: postgres
+      namespace: default
+
+  # Simple SSH tunnel
+  - name: redis
+    technology: ssh
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      host: redis.example.com
+      user: deploy

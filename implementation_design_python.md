@@ -1546,23 +1546,23 @@ jobs:
 - [x] **3.1 Port Forwarding Adapters**
   - [x] Implement `KubectlAdapter` with process management
   - [x] Implement `SSHAdapter` with tunnel management
-  - [ ] Create adapter factory and registration system
+  - [x] Create adapter factory and registration system
   - [ ] Add comprehensive integration tests
   - [x] Handle cross-platform process differences
 
 - [x] **3.2 Health Check Strategies**
   - [x] Implement `TCPHealthCheck` strategy
   - [x] Implement `HTTPHealthCheck` strategy
-  - [ ] Implement `KafkaHealthCheck` strategy
-  - [ ] Implement `PostgreSQLHealthCheck` strategy
-  - [ ] Create health check factory and configuration
+  - [x] Implement `KafkaHealthCheck` strategy
+  - [x] Implement `PostgreSQLHealthCheck` strategy
+  - [x] Create health check factory and configuration
 
-- [ ] **3.3 Configuration Management**
-  - [ ] Implement `YamlConfigRepository` with validation
+- [x] **3.3 Configuration Management**
+  - [x] Implement `YamlConfigRepository` with validation
   - [x] Implement `MemoryServiceRepository` for runtime state
-  - [ ] Add environment variable substitution
-  - [ ] Create configuration validation and error handling
-  - [ ] Add sample configuration files
+  - [x] Add environment variable substitution
+  - [x] Create configuration validation and error handling
+  - [x] Add sample configuration files
 
 ### Phase 4: Application Layer Implementation
 - [x] **4.1 Use Cases**
