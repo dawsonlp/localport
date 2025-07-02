@@ -1532,12 +1532,12 @@ jobs:
   - [x] Implement `Service` entity with factory methods
   - [x] Implement `PortForward` entity with process tracking
   - [x] Implement `HealthCheck` entity with status tracking
-  - [ ] Create value objects for `Port` and `ConnectionInfo`
+  - [x] Create value objects for `Port` and `ConnectionInfo`
   - [x] Add comprehensive unit tests for all entities
 
-- [ ] **2.2 Repository Interfaces**
-  - [ ] Define `ServiceRepository` abstract interface
-  - [ ] Define `ConfigRepository` abstract interface
+- [x] **2.2 Repository Interfaces**
+  - [x] Define `ServiceRepository` abstract interface
+  - [x] Define `ConfigRepository` abstract interface
   - [ ] Create domain service interfaces
   - [ ] Add repository contract tests
   - [ ] Document repository patterns and usage
