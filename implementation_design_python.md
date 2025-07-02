@@ -1513,27 +1513,27 @@ jobs:
 ## Implementation Checklist
 
 ### Phase 1: Project Foundation
-- [ ] **1.1 Initialize Project Structure**
-  - [ ] Create directory structure as defined in project layout
-  - [ ] Set up `pyproject.toml` with dependencies and configuration
+- [x] **1.1 Initialize Project Structure**
+  - [x] Create directory structure as defined in project layout
+  - [x] Set up `pyproject.toml` with dependencies and configuration
   - [ ] Create `uv.lock` file for reproducible builds
-  - [ ] Add `.gitignore` for Python projects
-  - [ ] Create `README.md` with basic project information
+  - [x] Add `.gitignore` for Python projects
+  - [x] Create `README.md` with basic project information
 
-- [ ] **1.2 Development Environment Setup**
-  - [ ] Create `scripts/setup-dev.sh` development setup script
-  - [ ] Configure pre-commit hooks with Black, Ruff, MyPy
+- [x] **1.2 Development Environment Setup**
+  - [x] Create `scripts/setup-dev.sh` development setup script
+  - [x] Configure pre-commit hooks with Black, Ruff, MyPy
   - [ ] Set up GitHub Actions CI/CD pipeline
-  - [ ] Create basic test structure and fixtures
+  - [x] Create basic test structure and fixtures
   - [ ] Verify UV and pipx installation methods work
 
 ### Phase 2: Domain Layer Implementation
-- [ ] **2.1 Core Entities**
-  - [ ] Implement `Service` entity with factory methods
-  - [ ] Implement `PortForward` entity with process tracking
-  - [ ] Implement `HealthCheck` entity with status tracking
+- [x] **2.1 Core Entities**
+  - [x] Implement `Service` entity with factory methods
+  - [x] Implement `PortForward` entity with process tracking
+  - [x] Implement `HealthCheck` entity with status tracking
   - [ ] Create value objects for `Port` and `ConnectionInfo`
-  - [ ] Add comprehensive unit tests for all entities
+  - [x] Add comprehensive unit tests for all entities
 
 - [ ] **2.2 Repository Interfaces**
   - [ ] Define `ServiceRepository` abstract interface
