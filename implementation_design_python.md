@@ -1543,23 +1543,23 @@ jobs:
   - [ ] Document repository patterns and usage
 
 ### Phase 3: Infrastructure Layer Implementation
-- [ ] **3.1 Port Forwarding Adapters**
-  - [ ] Implement `KubectlAdapter` with process management
-  - [ ] Implement `SSHAdapter` with tunnel management
+- [x] **3.1 Port Forwarding Adapters**
+  - [x] Implement `KubectlAdapter` with process management
+  - [x] Implement `SSHAdapter` with tunnel management
   - [ ] Create adapter factory and registration system
   - [ ] Add comprehensive integration tests
-  - [ ] Handle cross-platform process differences
+  - [x] Handle cross-platform process differences
 
-- [ ] **3.2 Health Check Strategies**
-  - [ ] Implement `TCPHealthCheck` strategy
-  - [ ] Implement `HTTPHealthCheck` strategy
+- [x] **3.2 Health Check Strategies**
+  - [x] Implement `TCPHealthCheck` strategy
+  - [x] Implement `HTTPHealthCheck` strategy
   - [ ] Implement `KafkaHealthCheck` strategy
   - [ ] Implement `PostgreSQLHealthCheck` strategy
   - [ ] Create health check factory and configuration
 
 - [ ] **3.3 Configuration Management**
   - [ ] Implement `YamlConfigRepository` with validation
-  - [ ] Implement `MemoryServiceRepository` for runtime state
+  - [x] Implement `MemoryServiceRepository` for runtime state
   - [ ] Add environment variable substitution
   - [ ] Create configuration validation and error handling
   - [ ] Add sample configuration files
