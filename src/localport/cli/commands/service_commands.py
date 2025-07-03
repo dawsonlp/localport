@@ -207,14 +207,33 @@ async def stop_services_command(
 ) -> None:
     """Stop port forwarding services."""
     try:
+        # Load configuration (same logic as start command)
+        config_path = None
+        for path in ["./localport.yaml", "~/.config/localport/config.yaml"]:
+            test_path = Path(path).expanduser()
+            if test_path.exists():
+                config_path = test_path
+                break
+
         # Initialize repositories and services
-        MemoryServiceRepository()
+        service_repo = MemoryServiceRepository()
+        config_repo = YamlConfigRepository(str(config_path)) if config_path else None
         AdapterFactory()
         HealthCheckFactory()
         service_manager = ServiceManager()
 
+        # Load services from config if available
+        if config_repo:
+            await config_repo.load_configuration()
+            loaded_services = await config_repo.load_services()
+            for service in loaded_services:
+                await service_repo.save(service)
+
         # Initialize use case
-        stop_use_case = StopServicesUseCase(service_manager=service_manager)
+        stop_use_case = StopServicesUseCase(
+            service_repository=service_repo,
+            service_manager=service_manager
+        )
 
         # Determine which services to stop
         if all_services:
@@ -233,26 +252,38 @@ async def stop_services_command(
         ) as progress:
             task = progress.add_task("Stopping services...", total=None)
 
-            result = await stop_use_case.execute(
+            # Create command object
+            from ...application.use_cases.stop_services import StopServicesCommand
+            command = StopServicesCommand(
                 service_names=service_names,
-                force=force
+                all_services=all_services,
+                force_stop=force
             )
+
+            result = await stop_use_case.execute(command)
 
             progress.update(task, completed=True)
 
         # Display results
-        if result.success:
+        if result.success_count > 0:
             console.print(create_success_panel(
                 "Services Stopped",
-                f"Successfully stopped {len(result.stopped_services)} service(s)"
+                f"Successfully stopped {result.success_count} service(s)"
             ))
-        else:
+
+        if result.failure_count > 0:
+            error_messages = []
+            for service_name, error in result.errors.items():
+                error_messages.append(f"• {service_name}: {error}")
+            
             console.print(create_error_panel(
-                "Failed to Stop Services",
-                result.error or "Unknown error occurred",
+                "Failed to Stop Some Services",
+                f"Failed to stop {result.failure_count} service(s):\n" + "\n".join(error_messages),
                 "Check the logs for more details or try with --force flag."
             ))
-            raise typer.Exit(1)
+            
+            if result.success_count == 0:
+                raise typer.Exit(1)
 
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
