@@ -21,10 +21,10 @@ class Port:
     @staticmethod
     def is_valid_port(port: int | str) -> bool:
         """Check if a port number is valid.
-        
+
         Args:
             port: Port number to validate
-            
+
         Returns:
             True if port is valid, False otherwise
         """
@@ -37,13 +37,13 @@ class Port:
     @classmethod
     def from_string(cls, port_str: str) -> "Port":
         """Create a Port from a string representation.
-        
+
         Args:
             port_str: String representation of the port
-            
+
         Returns:
             Port instance
-            
+
         Raises:
             ValueError: If the string cannot be converted to a valid port
         """
@@ -55,7 +55,7 @@ class Port:
 
     def is_privileged(self) -> bool:
         """Check if this is a privileged port (< 1024).
-        
+
         Returns:
             True if port is privileged, False otherwise
         """
@@ -63,7 +63,7 @@ class Port:
 
     def is_ephemeral(self) -> bool:
         """Check if this is an ephemeral port (>= 32768).
-        
+
         Returns:
             True if port is ephemeral, False otherwise
         """
@@ -71,7 +71,7 @@ class Port:
 
     def is_well_known(self) -> bool:
         """Check if this is a well-known port (1-1023).
-        
+
         Returns:
             True if port is well-known, False otherwise
         """
@@ -79,7 +79,7 @@ class Port:
 
     def is_registered(self) -> bool:
         """Check if this is a registered port (1024-49151).
-        
+
         Returns:
             True if port is registered, False otherwise
         """

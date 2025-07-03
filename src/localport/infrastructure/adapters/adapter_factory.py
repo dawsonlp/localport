@@ -31,13 +31,13 @@ class AdapterFactory:
 
     async def create_adapter(self, adapter_type: str) -> PortForwardingAdapter | None:
         """Create an adapter instance.
-        
+
         Args:
             adapter_type: Type of adapter to create
-            
+
         Returns:
             Adapter instance or None if type not supported
-            
+
         Raises:
             AdapterNotAvailableError: If adapter prerequisites are not met
         """
@@ -85,10 +85,10 @@ class AdapterFactory:
 
     async def get_adapter(self, technology: ForwardingTechnology) -> PortForwardingAdapter | None:
         """Get an adapter for a specific forwarding technology.
-        
+
         Args:
             technology: Forwarding technology enum
-            
+
         Returns:
             Adapter instance or None if not available
         """
@@ -97,7 +97,7 @@ class AdapterFactory:
 
     def register_adapter(self, adapter_type: str, adapter_class: type[PortForwardingAdapter]) -> None:
         """Register a new adapter type.
-        
+
         Args:
             adapter_type: Name of the adapter type
             adapter_class: Class implementing the adapter
@@ -115,7 +115,7 @@ class AdapterFactory:
 
     def get_supported_types(self) -> list[str]:
         """Get list of supported adapter types.
-        
+
         Returns:
             List of supported adapter type names
         """
@@ -123,10 +123,10 @@ class AdapterFactory:
 
     def is_supported(self, adapter_type: str) -> bool:
         """Check if an adapter type is supported.
-        
+
         Args:
             adapter_type: Type to check
-            
+
         Returns:
             True if supported, False otherwise
         """
@@ -134,7 +134,7 @@ class AdapterFactory:
 
     async def check_all_adapters(self) -> dict[str, bool]:
         """Check prerequisites for all registered adapters.
-        
+
         Returns:
             Dictionary mapping adapter types to availability status
         """
@@ -161,7 +161,7 @@ class AdapterFactory:
 
     async def get_available_adapters(self) -> list[str]:
         """Get list of adapters that have their prerequisites met.
-        
+
         Returns:
             List of available adapter type names
         """
@@ -170,7 +170,7 @@ class AdapterFactory:
 
     async def cleanup_all_adapters(self) -> int:
         """Clean up dead processes from all adapter instances.
-        
+
         Returns:
             Total number of processes cleaned up
         """
@@ -202,11 +202,11 @@ class AdapterFactory:
         connection_info: dict[str, any]
     ) -> list[str]:
         """Validate connection information for a specific adapter type.
-        
+
         Args:
             adapter_type: Type of adapter
             connection_info: Connection configuration to validate
-            
+
         Returns:
             List of validation errors (empty if valid)
         """
@@ -232,10 +232,10 @@ _default_factory = AdapterFactory()
 
 async def create_adapter(adapter_type: str) -> PortForwardingAdapter | None:
     """Create an adapter using the default factory.
-    
+
     Args:
         adapter_type: Type of adapter to create
-        
+
     Returns:
         Adapter instance or None if type not supported
     """
@@ -244,10 +244,10 @@ async def create_adapter(adapter_type: str) -> PortForwardingAdapter | None:
 
 async def get_adapter_for_technology(technology: ForwardingTechnology) -> PortForwardingAdapter | None:
     """Get an adapter for a specific forwarding technology.
-    
+
     Args:
         technology: Forwarding technology enum
-        
+
     Returns:
         Adapter instance or None if not available
     """
@@ -256,7 +256,7 @@ async def get_adapter_for_technology(technology: ForwardingTechnology) -> PortFo
 
 def register_adapter(adapter_type: str, adapter_class: type[PortForwardingAdapter]) -> None:
     """Register a new adapter type with the default factory.
-    
+
     Args:
         adapter_type: Name of the adapter type
         adapter_class: Class implementing the adapter
@@ -266,7 +266,7 @@ def register_adapter(adapter_type: str, adapter_class: type[PortForwardingAdapte
 
 def get_supported_adapter_types() -> list[str]:
     """Get list of supported adapter types.
-    
+
     Returns:
         List of supported adapter type names
     """
@@ -275,7 +275,7 @@ def get_supported_adapter_types() -> list[str]:
 
 async def get_available_adapters() -> list[str]:
     """Get list of adapters that have their prerequisites met.
-    
+
     Returns:
         List of available adapter type names
     """
@@ -284,7 +284,7 @@ async def get_available_adapters() -> list[str]:
 
 async def check_adapter_availability() -> dict[str, bool]:
     """Check prerequisites for all registered adapters.
-    
+
     Returns:
         Dictionary mapping adapter types to availability status
     """
@@ -293,7 +293,7 @@ async def check_adapter_availability() -> dict[str, bool]:
 
 async def cleanup_all_adapter_processes() -> int:
     """Clean up dead processes from all adapters.
-    
+
     Returns:
         Total number of processes cleaned up
     """

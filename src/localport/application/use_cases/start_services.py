@@ -39,10 +39,10 @@ class StartServicesUseCase:
 
     async def execute(self, command: StartServicesCommand) -> BulkOperationResult:
         """Execute the start services use case.
-        
+
         Args:
             command: Command containing service selection criteria
-            
+
         Returns:
             BulkOperationResult with the results of starting services
         """
@@ -118,10 +118,10 @@ class StartServicesUseCase:
 
     async def _resolve_services(self, command: StartServicesCommand) -> list[Service]:
         """Resolve which services to start based on command.
-        
+
         Args:
             command: Command containing service selection criteria
-            
+
         Returns:
             List of services to start
         """
@@ -160,11 +160,11 @@ class StartServicesUseCase:
         command: StartServicesCommand
     ) -> ServiceStartResult:
         """Start a single service.
-        
+
         Args:
             service: Service to start
             command: Command with additional options
-            
+
         Returns:
             ServiceStartResult with the outcome
         """
@@ -212,11 +212,11 @@ class StartServicesUseCase:
 
     async def _wait_for_health(self, service: Service, timeout: float) -> bool:
         """Wait for service to become healthy.
-        
+
         Args:
             service: Service to check
             timeout: Maximum time to wait in seconds
-            
+
         Returns:
             True if service becomes healthy, False otherwise
         """
@@ -253,10 +253,10 @@ class StartServicesUseCase:
 
     async def start_service_by_name(self, service_name: str) -> ServiceStartResult:
         """Convenience method to start a single service by name.
-        
+
         Args:
             service_name: Name of the service to start
-            
+
         Returns:
             ServiceStartResult with the outcome
         """
@@ -277,7 +277,7 @@ class StartServicesUseCase:
 
     async def start_all_services(self) -> BulkOperationResult:
         """Convenience method to start all services.
-        
+
         Returns:
             BulkOperationResult with the outcome
         """
@@ -286,10 +286,10 @@ class StartServicesUseCase:
 
     async def start_services_by_tags(self, tags: list[str]) -> BulkOperationResult:
         """Convenience method to start services by tags.
-        
+
         Args:
             tags: List of tags to filter services
-            
+
         Returns:
             BulkOperationResult with the outcome
         """

@@ -31,7 +31,7 @@ class DaemonManager:
         health_monitor: HealthMonitorScheduler
     ):
         """Initialize the daemon manager.
-        
+
         Args:
             service_repository: Repository for service persistence
             config_repository: Repository for configuration management
@@ -67,7 +67,7 @@ class DaemonManager:
 
     async def start_daemon(self, auto_start_services: bool = True) -> None:
         """Start the daemon manager.
-        
+
         Args:
             auto_start_services: Whether to automatically start configured services
         """
@@ -112,7 +112,7 @@ class DaemonManager:
 
     async def stop_daemon(self, timeout: float | None = None) -> None:
         """Stop the daemon manager.
-        
+
         Args:
             timeout: Timeout for graceful shutdown
         """
@@ -179,7 +179,7 @@ class DaemonManager:
 
     async def get_daemon_status(self) -> DaemonStatusInfo:
         """Get current daemon status.
-        
+
         Returns:
             Daemon status information
         """
@@ -319,7 +319,7 @@ class DaemonManager:
 
     async def _start_service_safe(self, service: Service) -> None:
         """Safely start a service with error handling.
-        
+
         Args:
             service: Service to start
         """
@@ -437,7 +437,7 @@ class DaemonManager:
 
     async def _stop_service_safe(self, service: Service) -> None:
         """Safely stop a service with error handling.
-        
+
         Args:
             service: Service to stop
         """
@@ -454,7 +454,7 @@ class DaemonManager:
 
     async def _cancel_background_tasks(self, timeout: float) -> None:
         """Cancel all background tasks.
-        
+
         Args:
             timeout: Timeout for task cancellation
         """
@@ -481,7 +481,7 @@ class DaemonManager:
 
     async def _reconcile_services(self, current_services: list[Service]) -> None:
         """Reconcile current services with configuration.
-        
+
         Args:
             current_services: Currently managed services
         """
@@ -514,7 +514,7 @@ class DaemonManager:
 
     async def set_auto_start_services(self, enabled: bool) -> None:
         """Set auto-start services configuration.
-        
+
         Args:
             enabled: Whether to auto-start services
         """
@@ -523,7 +523,7 @@ class DaemonManager:
 
     async def set_health_monitoring(self, enabled: bool) -> None:
         """Set health monitoring configuration.
-        
+
         Args:
             enabled: Whether to enable health monitoring
         """
@@ -539,7 +539,7 @@ class DaemonManager:
 
     async def set_config_reload(self, enabled: bool) -> None:
         """Set configuration reload capability.
-        
+
         Args:
             enabled: Whether to enable config reload
         """
@@ -548,7 +548,7 @@ class DaemonManager:
 
     async def set_hot_reload(self, enabled: bool) -> None:
         """Set hot configuration reloading capability.
-        
+
         Args:
             enabled: Whether to enable hot reload
         """
@@ -581,7 +581,7 @@ class DaemonManager:
 
     async def _handle_configuration_change(self, diff: ConfigurationDiff) -> None:
         """Handle configuration changes from hot reloading.
-        
+
         Args:
             diff: Configuration diff describing changes
         """
@@ -612,7 +612,7 @@ class DaemonManager:
 
     async def _apply_service_changes(self, diff: ConfigurationDiff) -> None:
         """Apply service configuration changes.
-        
+
         Args:
             diff: Configuration diff
         """
@@ -652,7 +652,7 @@ class DaemonManager:
 
     async def get_configuration_status(self) -> dict[str, Any]:
         """Get configuration management status.
-        
+
         Returns:
             Configuration status information
         """

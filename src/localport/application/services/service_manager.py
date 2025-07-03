@@ -30,10 +30,10 @@ class ServiceManager:
 
     async def start_service(self, service: Service) -> ServiceStartResult:
         """Start a port forwarding service.
-        
+
         Args:
             service: The service to start
-            
+
         Returns:
             ServiceStartResult with the outcome
         """
@@ -118,10 +118,10 @@ class ServiceManager:
 
     async def stop_service(self, service: Service) -> ServiceStopResult:
         """Stop a port forwarding service.
-        
+
         Args:
             service: The service to stop
-            
+
         Returns:
             ServiceStopResult with the outcome
         """
@@ -162,10 +162,10 @@ class ServiceManager:
 
     async def restart_service(self, service: Service) -> ServiceStartResult:
         """Restart a port forwarding service.
-        
+
         Args:
             service: The service to restart
-            
+
         Returns:
             ServiceStartResult with the outcome
         """
@@ -204,10 +204,10 @@ class ServiceManager:
 
     async def is_service_running(self, service: Service) -> bool:
         """Check if a service is currently running.
-        
+
         Args:
             service: The service to check
-            
+
         Returns:
             True if service is running, False otherwise
         """
@@ -219,10 +219,10 @@ class ServiceManager:
 
     async def get_service_status(self, service: Service) -> ServiceStatusInfo:
         """Get detailed status information for a service.
-        
+
         Args:
             service: The service to get status for
-            
+
         Returns:
             ServiceStatusInfo with detailed status
         """
@@ -261,10 +261,10 @@ class ServiceManager:
 
     async def get_all_service_status(self, services: list[Service]) -> list[ServiceStatusInfo]:
         """Get status information for multiple services.
-        
+
         Args:
             services: List of services to get status for
-            
+
         Returns:
             List of ServiceStatusInfo objects
         """
@@ -295,7 +295,7 @@ class ServiceManager:
 
     async def cleanup_dead_processes(self) -> int:
         """Clean up dead port forward processes.
-        
+
         Returns:
             Number of dead processes cleaned up
         """
@@ -319,10 +319,10 @@ class ServiceManager:
 
     async def stop_all_services(self, services: list[Service]) -> list[ServiceStopResult]:
         """Stop all provided services.
-        
+
         Args:
             services: List of services to stop
-            
+
         Returns:
             List of ServiceStopResult objects
         """
@@ -362,10 +362,10 @@ class ServiceManager:
 
     async def _is_port_available(self, port: int) -> bool:
         """Check if a local port is available.
-        
+
         Args:
             port: Port number to check
-            
+
         Returns:
             True if port is available, False if in use
         """
@@ -373,7 +373,7 @@ class ServiceManager:
 
     def get_active_forwards_count(self) -> int:
         """Get the number of active port forwards.
-        
+
         Returns:
             Number of active port forwards
         """
@@ -381,7 +381,7 @@ class ServiceManager:
 
     def get_active_forwards(self) -> dict[UUID, PortForward]:
         """Get all active port forwards.
-        
+
         Returns:
             Dictionary of active port forwards by service ID
         """

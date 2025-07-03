@@ -24,10 +24,10 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def save(self, service: Service) -> None:
         """Save a service.
-        
+
         Args:
             service: The service to save
-            
+
         Raises:
             DuplicateServiceError: If a service with the same name already exists
             RepositoryError: If the service cannot be saved
@@ -56,13 +56,13 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def find_by_id(self, service_id: UUID) -> Service | None:
         """Find a service by ID.
-        
+
         Args:
             service_id: The unique identifier of the service
-            
+
         Returns:
             The service if found, None otherwise
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -84,13 +84,13 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def find_by_name(self, name: str) -> Service | None:
         """Find a service by name.
-        
+
         Args:
             name: The name of the service
-            
+
         Returns:
             The service if found, None otherwise
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -112,10 +112,10 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def find_all(self) -> list[Service]:
         """Find all services.
-        
+
         Returns:
             List of all services
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -130,13 +130,13 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def find_by_tags(self, tags: list[str]) -> list[Service]:
         """Find services by tags.
-        
+
         Args:
             tags: List of tags to search for
-            
+
         Returns:
             List of services that have any of the specified tags
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -162,10 +162,10 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def find_enabled(self) -> list[Service]:
         """Find all enabled services.
-        
+
         Returns:
             List of enabled services
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -187,13 +187,13 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def delete(self, service_id: UUID) -> bool:
         """Delete a service.
-        
+
         Args:
             service_id: The unique identifier of the service to delete
-            
+
         Returns:
             True if the service was deleted, False if it didn't exist
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -221,13 +221,13 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def exists(self, service_id: UUID) -> bool:
         """Check if a service exists.
-        
+
         Args:
             service_id: The unique identifier of the service
-            
+
         Returns:
             True if the service exists, False otherwise
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -246,10 +246,10 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def count(self) -> int:
         """Count the total number of services.
-        
+
         Returns:
             The total number of services
-            
+
         Raises:
             RepositoryError: If there's an error accessing the repository
         """
@@ -264,7 +264,7 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def clear(self) -> None:
         """Clear all services from the repository.
-        
+
         This method is useful for testing and cleanup.
         """
         try:
@@ -280,10 +280,10 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def bulk_save(self, services: list[Service]) -> None:
         """Save multiple services in bulk.
-        
+
         Args:
             services: List of services to save
-            
+
         Raises:
             DuplicateServiceError: If any service has a duplicate name
             RepositoryError: If any service cannot be saved
@@ -318,10 +318,10 @@ class MemoryServiceRepository(ServiceRepository):
 
     async def find_by_status(self, status: str) -> list[Service]:
         """Find services by status.
-        
+
         Args:
             status: Service status to filter by
-            
+
         Returns:
             List of services with the specified status
         """
@@ -354,7 +354,7 @@ class MemoryServiceRepository(ServiceRepository):
 
     def get_statistics(self) -> dict[str, int]:
         """Get repository statistics.
-        
+
         Returns:
             Dictionary with repository statistics
         """

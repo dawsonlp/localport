@@ -14,7 +14,7 @@ def setup_rich_logging(
     console: Console | None = None
 ) -> None:
     """Setup Rich-based logging for the CLI.
-    
+
     Args:
         level: Logging level (DEBUG, INFO, WARN, ERROR)
         verbose: Enable verbose logging
@@ -79,10 +79,10 @@ def setup_rich_logging(
 
 def get_status_color(status: str) -> str:
     """Get Rich color for service status.
-    
+
     Args:
         status: Service status string
-        
+
     Returns:
         Rich color name
     """
@@ -99,10 +99,10 @@ def get_status_color(status: str) -> str:
 
 def format_uptime(seconds: float) -> str:
     """Format uptime in a human-readable format.
-    
+
     Args:
         seconds: Uptime in seconds
-        
+
     Returns:
         Formatted uptime string
     """
@@ -121,10 +121,10 @@ def format_uptime(seconds: float) -> str:
 
 def format_port(port: int) -> str:
     """Format port number with appropriate styling.
-    
+
     Args:
         port: Port number
-        
+
     Returns:
         Formatted port string
     """
@@ -133,10 +133,10 @@ def format_port(port: int) -> str:
 
 def format_service_name(name: str) -> str:
     """Format service name with appropriate styling.
-    
+
     Args:
         name: Service name
-        
+
     Returns:
         Formatted service name
     """
@@ -145,10 +145,10 @@ def format_service_name(name: str) -> str:
 
 def format_technology(technology: str) -> str:
     """Format technology name with appropriate styling.
-    
+
     Args:
         technology: Technology name (kubectl, ssh, etc.)
-        
+
     Returns:
         Formatted technology string
     """
@@ -163,11 +163,11 @@ def format_technology(technology: str) -> str:
 
 def format_health_status(is_healthy: bool, failure_count: int = 0) -> str:
     """Format health status with appropriate styling.
-    
+
     Args:
         is_healthy: Whether the service is healthy
         failure_count: Number of consecutive failures
-        
+
     Returns:
         Formatted health status string
     """
@@ -182,12 +182,12 @@ def format_health_status(is_healthy: bool, failure_count: int = 0) -> str:
 
 def create_error_panel(title: str, message: str, suggestion: str | None = None) -> str:
     """Create a formatted error panel.
-    
+
     Args:
         title: Error title
         message: Error message
         suggestion: Optional suggestion for fixing the error
-        
+
     Returns:
         Formatted error panel markup
     """
@@ -214,11 +214,11 @@ def create_error_panel(title: str, message: str, suggestion: str | None = None) 
 
 def create_success_panel(title: str, message: str) -> str:
     """Create a formatted success panel.
-    
+
     Args:
         title: Success title
         message: Success message
-        
+
     Returns:
         Formatted success panel markup
     """
@@ -241,11 +241,11 @@ def create_success_panel(title: str, message: str) -> str:
 
 def create_info_panel(title: str, message: str) -> str:
     """Create a formatted info panel.
-    
+
     Args:
         title: Info title
         message: Info message
-        
+
     Returns:
         Formatted info panel markup
     """

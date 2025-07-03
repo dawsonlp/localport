@@ -40,14 +40,14 @@ async def start_daemon_command(
         # Initialize repositories and services
         service_repo = MemoryServiceRepository()
         config_repo = YamlConfigRepository()
-        adapter_factory = AdapterFactory()
+        AdapterFactory()
         health_check_factory = HealthCheckFactory()
 
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
 
-        daemon_manager = DaemonManager(
+        DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
@@ -135,14 +135,14 @@ async def stop_daemon_command(force: bool = False) -> None:
         # Initialize minimal setup for daemon management
         service_repo = MemoryServiceRepository()
         config_repo = YamlConfigRepository()
-        adapter_factory = AdapterFactory()
+        AdapterFactory()
         health_check_factory = HealthCheckFactory()
 
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
 
-        daemon_manager = DaemonManager(
+        DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
@@ -212,14 +212,14 @@ async def restart_daemon_command(
         # Initialize repositories and services
         service_repo = MemoryServiceRepository()
         config_repo = YamlConfigRepository()
-        adapter_factory = AdapterFactory()
+        AdapterFactory()
         health_check_factory = HealthCheckFactory()
 
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
 
-        daemon_manager = DaemonManager(
+        DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
@@ -287,14 +287,14 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
         # Initialize minimal setup for daemon management
         service_repo = MemoryServiceRepository()
         config_repo = YamlConfigRepository()
-        adapter_factory = AdapterFactory()
+        AdapterFactory()
         health_check_factory = HealthCheckFactory()
 
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
 
-        daemon_manager = DaemonManager(
+        DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
@@ -387,14 +387,14 @@ async def reload_daemon_command() -> None:
         # Initialize minimal setup for daemon management
         service_repo = MemoryServiceRepository()
         config_repo = YamlConfigRepository()
-        adapter_factory = AdapterFactory()
+        AdapterFactory()
         health_check_factory = HealthCheckFactory()
 
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
 
-        daemon_manager = DaemonManager(
+        DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,

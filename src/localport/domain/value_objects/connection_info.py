@@ -80,13 +80,13 @@ class ConnectionInfo:
         context: str | None = None
     ) -> "ConnectionInfo":
         """Create kubectl connection info.
-        
+
         Args:
             resource_name: Name of the Kubernetes resource
             namespace: Kubernetes namespace
             resource_type: Type of resource (service, pod, deployment)
             context: Kubernetes context to use
-            
+
         Returns:
             ConnectionInfo instance for kubectl
         """
@@ -112,7 +112,7 @@ class ConnectionInfo:
         **kwargs: Any
     ) -> "ConnectionInfo":
         """Create SSH connection info.
-        
+
         Args:
             host: SSH host to connect to
             user: SSH username
@@ -120,7 +120,7 @@ class ConnectionInfo:
             key_file: Path to SSH private key file
             password: SSH password (not recommended)
             **kwargs: Additional SSH options
-            
+
         Returns:
             ConnectionInfo instance for SSH
         """
@@ -145,10 +145,10 @@ class ConnectionInfo:
 
     def get_kubectl_resource_name(self) -> str:
         """Get the Kubernetes resource name.
-        
+
         Returns:
             Resource name for kubectl connections
-            
+
         Raises:
             ValueError: If not a kubectl connection
         """
@@ -158,10 +158,10 @@ class ConnectionInfo:
 
     def get_kubectl_namespace(self) -> str:
         """Get the Kubernetes namespace.
-        
+
         Returns:
             Namespace for kubectl connections
-            
+
         Raises:
             ValueError: If not a kubectl connection
         """
@@ -171,10 +171,10 @@ class ConnectionInfo:
 
     def get_kubectl_resource_type(self) -> str:
         """Get the Kubernetes resource type.
-        
+
         Returns:
             Resource type for kubectl connections
-            
+
         Raises:
             ValueError: If not a kubectl connection
         """
@@ -184,10 +184,10 @@ class ConnectionInfo:
 
     def get_kubectl_context(self) -> str | None:
         """Get the Kubernetes context.
-        
+
         Returns:
             Context for kubectl connections, None if not specified
-            
+
         Raises:
             ValueError: If not a kubectl connection
         """
@@ -197,10 +197,10 @@ class ConnectionInfo:
 
     def get_ssh_host(self) -> str:
         """Get the SSH host.
-        
+
         Returns:
             Host for SSH connections
-            
+
         Raises:
             ValueError: If not an SSH connection
         """
@@ -210,10 +210,10 @@ class ConnectionInfo:
 
     def get_ssh_user(self) -> str | None:
         """Get the SSH user.
-        
+
         Returns:
             User for SSH connections, None if not specified
-            
+
         Raises:
             ValueError: If not an SSH connection
         """
@@ -223,10 +223,10 @@ class ConnectionInfo:
 
     def get_ssh_port(self) -> int:
         """Get the SSH port.
-        
+
         Returns:
             Port for SSH connections
-            
+
         Raises:
             ValueError: If not an SSH connection
         """
@@ -236,10 +236,10 @@ class ConnectionInfo:
 
     def get_ssh_key_file(self) -> str | None:
         """Get the SSH key file path.
-        
+
         Returns:
             Key file path for SSH connections, None if not specified
-            
+
         Raises:
             ValueError: If not an SSH connection
         """
@@ -249,10 +249,10 @@ class ConnectionInfo:
 
     def has_ssh_password(self) -> bool:
         """Check if SSH connection has a password.
-        
+
         Returns:
             True if password is configured
-            
+
         Raises:
             ValueError: If not an SSH connection
         """
@@ -262,7 +262,7 @@ class ConnectionInfo:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
-        
+
         Returns:
             Dictionary representation of connection info
         """
@@ -274,13 +274,13 @@ class ConnectionInfo:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ConnectionInfo":
         """Create ConnectionInfo from dictionary.
-        
+
         Args:
             data: Dictionary containing technology and config
-            
+
         Returns:
             ConnectionInfo instance
-            
+
         Raises:
             ValueError: If data is invalid
         """

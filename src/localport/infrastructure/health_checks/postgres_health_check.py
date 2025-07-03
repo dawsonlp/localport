@@ -13,7 +13,7 @@ class PostgreSQLHealthCheck:
 
     def __init__(self, timeout: float = 10.0):
         """Initialize PostgreSQL health check.
-        
+
         Args:
             timeout: Connection timeout in seconds
         """
@@ -21,10 +21,10 @@ class PostgreSQLHealthCheck:
 
     async def check(self, config: dict[str, Any]) -> bool:
         """Check PostgreSQL connectivity via database connection.
-        
+
         Args:
             config: Configuration containing database connection parameters
-            
+
         Returns:
             True if PostgreSQL is healthy, False otherwise
         """
@@ -76,10 +76,10 @@ class PostgreSQLHealthCheck:
 
     def _build_connection_string(self, config: dict[str, Any]) -> str:
         """Build PostgreSQL connection string from configuration.
-        
+
         Args:
             config: Configuration dictionary
-            
+
         Returns:
             PostgreSQL connection string
         """
@@ -113,11 +113,11 @@ class PostgreSQLHealthCheck:
 
     async def check_database_exists(self, config: dict[str, Any], database_name: str) -> bool:
         """Check if a specific database exists.
-        
+
         Args:
             config: Configuration containing connection parameters
             database_name: Name of the database to check
-            
+
         Returns:
             True if database exists, False otherwise
         """
@@ -155,12 +155,12 @@ class PostgreSQLHealthCheck:
 
     async def check_table_exists(self, config: dict[str, Any], table_name: str, schema: str = 'public') -> bool:
         """Check if a specific table exists.
-        
+
         Args:
             config: Configuration containing connection parameters
             table_name: Name of the table to check
             schema: Schema name (default: 'public')
-            
+
         Returns:
             True if table exists, False otherwise
         """
@@ -176,7 +176,7 @@ class PostgreSQLHealthCheck:
                 async with conn.cursor() as cur:
                     await cur.execute(
                         """
-                        SELECT 1 FROM information_schema.tables 
+                        SELECT 1 FROM information_schema.tables
                         WHERE table_schema = %s AND table_name = %s
                         """,
                         (schema, table_name)
@@ -197,11 +197,11 @@ class PostgreSQLHealthCheck:
 
     async def check_user_permissions(self, config: dict[str, Any], required_permissions: list = None) -> bool:
         """Check if the user has required permissions.
-        
+
         Args:
             config: Configuration containing connection parameters
             required_permissions: List of required permissions to check
-            
+
         Returns:
             True if user has required permissions, False otherwise
         """
@@ -271,10 +271,10 @@ class PostgreSQLHealthCheck:
 
     async def get_server_version(self, config: dict[str, Any]) -> str | None:
         """Get PostgreSQL server version.
-        
+
         Args:
             config: Configuration containing connection parameters
-            
+
         Returns:
             Server version string if successful, None otherwise
         """
@@ -306,11 +306,11 @@ class PostgreSQLHealthCheck:
 
     async def check_connection_pool(self, config: dict[str, Any], pool_size: int = 5) -> bool:
         """Check if multiple connections can be established (connection pool test).
-        
+
         Args:
             config: Configuration containing connection parameters
             pool_size: Number of concurrent connections to test
-            
+
         Returns:
             True if all connections successful, False otherwise
         """
@@ -361,7 +361,7 @@ async def check_postgres_health(
     timeout: float = 10.0
 ) -> bool:
     """Simple PostgreSQL health check function.
-    
+
     Args:
         host: Database host
         port: Database port
@@ -369,7 +369,7 @@ async def check_postgres_health(
         user: Database user
         password: Database password
         timeout: Connection timeout in seconds
-        
+
     Returns:
         True if PostgreSQL is healthy, False otherwise
     """

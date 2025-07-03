@@ -364,7 +364,7 @@ def export_config_sync(
     tags: list[str] | None = typer.Option(None, "--tag", "-t", help="Export services with specific tags only")
 ) -> None:
     """Export LocalPort configuration to different formats.
-    
+
     Examples:
         localport config export                     # Export to stdout as YAML
         localport config export --format json      # Export as JSON
@@ -383,7 +383,7 @@ def validate_config_sync(
     config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file to validate")
 ) -> None:
     """Validate LocalPort configuration file.
-    
+
     Examples:
         localport config validate                   # Validate default config
         localport config validate --config my.yaml # Validate specific file

@@ -24,15 +24,15 @@ class SSHAdapter:
         connection_info: dict[str, Any]
     ) -> int:
         """Start an SSH tunnel port-forward process.
-        
+
         Args:
             local_port: Local port to bind to
             remote_port: Remote port to forward to
             connection_info: SSH-specific connection details
-            
+
         Returns:
             Process ID of the started SSH process
-            
+
         Raises:
             RuntimeError: If SSH tunnel fails to start
             ValueError: If connection_info is invalid
@@ -127,10 +127,10 @@ class SSHAdapter:
 
     async def stop_port_forward(self, process_id: int) -> None:
         """Stop an SSH tunnel process.
-        
+
         Args:
             process_id: Process ID to stop
-            
+
         Raises:
             RuntimeError: If process cannot be stopped
         """
@@ -181,10 +181,10 @@ class SSHAdapter:
 
     async def is_process_running(self, process_id: int) -> bool:
         """Check if an SSH tunnel process is still running.
-        
+
         Args:
             process_id: Process ID to check
-            
+
         Returns:
             True if process is running, False otherwise
         """
@@ -205,10 +205,10 @@ class SSHAdapter:
 
     async def get_process_info(self, process_id: int) -> dict[str, Any] | None:
         """Get information about an SSH tunnel process.
-        
+
         Args:
             process_id: Process ID to get info for
-            
+
         Returns:
             Dictionary with process information, None if process not found
         """
@@ -249,7 +249,7 @@ class SSHAdapter:
 
     async def validate_ssh_available(self) -> bool:
         """Validate that SSH client is available and working.
-        
+
         Returns:
             True if SSH is available, False otherwise
         """
@@ -286,14 +286,14 @@ class SSHAdapter:
         timeout: float = 10.0
     ) -> bool:
         """Test SSH connection to a host.
-        
+
         Args:
             host: SSH host to test
             user: SSH username
             port: SSH port
             key_file: Path to SSH key file
             timeout: Connection timeout in seconds
-            
+
         Returns:
             True if connection successful, False otherwise
         """
@@ -351,7 +351,7 @@ class SSHAdapter:
 
     async def check_sshpass_available(self) -> bool:
         """Check if sshpass is available for password authentication.
-        
+
         Returns:
             True if sshpass is available, False otherwise
         """

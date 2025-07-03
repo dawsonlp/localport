@@ -38,10 +38,10 @@ class StopServicesUseCase:
 
     async def execute(self, command: StopServicesCommand) -> BulkOperationResult:
         """Execute the stop services use case.
-        
+
         Args:
             command: Command containing service selection criteria
-            
+
         Returns:
             BulkOperationResult with the results of stopping services
         """
@@ -116,10 +116,10 @@ class StopServicesUseCase:
 
     async def _resolve_services(self, command: StopServicesCommand) -> list[Service]:
         """Resolve which services to stop based on command.
-        
+
         Args:
             command: Command containing service selection criteria
-            
+
         Returns:
             List of services to stop
         """
@@ -158,11 +158,11 @@ class StopServicesUseCase:
         command: StopServicesCommand
     ) -> ServiceStopResult:
         """Stop a single service.
-        
+
         Args:
             service: Service to stop
             command: Command with additional options
-            
+
         Returns:
             ServiceStopResult with the outcome
         """
@@ -190,10 +190,10 @@ class StopServicesUseCase:
 
     async def stop_service_by_name(self, service_name: str) -> ServiceStopResult:
         """Convenience method to stop a single service by name.
-        
+
         Args:
             service_name: Name of the service to stop
-            
+
         Returns:
             ServiceStopResult with the outcome
         """
@@ -208,7 +208,7 @@ class StopServicesUseCase:
 
     async def stop_all_services(self) -> BulkOperationResult:
         """Convenience method to stop all services.
-        
+
         Returns:
             BulkOperationResult with the outcome
         """
@@ -217,10 +217,10 @@ class StopServicesUseCase:
 
     async def stop_services_by_tags(self, tags: list[str]) -> BulkOperationResult:
         """Convenience method to stop services by tags.
-        
+
         Args:
             tags: List of tags to filter services
-            
+
         Returns:
             BulkOperationResult with the outcome
         """
@@ -229,7 +229,7 @@ class StopServicesUseCase:
 
     async def emergency_stop_all(self) -> BulkOperationResult:
         """Emergency stop all services with force.
-        
+
         Returns:
             BulkOperationResult with the outcome
         """

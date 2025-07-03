@@ -13,7 +13,7 @@ class HTTPHealthCheck:
 
     def __init__(self, config: dict[str, Any]):
         """Initialize HTTP health checker.
-        
+
         Args:
             config: Configuration dictionary
         """
@@ -26,12 +26,12 @@ class HTTPHealthCheck:
 
     async def check(self, url: str, timeout: float = 5.0, **kwargs) -> bool:
         """Perform HTTP health check.
-        
+
         Args:
             url: URL to check
             timeout: Request timeout in seconds
             **kwargs: Additional arguments (ignored)
-            
+
         Returns:
             True if the HTTP endpoint is healthy
         """

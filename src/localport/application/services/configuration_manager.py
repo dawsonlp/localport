@@ -26,7 +26,7 @@ class ConfigurationManager:
         poll_interval: float = 2.0
     ):
         """Initialize the configuration manager.
-        
+
         Args:
             config_repository: Repository for configuration management
             service_repository: Repository for service persistence
@@ -62,11 +62,11 @@ class ConfigurationManager:
         reload_callback: Callable[[ConfigurationDiff], None] | None = None
     ) -> bool:
         """Start hot reloading for configuration changes.
-        
+
         Args:
             config_path: Path to configuration file (auto-detected if None)
             reload_callback: Callback to call when configuration changes
-            
+
         Returns:
             True if hot reloading started successfully
         """
@@ -127,7 +127,7 @@ class ConfigurationManager:
 
     def add_reload_callback(self, callback: Callable[[ConfigurationDiff], None]) -> None:
         """Add a callback to be called when configuration reloads.
-        
+
         Args:
             callback: Function to call with configuration diff
         """
@@ -137,7 +137,7 @@ class ConfigurationManager:
 
     def remove_reload_callback(self, callback: Callable[[ConfigurationDiff], None]) -> None:
         """Remove a reload callback.
-        
+
         Args:
             callback: Function to remove
         """
@@ -147,10 +147,10 @@ class ConfigurationManager:
 
     async def reload_configuration(self, force: bool = False) -> ConfigurationDiff | None:
         """Manually reload configuration.
-        
+
         Args:
             force: Whether to force reload even if file hasn't changed
-            
+
         Returns:
             Configuration diff if changes were detected, None otherwise
         """
@@ -168,7 +168,7 @@ class ConfigurationManager:
 
     def _handle_config_change(self, config_path: Path) -> None:
         """Handle configuration file change event.
-        
+
         Args:
             config_path: Path to changed configuration file
         """
@@ -179,10 +179,10 @@ class ConfigurationManager:
 
     async def _reload_config_internal(self, force: bool = False) -> ConfigurationDiff | None:
         """Internal method to reload configuration.
-        
+
         Args:
             force: Whether to force reload
-            
+
         Returns:
             Configuration diff if changes detected
         """
@@ -269,7 +269,7 @@ class ConfigurationManager:
 
     async def _notify_reload_callbacks(self, diff: ConfigurationDiff) -> None:
         """Notify all reload callbacks about configuration changes.
-        
+
         Args:
             diff: Configuration diff
         """
@@ -290,7 +290,7 @@ class ConfigurationManager:
 
     async def get_current_configuration(self) -> dict[str, Any] | None:
         """Get the current configuration.
-        
+
         Returns:
             Current configuration dictionary
         """
@@ -298,7 +298,7 @@ class ConfigurationManager:
 
     async def validate_current_configuration(self) -> list[str]:
         """Validate the current configuration.
-        
+
         Returns:
             List of validation errors (empty if valid)
         """
@@ -309,10 +309,10 @@ class ConfigurationManager:
 
     async def backup_current_configuration(self, backup_path: str | None = None) -> str | None:
         """Create a backup of the current configuration.
-        
+
         Args:
             backup_path: Path for backup file (auto-generated if None)
-            
+
         Returns:
             Path to backup file if successful
         """
@@ -331,7 +331,7 @@ class ConfigurationManager:
 
     def set_validation_enabled(self, enabled: bool) -> None:
         """Enable or disable configuration validation.
-        
+
         Args:
             enabled: Whether to enable validation
         """
@@ -340,7 +340,7 @@ class ConfigurationManager:
 
     def set_auto_rollback(self, enabled: bool) -> None:
         """Enable or disable automatic rollback on validation failure.
-        
+
         Args:
             enabled: Whether to enable auto-rollback
         """
@@ -369,7 +369,7 @@ class ConfigurationManager:
 
     async def get_configuration_status(self) -> dict[str, Any]:
         """Get comprehensive configuration management status.
-        
+
         Returns:
             Status information dictionary
         """

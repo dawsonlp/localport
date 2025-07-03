@@ -18,13 +18,13 @@ class OutputFormat(str, Enum):
     @classmethod
     def from_string(cls, value: str) -> "OutputFormat":
         """Create OutputFormat from string value.
-        
+
         Args:
             value: String representation of the format
-            
+
         Returns:
             OutputFormat enum value
-            
+
         Raises:
             ValueError: If the format is not supported
         """

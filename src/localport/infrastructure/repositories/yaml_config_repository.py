@@ -28,7 +28,7 @@ class YamlConfigRepository(ConfigRepository):
 
     def __init__(self, config_path: str | None = None):
         """Initialize YAML configuration repository.
-        
+
         Args:
             config_path: Path to YAML configuration file
         """
@@ -38,7 +38,7 @@ class YamlConfigRepository(ConfigRepository):
 
     def _find_config_file(self) -> Path:
         """Find configuration file in standard locations.
-        
+
         Returns:
             Path to configuration file
         """
@@ -64,10 +64,10 @@ class YamlConfigRepository(ConfigRepository):
 
     async def load_configuration(self) -> dict[str, Any]:
         """Load configuration from YAML file.
-        
+
         Returns:
             Configuration dictionary
-            
+
         Raises:
             FileNotFoundError: If configuration file doesn't exist
             yaml.YAMLError: If YAML parsing fails
@@ -111,7 +111,7 @@ class YamlConfigRepository(ConfigRepository):
 
     async def save_configuration(self, config: dict[str, Any]) -> None:
         """Save configuration to YAML file.
-        
+
         Args:
             config: Configuration dictionary to save
         """
@@ -148,10 +148,10 @@ class YamlConfigRepository(ConfigRepository):
 
     async def validate_configuration(self, config: dict[str, Any]) -> list[str]:
         """Validate configuration structure and content.
-        
+
         Args:
             config: Configuration to validate
-            
+
         Returns:
             List of validation errors (empty if valid)
         """
@@ -210,11 +210,11 @@ class YamlConfigRepository(ConfigRepository):
 
     def _validate_service(self, service: dict[str, Any], index: int) -> list[str]:
         """Validate a single service configuration.
-        
+
         Args:
             service: Service configuration to validate
             index: Index of service in list (for error messages)
-            
+
         Returns:
             List of validation errors
         """
@@ -289,11 +289,11 @@ class YamlConfigRepository(ConfigRepository):
 
     def _validate_health_check(self, health_check: dict[str, Any], prefix: str) -> list[str]:
         """Validate health check configuration.
-        
+
         Args:
             health_check: Health check configuration
             prefix: Error message prefix
-            
+
         Returns:
             List of validation errors
         """
@@ -323,18 +323,18 @@ class YamlConfigRepository(ConfigRepository):
         for field, (min_val, max_val) in numeric_fields.items():
             value = health_check.get(field)
             if value is not None:
-                if not isinstance(value, (int, float)) or not (min_val <= value <= max_val):
+                if not isinstance(value, int | float) or not (min_val <= value <= max_val):
                     errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
 
         return errors
 
     def _validate_restart_policy(self, restart_policy: dict[str, Any], prefix: str) -> list[str]:
         """Validate restart policy configuration.
-        
+
         Args:
             restart_policy: Restart policy configuration
             prefix: Error message prefix
-            
+
         Returns:
             List of validation errors
         """
@@ -360,17 +360,17 @@ class YamlConfigRepository(ConfigRepository):
         for field, (min_val, max_val) in numeric_fields.items():
             value = restart_policy.get(field)
             if value is not None:
-                if not isinstance(value, (int, float)) or not (min_val <= value <= max_val):
+                if not isinstance(value, int | float) or not (min_val <= value <= max_val):
                     errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
 
         return errors
 
     def _validate_defaults(self, defaults: dict[str, Any]) -> list[str]:
         """Validate defaults configuration.
-        
+
         Args:
             defaults: Defaults configuration
-            
+
         Returns:
             List of validation errors
         """
@@ -392,7 +392,7 @@ class YamlConfigRepository(ConfigRepository):
 
     async def get_default_configuration(self) -> dict[str, Any]:
         """Get default configuration template.
-        
+
         Returns:
             Default configuration dictionary
         """
@@ -419,10 +419,10 @@ class YamlConfigRepository(ConfigRepository):
 
     def _substitute_environment_variables(self, content: str) -> str:
         """Substitute environment variables in configuration content.
-        
+
         Args:
             content: Configuration content with ${VAR} placeholders
-            
+
         Returns:
             Content with environment variables substituted
         """
@@ -459,7 +459,7 @@ class YamlConfigRepository(ConfigRepository):
 
     def get_config_path(self) -> Path:
         """Get the path to the configuration file.
-        
+
         Returns:
             Path to configuration file
         """
@@ -472,7 +472,7 @@ class YamlConfigRepository(ConfigRepository):
 
     async def reload_configuration(self) -> dict[str, Any]:
         """Reload configuration from file, bypassing cache.
-        
+
         Returns:
             Reloaded configuration dictionary
         """
@@ -481,10 +481,10 @@ class YamlConfigRepository(ConfigRepository):
 
     async def backup_configuration(self, backup_path: str | None = None) -> str:
         """Create a backup of the current configuration file.
-        
+
         Args:
             backup_path: Path for backup file (auto-generated if None)
-            
+
         Returns:
             Path to backup file
         """

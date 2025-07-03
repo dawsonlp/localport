@@ -27,13 +27,13 @@ class TCPHealthCheck:
         **kwargs: Any
     ) -> HealthCheckResult:
         """Perform TCP health check.
-        
+
         Args:
             host: Host to connect to
             port: Port to connect to
             timeout: Connection timeout in seconds
             **kwargs: Additional configuration (ignored)
-            
+
         Returns:
             HealthCheckResult with the check outcome
         """
@@ -106,10 +106,10 @@ class TCPHealthCheck:
 
     async def check_with_config(self, config: dict[str, Any]) -> HealthCheckResult:
         """Perform TCP health check with configuration dictionary.
-        
+
         Args:
             config: Configuration dictionary containing host, port, timeout
-            
+
         Returns:
             HealthCheckResult with the check outcome
         """
@@ -121,10 +121,10 @@ class TCPHealthCheck:
 
     def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate TCP health check configuration.
-        
+
         Args:
             config: Configuration to validate
-            
+
         Returns:
             True if configuration is valid, False otherwise
         """
@@ -148,7 +148,7 @@ class TCPHealthCheck:
 
             # Validate optional timeout
             timeout = config.get('timeout', 5.0)
-            if not isinstance(timeout, (int, float)) or timeout <= 0:
+            if not isinstance(timeout, int | float) or timeout <= 0:
                 logger.error("TCP health check invalid timeout", timeout=timeout)
                 return False
 
@@ -160,11 +160,11 @@ class TCPHealthCheck:
 
     async def check_port_available(self, port: int, host: str = "localhost") -> bool:
         """Check if a port is available (not in use).
-        
+
         Args:
             port: Port to check
             host: Host to check on
-            
+
         Returns:
             True if port is available, False if in use
         """
@@ -194,13 +194,13 @@ class TCPHealthCheck:
         timeout: float = 1.0
     ) -> dict[int, bool]:
         """Scan a range of ports for connectivity.
-        
+
         Args:
             start_port: Starting port number
             end_port: Ending port number (inclusive)
             host: Host to scan
             timeout: Timeout per port
-            
+
         Returns:
             Dictionary mapping port numbers to connectivity status
         """
@@ -228,12 +228,12 @@ class TCPHealthCheck:
 
     async def _check_single_port(self, host: str, port: int, timeout: float) -> bool:
         """Check a single port for connectivity.
-        
+
         Args:
             host: Host to check
             port: Port to check
             timeout: Connection timeout
-            
+
         Returns:
             True if port is open, False otherwise
         """
@@ -251,7 +251,7 @@ class TCPHealthCheck:
 
     def get_default_config(self) -> dict[str, Any]:
         """Get default configuration for TCP health checks.
-        
+
         Returns:
             Default configuration dictionary
         """
@@ -263,7 +263,7 @@ class TCPHealthCheck:
 
     def get_config_schema(self) -> dict[str, Any]:
         """Get configuration schema for TCP health checks.
-        
+
         Returns:
             JSON schema for configuration validation
         """

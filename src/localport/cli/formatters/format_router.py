@@ -36,11 +36,11 @@ class FormatRouter:
 
     def format_service_status(self, data: Any, output_format: OutputFormat) -> str:
         """Format service status output.
-        
+
         Args:
             data: ServiceSummary object
             output_format: Desired output format
-            
+
         Returns:
             Formatted output string
         """
@@ -53,12 +53,12 @@ class FormatRouter:
 
     def format_service_operation(self, data: Any, output_format: OutputFormat, command_name: str) -> str:
         """Format service operation output.
-        
+
         Args:
             data: Service operation result(s)
             output_format: Desired output format
             command_name: Name of the command that generated this output
-            
+
         Returns:
             Formatted output string
         """
@@ -71,11 +71,11 @@ class FormatRouter:
 
     def format_daemon_status(self, data: Any, output_format: OutputFormat) -> str:
         """Format daemon status output.
-        
+
         Args:
             data: Daemon status result
             output_format: Desired output format
-            
+
         Returns:
             Formatted output string
         """
@@ -88,12 +88,12 @@ class FormatRouter:
 
     def format_daemon_operation(self, data: Any, output_format: OutputFormat, command_name: str) -> str:
         """Format daemon operation output.
-        
+
         Args:
             data: Daemon operation result
             output_format: Desired output format
             command_name: Name of the command that generated this output
-            
+
         Returns:
             Formatted output string
         """
@@ -106,10 +106,10 @@ class FormatRouter:
 
     def _format_service_status_table(self, data: Any) -> str:
         """Format service status as Rich table.
-        
+
         Args:
             data: ServiceSummary object
-            
+
         Returns:
             Rich table markup string
         """
@@ -159,11 +159,11 @@ class FormatRouter:
 
     def _format_service_operation_table(self, data: Any, command_name: str) -> str:
         """Format service operation as Rich table.
-        
+
         Args:
             data: Service operation result(s)
             command_name: Command name
-            
+
         Returns:
             Rich table markup string
         """
@@ -179,10 +179,10 @@ class FormatRouter:
 
     def _format_daemon_status_table(self, data: Any) -> str:
         """Format daemon status as Rich table.
-        
+
         Args:
             data: Daemon status result
-            
+
         Returns:
             Rich table markup string
         """
@@ -219,11 +219,11 @@ class FormatRouter:
 
     def _format_daemon_operation_table(self, data: Any, command_name: str) -> str:
         """Format daemon operation as Rich table.
-        
+
         Args:
             data: Daemon operation result
             command_name: Command name
-            
+
         Returns:
             Rich table markup string
         """

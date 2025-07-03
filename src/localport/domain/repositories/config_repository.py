@@ -13,13 +13,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def load_configuration(self, config_path: Path | None = None) -> dict[str, Any]:
         """Load configuration from file or default locations.
-        
+
         Args:
             config_path: Optional path to configuration file
-            
+
         Returns:
             Dictionary containing the loaded configuration
-            
+
         Raises:
             ConfigurationError: If configuration cannot be loaded or is invalid
         """
@@ -28,11 +28,11 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def save_configuration(self, config: dict[str, Any], config_path: Path) -> None:
         """Save configuration to file.
-        
+
         Args:
             config: Configuration dictionary to save
             config_path: Path where to save the configuration
-            
+
         Raises:
             ConfigurationError: If configuration cannot be saved
         """
@@ -41,13 +41,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def load_services(self, config_path: Path | None = None) -> list[Service]:
         """Load services from configuration.
-        
+
         Args:
             config_path: Optional path to configuration file
-            
+
         Returns:
             List of services loaded from configuration
-            
+
         Raises:
             ConfigurationError: If services cannot be loaded or are invalid
         """
@@ -56,13 +56,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def validate_configuration(self, config: dict[str, Any]) -> bool:
         """Validate configuration structure and values.
-        
+
         Args:
             config: Configuration dictionary to validate
-            
+
         Returns:
             True if configuration is valid
-            
+
         Raises:
             ConfigurationError: If configuration is invalid
         """
@@ -71,7 +71,7 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def get_default_config_paths(self) -> list[Path]:
         """Get list of default configuration file paths to search.
-        
+
         Returns:
             List of paths in order of preference
         """
@@ -80,7 +80,7 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def find_config_file(self) -> Path | None:
         """Find the first existing configuration file in default locations.
-        
+
         Returns:
             Path to configuration file if found, None otherwise
         """
@@ -89,13 +89,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def substitute_environment_variables(self, config: dict[str, Any]) -> dict[str, Any]:
         """Substitute environment variables in configuration.
-        
+
         Args:
             config: Configuration dictionary with potential environment variables
-            
+
         Returns:
             Configuration with environment variables substituted
-            
+
         Raises:
             ConfigurationError: If required environment variables are missing
         """

@@ -35,10 +35,10 @@ class MonitorServicesUseCase:
 
     async def execute(self, command: MonitorServicesCommand) -> ServiceSummary:
         """Execute the monitor services use case.
-        
+
         Args:
             command: Command containing monitoring criteria
-            
+
         Returns:
             ServiceSummary with current status of all services
         """
@@ -87,10 +87,10 @@ class MonitorServicesUseCase:
 
     async def _resolve_services(self, command: MonitorServicesCommand) -> list[Service]:
         """Resolve which services to monitor based on command.
-        
+
         Args:
             command: Command containing service selection criteria
-            
+
         Returns:
             List of services to monitor
         """
@@ -121,10 +121,10 @@ class MonitorServicesUseCase:
 
     def _calculate_summary(self, service_statuses: list[ServiceStatusInfo]) -> ServiceSummary:
         """Calculate summary statistics from service statuses.
-        
+
         Args:
             service_statuses: List of service status information
-            
+
         Returns:
             ServiceSummary with calculated statistics
         """
@@ -162,10 +162,10 @@ class MonitorServicesUseCase:
 
     async def get_service_status(self, service_name: str) -> ServiceStatusInfo | None:
         """Get status for a single service by name.
-        
+
         Args:
             service_name: Name of the service to get status for
-            
+
         Returns:
             ServiceStatusInfo if service found, None otherwise
         """
@@ -185,7 +185,7 @@ class MonitorServicesUseCase:
 
     async def get_running_services(self) -> list[ServiceStatusInfo]:
         """Get status for all currently running services.
-        
+
         Returns:
             List of ServiceStatusInfo for running services
         """
@@ -208,7 +208,7 @@ class MonitorServicesUseCase:
 
     async def get_failed_services(self) -> list[ServiceStatusInfo]:
         """Get status for all failed services.
-        
+
         Returns:
             List of ServiceStatusInfo for failed services
         """
@@ -231,7 +231,7 @@ class MonitorServicesUseCase:
 
     async def get_unhealthy_services(self) -> list[ServiceStatusInfo]:
         """Get status for all unhealthy services.
-        
+
         Returns:
             List of ServiceStatusInfo for unhealthy services
         """
@@ -254,7 +254,7 @@ class MonitorServicesUseCase:
 
     async def cleanup_dead_processes(self) -> int:
         """Clean up dead port forward processes.
-        
+
         Returns:
             Number of dead processes cleaned up
         """
@@ -269,10 +269,10 @@ class MonitorServicesUseCase:
 
     async def get_services_by_tag(self, tag: str) -> list[ServiceStatusInfo]:
         """Get status for all services with a specific tag.
-        
+
         Args:
             tag: Tag to filter services by
-            
+
         Returns:
             List of ServiceStatusInfo for services with the tag
         """
@@ -289,7 +289,7 @@ class MonitorServicesUseCase:
 
     async def get_port_usage_summary(self) -> dict:
         """Get summary of port usage across all services.
-        
+
         Returns:
             Dictionary with port usage information
         """
@@ -347,7 +347,7 @@ class MonitorServicesUseCase:
 
     async def get_quick_status(self) -> dict:
         """Get a quick status overview.
-        
+
         Returns:
             Dictionary with quick status information
         """

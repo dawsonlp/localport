@@ -104,31 +104,31 @@ def main(
 ):
     """
     [bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring.
-    
+
     LocalPort provides a unified interface for managing port forwards across different
     technologies (kubectl, SSH) with automatic health monitoring and restart capabilities.
-    
+
     [bold]Examples:[/bold]
-    
+
         [dim]# Start all configured services[/dim]
         localport start --all
-        
+
         [dim]# Start specific services[/dim]
         localport start postgres redis
-        
+
         [dim]# Check service status[/dim]
         localport status
-        
+
         [dim]# Run in daemon mode[/dim]
         localport daemon start
-    
+
     [bold]Configuration:[/bold]
-    
+
     LocalPort looks for configuration files in the following locations:
     • ./localport.yaml
     • ~/.config/localport/config.yaml
     • /etc/localport/config.yaml
-    
+
     Use --config to specify a custom configuration file.
     """
     global settings

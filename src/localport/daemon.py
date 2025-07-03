@@ -28,7 +28,7 @@ class LocalPortDaemon:
 
     def __init__(self, config_file: str | None = None, auto_start: bool = True):
         """Initialize the daemon.
-        
+
         Args:
             config_file: Optional configuration file path
             auto_start: Whether to auto-start configured services
@@ -48,7 +48,7 @@ class LocalPortDaemon:
             # Initialize repositories and services
             service_repo = MemoryServiceRepository()
             config_repo = YamlConfigRepository(config_file=self.config_file)
-            adapter_factory = AdapterFactory()
+            AdapterFactory()
             health_check_factory = HealthCheckFactory()
 
             # Initialize core services
@@ -162,7 +162,7 @@ def daemonize() -> None:
 
 def setup_daemon_logging(log_file: str | None = None) -> None:
     """Setup logging for daemon operation.
-    
+
     Args:
         log_file: Optional log file path
     """

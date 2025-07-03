@@ -20,10 +20,10 @@ class PortConflictResolver(ABC):
     @abstractmethod
     async def check_port_availability(self, port: Port) -> bool:
         """Check if a port is available for use.
-        
+
         Args:
             port: Port to check
-            
+
         Returns:
             True if port is available, False otherwise
         """
@@ -32,12 +32,12 @@ class PortConflictResolver(ABC):
     @abstractmethod
     async def find_alternative_port(self, preferred_port: Port, range_start: int = 8000, range_end: int = 9000) -> Port | None:
         """Find an alternative port if the preferred one is not available.
-        
+
         Args:
             preferred_port: The originally requested port
             range_start: Start of port range to search
             range_end: End of port range to search
-            
+
         Returns:
             Alternative port if found, None otherwise
         """
@@ -46,10 +46,10 @@ class PortConflictResolver(ABC):
     @abstractmethod
     async def resolve_conflicts(self, services: list[Service]) -> dict[str, Any]:
         """Resolve port conflicts among multiple services.
-        
+
         Args:
             services: List of services to check for conflicts
-            
+
         Returns:
             Dictionary with conflict resolution results
         """
@@ -62,10 +62,10 @@ class ServiceValidationService(ABC):
     @abstractmethod
     async def validate_service_configuration(self, service: Service) -> list[str]:
         """Validate a service configuration.
-        
+
         Args:
             service: Service to validate
-            
+
         Returns:
             List of validation errors (empty if valid)
         """
@@ -74,10 +74,10 @@ class ServiceValidationService(ABC):
     @abstractmethod
     async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
         """Validate connection information.
-        
+
         Args:
             connection_info: Connection info to validate
-            
+
         Returns:
             List of validation errors (empty if valid)
         """
@@ -86,10 +86,10 @@ class ServiceValidationService(ABC):
     @abstractmethod
     async def validate_service_dependencies(self, services: list[Service]) -> dict[str, list[str]]:
         """Validate dependencies between services.
-        
+
         Args:
             services: List of services to validate
-            
+
         Returns:
             Dictionary mapping service names to dependency errors
         """
@@ -102,10 +102,10 @@ class ServiceLifecycleService(ABC):
     @abstractmethod
     async def can_start_service(self, service: Service) -> bool:
         """Check if a service can be started.
-        
+
         Args:
             service: Service to check
-            
+
         Returns:
             True if service can be started
         """
@@ -114,10 +114,10 @@ class ServiceLifecycleService(ABC):
     @abstractmethod
     async def can_stop_service(self, service: Service) -> bool:
         """Check if a service can be stopped.
-        
+
         Args:
             service: Service to check
-            
+
         Returns:
             True if service can be stopped
         """
@@ -126,10 +126,10 @@ class ServiceLifecycleService(ABC):
     @abstractmethod
     async def can_restart_service(self, service: Service) -> bool:
         """Check if a service can be restarted.
-        
+
         Args:
             service: Service to check
-            
+
         Returns:
             True if service can be restarted
         """
@@ -138,10 +138,10 @@ class ServiceLifecycleService(ABC):
     @abstractmethod
     async def determine_startup_order(self, services: list[Service]) -> list[Service]:
         """Determine the optimal startup order for services.
-        
+
         Args:
             services: List of services to order
-            
+
         Returns:
             Services ordered by startup priority
         """
@@ -150,10 +150,10 @@ class ServiceLifecycleService(ABC):
     @abstractmethod
     async def determine_shutdown_order(self, services: list[Service]) -> list[Service]:
         """Determine the optimal shutdown order for services.
-        
+
         Args:
             services: List of services to order
-            
+
         Returns:
             Services ordered by shutdown priority
         """
@@ -166,10 +166,10 @@ class HealthCheckOrchestrator(ABC):
     @abstractmethod
     async def schedule_health_checks(self, services: list[Service]) -> dict[UUID, HealthCheck]:
         """Schedule health checks for multiple services.
-        
+
         Args:
             services: Services to schedule health checks for
-            
+
         Returns:
             Dictionary mapping service IDs to health check configurations
         """
@@ -178,11 +178,11 @@ class HealthCheckOrchestrator(ABC):
     @abstractmethod
     async def evaluate_service_health(self, service: Service, health_check: HealthCheck) -> bool:
         """Evaluate the health of a service.
-        
+
         Args:
             service: Service to evaluate
             health_check: Health check configuration
-            
+
         Returns:
             True if service is healthy
         """
@@ -191,11 +191,11 @@ class HealthCheckOrchestrator(ABC):
     @abstractmethod
     async def determine_restart_strategy(self, service: Service, failure_count: int) -> dict[str, Any] | None:
         """Determine restart strategy for a failed service.
-        
+
         Args:
             service: Failed service
             failure_count: Number of consecutive failures
-            
+
         Returns:
             Restart strategy configuration or None if no restart should be attempted
         """
@@ -208,10 +208,10 @@ class ServiceDiscoveryService(ABC):
     @abstractmethod
     async def discover_service_dependencies(self, service: Service) -> list[str]:
         """Discover dependencies for a service.
-        
+
         Args:
             service: Service to analyze
-            
+
         Returns:
             List of service names this service depends on
         """
@@ -220,11 +220,11 @@ class ServiceDiscoveryService(ABC):
     @abstractmethod
     async def find_dependent_services(self, service_name: str, all_services: list[Service]) -> list[Service]:
         """Find services that depend on the given service.
-        
+
         Args:
             service_name: Name of the service
             all_services: All available services
-            
+
         Returns:
             List of services that depend on the given service
         """
@@ -233,10 +233,10 @@ class ServiceDiscoveryService(ABC):
     @abstractmethod
     async def build_dependency_graph(self, services: list[Service]) -> dict[str, list[str]]:
         """Build a dependency graph for services.
-        
+
         Args:
             services: List of services
-            
+
         Returns:
             Dictionary mapping service names to their dependencies
         """
@@ -245,10 +245,10 @@ class ServiceDiscoveryService(ABC):
     @abstractmethod
     async def detect_circular_dependencies(self, services: list[Service]) -> list[list[str]]:
         """Detect circular dependencies in service configuration.
-        
+
         Args:
             services: List of services to analyze
-            
+
         Returns:
             List of circular dependency chains
         """
@@ -261,11 +261,11 @@ class ServiceMetricsService(ABC):
     @abstractmethod
     async def calculate_service_reliability(self, service: Service, time_window_hours: int = 24) -> float:
         """Calculate service reliability score.
-        
+
         Args:
             service: Service to analyze
             time_window_hours: Time window for calculation
-            
+
         Returns:
             Reliability score between 0.0 and 1.0
         """
@@ -274,11 +274,11 @@ class ServiceMetricsService(ABC):
     @abstractmethod
     async def calculate_average_startup_time(self, service: Service, sample_size: int = 10) -> float:
         """Calculate average startup time for a service.
-        
+
         Args:
             service: Service to analyze
             sample_size: Number of recent startups to consider
-            
+
         Returns:
             Average startup time in seconds
         """
@@ -287,10 +287,10 @@ class ServiceMetricsService(ABC):
     @abstractmethod
     async def get_service_performance_metrics(self, service: Service) -> dict[str, Any]:
         """Get comprehensive performance metrics for a service.
-        
+
         Args:
             service: Service to analyze
-            
+
         Returns:
             Dictionary with performance metrics
         """
@@ -299,10 +299,10 @@ class ServiceMetricsService(ABC):
     @abstractmethod
     async def identify_performance_bottlenecks(self, services: list[Service]) -> dict[str, list[str]]:
         """Identify performance bottlenecks across services.
-        
+
         Args:
             services: Services to analyze
-            
+
         Returns:
             Dictionary mapping service names to identified bottlenecks
         """
@@ -315,11 +315,11 @@ class ServiceConfigurationService(ABC):
     @abstractmethod
     async def merge_configurations(self, base_config: dict[str, Any], override_config: dict[str, Any]) -> dict[str, Any]:
         """Merge service configurations with proper precedence.
-        
+
         Args:
             base_config: Base configuration
             override_config: Override configuration
-            
+
         Returns:
             Merged configuration
         """
@@ -328,11 +328,11 @@ class ServiceConfigurationService(ABC):
     @abstractmethod
     async def validate_configuration_schema(self, config: dict[str, Any], schema_version: str) -> list[str]:
         """Validate configuration against schema.
-        
+
         Args:
             config: Configuration to validate
             schema_version: Schema version to validate against
-            
+
         Returns:
             List of validation errors
         """
@@ -341,12 +341,12 @@ class ServiceConfigurationService(ABC):
     @abstractmethod
     async def migrate_configuration(self, config: dict[str, Any], from_version: str, to_version: str) -> dict[str, Any]:
         """Migrate configuration between versions.
-        
+
         Args:
             config: Configuration to migrate
             from_version: Source version
             to_version: Target version
-            
+
         Returns:
             Migrated configuration
         """
@@ -355,10 +355,10 @@ class ServiceConfigurationService(ABC):
     @abstractmethod
     async def extract_environment_variables(self, config: dict[str, Any]) -> dict[str, str]:
         """Extract environment variables from configuration.
-        
+
         Args:
             config: Configuration to analyze
-            
+
         Returns:
             Dictionary of environment variables
         """

@@ -121,7 +121,7 @@ class TestPortValueObject:
 
         # Port to other types
         assert port1 != "8080"
-        assert port1 != None
+        assert port1 is not None
 
     def test_port_ordering(self) -> None:
         """Test port ordering comparisons."""

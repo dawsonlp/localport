@@ -16,10 +16,10 @@ class JSONEncoder(json.JSONEncoder):
 
     def default(self, obj: Any) -> Any:
         """Convert objects to JSON-serializable format.
-        
+
         Args:
             obj: Object to serialize
-            
+
         Returns:
             JSON-serializable representation
         """
@@ -45,11 +45,11 @@ class BaseJSONFormatter(ABC):
 
     def format(self, data: Any, **kwargs) -> str:
         """Format data as JSON string.
-        
+
         Args:
             data: Data to format
             **kwargs: Additional formatting options
-            
+
         Returns:
             JSON-formatted string
         """
@@ -63,11 +63,11 @@ class BaseJSONFormatter(ABC):
     @abstractmethod
     def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare data for JSON serialization.
-        
+
         Args:
             data: Raw data to prepare
             **kwargs: Additional preparation options
-            
+
         Returns:
             Dictionary ready for JSON serialization
         """
@@ -75,12 +75,12 @@ class BaseJSONFormatter(ABC):
 
     def _format_error(self, error_type: str, message: str, details: dict[str, Any] | None = None) -> str:
         """Format an error as JSON.
-        
+
         Args:
             error_type: Type of error
             message: Error message
             details: Optional error details
-            
+
         Returns:
             JSON-formatted error string
         """
@@ -102,11 +102,11 @@ class BaseJSONFormatter(ABC):
 
     def _add_metadata(self, data: dict[str, Any], command: str) -> dict[str, Any]:
         """Add common metadata to JSON output.
-        
+
         Args:
             data: Data dictionary to enhance
             command: Command name that generated this output
-            
+
         Returns:
             Enhanced data dictionary with metadata
         """
@@ -122,11 +122,11 @@ class ServiceStatusJSONFormatter(BaseJSONFormatter):
 
     def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare service status data for JSON serialization.
-        
+
         Args:
             data: ServiceSummary object
             **kwargs: Additional options
-            
+
         Returns:
             Dictionary ready for JSON serialization
         """
@@ -173,11 +173,11 @@ class ServiceOperationJSONFormatter(BaseJSONFormatter):
 
     def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare service operation data for JSON serialization.
-        
+
         Args:
             data: Service operation result
             **kwargs: Additional options (command_name required)
-            
+
         Returns:
             Dictionary ready for JSON serialization
         """
@@ -232,11 +232,11 @@ class DaemonStatusJSONFormatter(BaseJSONFormatter):
 
     def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare daemon status data for JSON serialization.
-        
+
         Args:
             data: Daemon status result
             **kwargs: Additional options
-            
+
         Returns:
             Dictionary ready for JSON serialization
         """
@@ -271,11 +271,11 @@ class DaemonOperationJSONFormatter(BaseJSONFormatter):
 
     def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare daemon operation data for JSON serialization.
-        
+
         Args:
             data: Daemon operation result
             **kwargs: Additional options (command_name required)
-            
+
         Returns:
             Dictionary ready for JSON serialization
         """

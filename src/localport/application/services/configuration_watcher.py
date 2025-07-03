@@ -25,7 +25,7 @@ class ConfigurationFileHandler(FileSystemEventHandler):
 
     def __init__(self, config_path: Path, callback: Callable[[Path], None]):
         """Initialize the file handler.
-        
+
         Args:
             config_path: Path to configuration file to watch
             callback: Callback function to call on file changes
@@ -82,11 +82,11 @@ class ConfigurationWatcher:
 
     async def start_watching(self, config_path: Path, callback: Callable[[Path], None]) -> bool:
         """Start watching a configuration file for changes.
-        
+
         Args:
             config_path: Path to configuration file to watch
             callback: Callback function to call on file changes
-            
+
         Returns:
             True if watching started successfully, False otherwise
         """
@@ -132,7 +132,7 @@ class ConfigurationWatcher:
 
     async def stop_watching(self, config_path: Path | None = None) -> None:
         """Stop watching configuration file(s).
-        
+
         Args:
             config_path: Specific path to stop watching, or None to stop all
         """
@@ -166,10 +166,10 @@ class ConfigurationWatcher:
 
     def is_watching(self, config_path: Path | None = None) -> bool:
         """Check if configuration watching is active.
-        
+
         Args:
             config_path: Specific path to check, or None to check if any watching is active
-            
+
         Returns:
             True if watching is active
         """
@@ -197,7 +197,7 @@ class PollingConfigurationWatcher:
 
     def __init__(self, poll_interval: float = 2.0):
         """Initialize the polling watcher.
-        
+
         Args:
             poll_interval: Interval in seconds between file checks
         """
@@ -208,11 +208,11 @@ class PollingConfigurationWatcher:
 
     async def start_watching(self, config_path: Path, callback: Callable[[Path], None]) -> bool:
         """Start watching a configuration file using polling.
-        
+
         Args:
             config_path: Path to configuration file to watch
             callback: Callback function to call on file changes
-            
+
         Returns:
             True if watching started successfully
         """
@@ -245,7 +245,7 @@ class PollingConfigurationWatcher:
 
     async def stop_watching(self, config_path: Path | None = None) -> None:
         """Stop watching configuration file(s).
-        
+
         Args:
             config_path: Specific path to stop watching, or None to stop all
         """

@@ -39,7 +39,7 @@ class ManageDaemonUseCase:
         service_manager: ServiceManager
     ):
         """Initialize the manage daemon use case.
-        
+
         Args:
             service_repository: Repository for service persistence
             service_manager: Service manager for lifecycle operations
@@ -50,10 +50,10 @@ class ManageDaemonUseCase:
 
     async def execute(self, command: ManageDaemonCommand) -> DaemonOperationResult:
         """Execute the daemon management command.
-        
+
         Args:
             command: Daemon management command to execute
-            
+
         Returns:
             Result of the daemon operation
         """
@@ -88,10 +88,10 @@ class ManageDaemonUseCase:
 
     async def _start_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
         """Start the LocalPort daemon.
-        
+
         Args:
             command: Start daemon command
-            
+
         Returns:
             Result of the start operation
         """
@@ -134,10 +134,10 @@ class ManageDaemonUseCase:
 
     async def _stop_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
         """Stop the LocalPort daemon.
-        
+
         Args:
             command: Stop daemon command
-            
+
         Returns:
             Result of the stop operation
         """
@@ -177,10 +177,10 @@ class ManageDaemonUseCase:
 
     async def _restart_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
         """Restart the LocalPort daemon.
-        
+
         Args:
             command: Restart daemon command
-            
+
         Returns:
             Result of the restart operation
         """
@@ -219,10 +219,10 @@ class ManageDaemonUseCase:
 
     async def _get_daemon_status(self, command: ManageDaemonCommand) -> DaemonOperationResult:
         """Get the status of the LocalPort daemon.
-        
+
         Args:
             command: Status daemon command
-            
+
         Returns:
             Result containing daemon status information
         """
@@ -263,10 +263,10 @@ class ManageDaemonUseCase:
 
     async def _reload_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
         """Reload the daemon configuration.
-        
+
         Args:
             command: Reload daemon command
-            
+
         Returns:
             Result of the reload operation
         """
@@ -301,7 +301,7 @@ class ManageDaemonUseCase:
 
     async def _is_daemon_running(self) -> bool:
         """Check if the daemon is currently running.
-        
+
         Returns:
             True if daemon is running, False otherwise
         """
@@ -323,7 +323,7 @@ class ManageDaemonUseCase:
 
     async def _get_daemon_pid(self) -> int | None:
         """Get the daemon process ID.
-        
+
         Returns:
             Daemon PID if running, None otherwise
         """
@@ -341,10 +341,10 @@ class ManageDaemonUseCase:
 
     async def _start_daemon_process(self, config_file: str | None = None) -> int:
         """Start the daemon process.
-        
+
         Args:
             config_file: Optional configuration file path
-            
+
         Returns:
             Process ID of the started daemon
         """
@@ -376,7 +376,7 @@ class ManageDaemonUseCase:
 
     async def _stop_daemon_process(self, timeout: float = 30.0) -> None:
         """Stop the daemon process.
-        
+
         Args:
             timeout: Timeout for graceful shutdown
         """
@@ -408,7 +408,7 @@ class ManageDaemonUseCase:
 
     async def _write_pid_file(self, pid: int) -> None:
         """Write the daemon PID to file.
-        
+
         Args:
             pid: Process ID to write
         """
@@ -431,10 +431,10 @@ class ManageDaemonUseCase:
 
     async def _get_daemon_uptime(self, pid: int) -> float:
         """Get daemon uptime in seconds.
-        
+
         Args:
             pid: Process ID
-            
+
         Returns:
             Uptime in seconds
         """
@@ -452,7 +452,7 @@ class ManageDaemonUseCase:
 
     async def _get_active_services_count(self) -> int:
         """Get the number of active services.
-        
+
         Returns:
             Number of active services
         """
@@ -464,7 +464,7 @@ class ManageDaemonUseCase:
 
     async def _send_reload_signal(self, pid: int) -> None:
         """Send reload signal to daemon process.
-        
+
         Args:
             pid: Process ID to signal
         """

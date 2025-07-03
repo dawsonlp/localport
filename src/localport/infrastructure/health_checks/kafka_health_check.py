@@ -13,7 +13,7 @@ class KafkaHealthCheck:
 
     def __init__(self, timeout: float = 10.0):
         """Initialize Kafka health check.
-        
+
         Args:
             timeout: Connection timeout in seconds
         """
@@ -21,10 +21,10 @@ class KafkaHealthCheck:
 
     async def check(self, config: dict[str, Any]) -> bool:
         """Check Kafka connectivity via bootstrap servers.
-        
+
         Args:
             config: Configuration containing bootstrap_servers and other options
-            
+
         Returns:
             True if Kafka is healthy, False otherwise
         """
@@ -52,10 +52,10 @@ class KafkaHealthCheck:
 
     def _check_kafka_sync(self, bootstrap_servers: str) -> bool:
         """Synchronous Kafka connectivity check.
-        
+
         Args:
             bootstrap_servers: Comma-separated list of bootstrap servers
-            
+
         Returns:
             True if connection successful, False otherwise
         """
@@ -102,11 +102,11 @@ class KafkaHealthCheck:
 
     async def check_topic_exists(self, config: dict[str, Any], topic_name: str) -> bool:
         """Check if a specific Kafka topic exists.
-        
+
         Args:
             config: Configuration containing bootstrap_servers
             topic_name: Name of the topic to check
-            
+
         Returns:
             True if topic exists, False otherwise
         """
@@ -127,11 +127,11 @@ class KafkaHealthCheck:
 
     def _check_topic_sync(self, bootstrap_servers: str, topic_name: str) -> bool:
         """Synchronous Kafka topic existence check.
-        
+
         Args:
             bootstrap_servers: Comma-separated list of bootstrap servers
             topic_name: Name of the topic to check
-            
+
         Returns:
             True if topic exists, False otherwise
         """
@@ -168,10 +168,10 @@ class KafkaHealthCheck:
 
     async def check_producer_connectivity(self, config: dict[str, Any]) -> bool:
         """Check Kafka producer connectivity.
-        
+
         Args:
             config: Configuration containing bootstrap_servers
-            
+
         Returns:
             True if producer can connect, False otherwise
         """
@@ -191,10 +191,10 @@ class KafkaHealthCheck:
 
     def _check_producer_sync(self, bootstrap_servers: str) -> bool:
         """Synchronous Kafka producer connectivity check.
-        
+
         Args:
             bootstrap_servers: Comma-separated list of bootstrap servers
-            
+
         Returns:
             True if producer can connect, False otherwise
         """
@@ -211,7 +211,7 @@ class KafkaHealthCheck:
 
             try:
                 # Try to get cluster metadata
-                metadata = producer.partitions_for('__test_topic__')
+                producer.partitions_for('__test_topic__')
                 logger.debug("Kafka producer check passed",
                             bootstrap_servers=bootstrap_servers)
                 return True
@@ -232,11 +232,11 @@ async def check_kafka_health(
     timeout: float = 10.0
 ) -> bool:
     """Simple Kafka health check function.
-    
+
     Args:
         bootstrap_servers: Comma-separated list of bootstrap servers
         timeout: Connection timeout in seconds
-        
+
     Returns:
         True if Kafka is healthy, False otherwise
     """

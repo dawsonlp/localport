@@ -123,11 +123,11 @@ class ConfigurationDiffer:
         new_config: dict[str, Any]
     ) -> ConfigurationDiff:
         """Compare two configurations and return differences.
-        
+
         Args:
             old_config: Previous configuration
             new_config: New configuration
-            
+
         Returns:
             Configuration diff object
         """
@@ -171,11 +171,11 @@ class ConfigurationDiffer:
         new_services: list[dict[str, Any]]
     ) -> list[ServiceChange]:
         """Compare service configurations.
-        
+
         Args:
             old_services: Previous service configurations
             new_services: New service configurations
-            
+
         Returns:
             List of service changes
         """
@@ -236,11 +236,11 @@ class ConfigurationDiffer:
         new_service: dict[str, Any]
     ) -> set[str]:
         """Find which fields changed between two service configurations.
-        
+
         Args:
             old_service: Previous service configuration
             new_service: New service configuration
-            
+
         Returns:
             Set of field names that changed
         """
@@ -260,11 +260,11 @@ class ConfigurationDiffer:
 
     def _values_equal(self, old_value: Any, new_value: Any) -> bool:
         """Check if two values are equal, handling nested structures.
-        
+
         Args:
             old_value: Previous value
             new_value: New value
-            
+
         Returns:
             True if values are equal
         """
@@ -305,10 +305,10 @@ class ConfigurationDiffer:
 
     async def get_affected_services(self, diff: ConfigurationDiff) -> list[str]:
         """Get list of services affected by configuration changes.
-        
+
         Args:
             diff: Configuration diff
-            
+
         Returns:
             List of affected service names
         """
@@ -326,11 +326,11 @@ class ConfigurationDiffer:
         diff: ConfigurationDiff
     ) -> bool:
         """Check if a specific service requires restart.
-        
+
         Args:
             service_name: Name of service to check
             diff: Configuration diff
-            
+
         Returns:
             True if service requires restart
         """
@@ -342,10 +342,10 @@ class ConfigurationDiffer:
 
     def format_diff_summary(self, diff: ConfigurationDiff) -> str:
         """Format a human-readable summary of configuration changes.
-        
+
         Args:
             diff: Configuration diff
-            
+
         Returns:
             Formatted summary string
         """
@@ -385,10 +385,10 @@ class ConfigurationDiffer:
 
     def format_detailed_diff(self, diff: ConfigurationDiff) -> str:
         """Format a detailed view of configuration changes.
-        
+
         Args:
             diff: Configuration diff
-            
+
         Returns:
             Detailed formatted diff string
         """

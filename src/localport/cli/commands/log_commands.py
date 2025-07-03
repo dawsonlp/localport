@@ -371,7 +371,7 @@ def logs_sync(
     grep: str | None = typer.Option(None, "--grep", "-g", help="Filter logs by pattern (case-insensitive)")
 ) -> None:
     """View and filter LocalPort service logs.
-    
+
     Examples:
         localport logs                          # Show recent logs
         localport logs postgres                 # Show logs for postgres service

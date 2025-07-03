@@ -23,15 +23,15 @@ class KubectlAdapter:
         connection_info: dict[str, Any]
     ) -> int:
         """Start a kubectl port-forward process.
-        
+
         Args:
             local_port: Local port to bind to
             remote_port: Remote port to forward to
             connection_info: Kubectl-specific connection details
-            
+
         Returns:
             Process ID of the started kubectl process
-            
+
         Raises:
             RuntimeError: If kubectl port-forward fails to start
             ValueError: If connection_info is invalid
@@ -101,10 +101,10 @@ class KubectlAdapter:
 
     async def stop_port_forward(self, process_id: int) -> None:
         """Stop a kubectl port-forward process.
-        
+
         Args:
             process_id: Process ID to stop
-            
+
         Raises:
             RuntimeError: If process cannot be stopped
         """
@@ -155,10 +155,10 @@ class KubectlAdapter:
 
     async def is_process_running(self, process_id: int) -> bool:
         """Check if a kubectl port-forward process is still running.
-        
+
         Args:
             process_id: Process ID to check
-            
+
         Returns:
             True if process is running, False otherwise
         """
@@ -179,10 +179,10 @@ class KubectlAdapter:
 
     async def get_process_info(self, process_id: int) -> dict[str, Any] | None:
         """Get information about a kubectl port-forward process.
-        
+
         Args:
             process_id: Process ID to get info for
-            
+
         Returns:
             Dictionary with process information, None if process not found
         """
@@ -223,7 +223,7 @@ class KubectlAdapter:
 
     async def validate_kubectl_available(self) -> bool:
         """Validate that kubectl is available and working.
-        
+
         Returns:
             True if kubectl is available, False otherwise
         """
@@ -253,7 +253,7 @@ class KubectlAdapter:
 
     async def list_contexts(self) -> list[str]:
         """List available kubectl contexts.
-        
+
         Returns:
             List of available context names
         """

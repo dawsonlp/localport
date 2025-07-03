@@ -28,12 +28,12 @@ class RestartManager:
         restart_policy: dict | None = None
     ) -> bool:
         """Schedule a service restart with exponential backoff.
-        
+
         Args:
             service: Service to restart
             trigger_reason: Reason for the restart (e.g., "health_check_failure")
             restart_policy: Optional restart policy override
-            
+
         Returns:
             True if restart was scheduled, False if max attempts reached
         """
@@ -79,10 +79,10 @@ class RestartManager:
 
     async def cancel_restart(self, service_id: UUID) -> bool:
         """Cancel a scheduled restart for a service.
-        
+
         Args:
             service_id: ID of the service
-            
+
         Returns:
             True if restart was cancelled, False if no restart was scheduled
         """
@@ -96,7 +96,7 @@ class RestartManager:
 
     def reset_restart_attempts(self, service_id: UUID) -> None:
         """Reset restart attempts for a service (e.g., after successful health check).
-        
+
         Args:
             service_id: ID of the service
         """
@@ -109,10 +109,10 @@ class RestartManager:
 
     def get_restart_attempts(self, service_id: UUID) -> list[RestartAttempt]:
         """Get restart attempts for a service.
-        
+
         Args:
             service_id: ID of the service
-            
+
         Returns:
             List of restart attempts
         """
@@ -120,10 +120,10 @@ class RestartManager:
 
     def get_restart_count(self, service_id: UUID) -> int:
         """Get the number of restart attempts for a service.
-        
+
         Args:
             service_id: ID of the service
-            
+
         Returns:
             Number of restart attempts
         """
@@ -131,10 +131,10 @@ class RestartManager:
 
     def is_restart_scheduled(self, service_id: UUID) -> bool:
         """Check if a restart is currently scheduled for a service.
-        
+
         Args:
             service_id: ID of the service
-            
+
         Returns:
             True if restart is scheduled
         """
@@ -242,11 +242,11 @@ class RestartManager:
 
     def _calculate_backoff_delay(self, attempts: list[RestartAttempt], policy: dict) -> float:
         """Calculate the delay before the next restart attempt using exponential backoff.
-        
+
         Args:
             attempts: Previous restart attempts
             policy: Restart policy configuration
-            
+
         Returns:
             Delay in seconds
         """

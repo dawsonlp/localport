@@ -16,7 +16,7 @@ from localport.domain.repositories.service_repository import ServiceRepository
 
 class ServiceRepositoryContractTest(ABC):
     """Abstract base class for testing ServiceRepository implementations.
-    
+
     Any concrete ServiceRepository implementation should inherit from this
     class to ensure it properly implements the repository contract.
     """
@@ -24,7 +24,7 @@ class ServiceRepositoryContractTest(ABC):
     @pytest.fixture
     def repository(self) -> ServiceRepository:
         """Return a ServiceRepository implementation to test.
-        
+
         This must be implemented by concrete test classes.
         """
         raise NotImplementedError("Subclasses must implement repository fixture")
@@ -259,7 +259,7 @@ class ServiceRepositoryContractTest(ABC):
 
 class ConfigRepositoryContractTest(ABC):
     """Abstract base class for testing ConfigRepository implementations.
-    
+
     Any concrete ConfigRepository implementation should inherit from this
     class to ensure it properly implements the repository contract.
     """
@@ -267,7 +267,7 @@ class ConfigRepositoryContractTest(ABC):
     @pytest.fixture
     def repository(self) -> ConfigRepository:
         """Return a ConfigRepository implementation to test.
-        
+
         This must be implemented by concrete test classes.
         """
         raise NotImplementedError("Subclasses must implement repository fixture")

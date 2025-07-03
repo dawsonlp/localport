@@ -25,7 +25,7 @@ class HealthMonitor:
         health_check_factory: HealthCheckFactory
     ):
         """Initialize the health monitor.
-        
+
         Args:
             service_repository: Repository for service persistence
             service_manager: Service manager for lifecycle operations
@@ -51,7 +51,7 @@ class HealthMonitor:
 
     async def start_monitoring(self, services: list[Service] | None = None) -> None:
         """Start health monitoring for services.
-        
+
         Args:
             services: Optional list of services to monitor. If None, monitors all services.
         """
@@ -107,10 +107,10 @@ class HealthMonitor:
 
     async def check_service_health(self, service: Service) -> ServiceMonitorResult:
         """Check health of a single service.
-        
+
         Args:
             service: Service to check
-            
+
         Returns:
             Health check result
         """
@@ -120,7 +120,6 @@ class HealthMonitor:
         failure_count = self._failure_counts.get(service.id, 0)
         restart_attempted = False
         restart_success = False
-        error = None
 
         try:
             # Check if service has health check configuration
@@ -205,10 +204,10 @@ class HealthMonitor:
 
     async def get_health_status(self, service_id: UUID) -> HealthCheckInfo | None:
         """Get current health status for a service.
-        
+
         Args:
             service_id: Service ID
-            
+
         Returns:
             Health check information or None if not monitored
         """
@@ -216,7 +215,7 @@ class HealthMonitor:
 
     async def get_all_health_status(self) -> dict[UUID, HealthCheckInfo]:
         """Get health status for all monitored services.
-        
+
         Returns:
             Dictionary mapping service IDs to health check information
         """
@@ -224,7 +223,7 @@ class HealthMonitor:
 
     def _initialize_health_state(self, service: Service) -> None:
         """Initialize health state for a service.
-        
+
         Args:
             service: Service to initialize
         """
@@ -282,7 +281,7 @@ class HealthMonitor:
 
     async def _monitor_service(self, service: Service) -> None:
         """Monitor a single service.
-        
+
         Args:
             service: Service to monitor
         """
@@ -300,10 +299,10 @@ class HealthMonitor:
 
     async def _attempt_restart(self, service: Service) -> tuple[bool, bool]:
         """Attempt to restart a failed service.
-        
+
         Args:
             service: Service to restart
-            
+
         Returns:
             Tuple of (restart_attempted, restart_success)
         """
@@ -368,7 +367,7 @@ class HealthMonitor:
 
     async def reset_failure_count(self, service_id: UUID) -> None:
         """Reset failure count for a service.
-        
+
         Args:
             service_id: Service ID
         """
@@ -383,7 +382,7 @@ class HealthMonitor:
 
     async def set_monitoring_interval(self, interval: int) -> None:
         """Set the monitoring interval.
-        
+
         Args:
             interval: Interval in seconds
         """
@@ -395,7 +394,7 @@ class HealthMonitor:
 
     async def set_failure_threshold(self, service_id: UUID, threshold: int) -> None:
         """Set failure threshold for a specific service.
-        
+
         Args:
             service_id: Service ID
             threshold: Failure threshold
@@ -422,7 +421,7 @@ class HealthMonitor:
 
     async def get_monitoring_statistics(self) -> dict[str, any]:
         """Get monitoring statistics.
-        
+
         Returns:
             Dictionary with monitoring statistics
         """

@@ -68,14 +68,14 @@ async def start_services_command(
             raise typer.Exit(1)
 
         # Initialize repositories and services with config path
-        service_repo = MemoryServiceRepository()
+        MemoryServiceRepository()
         config_repo = YamlConfigRepository(str(config_path))
-        adapter_factory = AdapterFactory()
-        health_check_factory = HealthCheckFactory()
+        AdapterFactory()
+        HealthCheckFactory()
         service_manager = ServiceManager()
 
         # Load services from config
-        config_data = await config_repo.load_configuration()
+        await config_repo.load_configuration()
 
         # Initialize use case
         start_use_case = StartServicesUseCase(
@@ -166,9 +166,9 @@ async def stop_services_command(
     """Stop port forwarding services."""
     try:
         # Initialize repositories and services
-        service_repo = MemoryServiceRepository()
-        adapter_factory = AdapterFactory()
-        health_check_factory = HealthCheckFactory()
+        MemoryServiceRepository()
+        AdapterFactory()
+        HealthCheckFactory()
         service_manager = ServiceManager()
 
         # Initialize use case
@@ -235,8 +235,8 @@ async def status_services_command(
     try:
         # Initialize repositories and services
         service_repo = MemoryServiceRepository()
-        adapter_factory = AdapterFactory()
-        health_check_factory = HealthCheckFactory()
+        AdapterFactory()
+        HealthCheckFactory()
         service_manager = ServiceManager()
 
         # Initialize use case

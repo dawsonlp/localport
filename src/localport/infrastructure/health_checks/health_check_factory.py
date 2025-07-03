@@ -32,14 +32,14 @@ class HealthCheckFactory:
 
     def create_health_checker(self, check_type: str, config: dict[str, Any]) -> HealthChecker:
         """Create a health checker instance.
-        
+
         Args:
             check_type: Type of health check (tcp, http, kafka, postgres)
             config: Configuration for the health checker
-            
+
         Returns:
             Health checker instance
-            
+
         Raises:
             ValueError: If check_type is not supported
         """
@@ -60,7 +60,7 @@ class HealthCheckFactory:
 
     def register_health_checker(self, check_type: str, health_checker_class: type) -> None:
         """Register a custom health checker.
-        
+
         Args:
             check_type: Type identifier for the health checker
             health_checker_class: Health checker class
