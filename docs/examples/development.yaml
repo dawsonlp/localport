@@ -1,0 +1,346 @@
+# Development Environment Configuration
+# This example shows a typical development setup with local services
+
+version: "1.0"
+
+# Development-focused defaults
+defaults:
+  health_check:
+    type: tcp
+    interval: 15
+    timeout: 3.0
+    failure_threshold: 2
+    success_threshold: 1
+  restart_policy:
+    enabled: true
+    max_attempts: 3
+    backoff_multiplier: 1.5
+    initial_delay: 1
+    max_delay: 30
+
+services:
+  # Local PostgreSQL for development
+  - name: dev-postgres
+    technology: kubectl
+    local_port: 5432
+    remote_port: 5432
+    connection:
+      resource_name: postgres
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: true
+    tags: [database, development, essential]
+    description: "Development PostgreSQL database"
+    health_check:
+      type: postgres
+      interval: 20
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        database: ${DEV_DB_NAME:devdb}
+        user: ${DEV_DB_USER:developer}
+        password: ${DEV_DB_PASSWORD:devpass}
+        host: localhost
+        port: 5432
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 2
+
+  # Redis for caching and sessions
+  - name: dev-redis
+    technology: kubectl
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      resource_name: redis
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: true
+    tags: [cache, development, essential]
+    description: "Development Redis cache"
+    health_check:
+      type: tcp
+      interval: 10
+      timeout: 2.0
+      failure_threshold: 3
+
+  # Local API service
+  - name: api-server
+    technology: kubectl
+    local_port: 8080
+    remote_port: 8080
+    connection:
+      resource_type: deployment
+      resource_name: api-server
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: true
+    tags: [api, development, essential]
+    description: "Main API server for development"
+    health_check:
+      type: http
+      interval: 10
+      timeout: 3.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8080/health"
+        method: GET
+        expected_status: 200
+
+  # Frontend development server
+  - name: frontend-dev
+    technology: kubectl
+    local_port: 3000
+    remote_port: 3000
+    connection:
+      resource_name: frontend-dev
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: true
+    tags: [frontend, development]
+    description: "React development server with hot reload"
+    health_check:
+      type: http
+      interval: 15
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:3000/"
+        method: GET
+        expected_status: 200
+
+  # Test database (separate from main dev db)
+  - name: test-postgres
+    technology: kubectl
+    local_port: 5433
+    remote_port: 5432
+    connection:
+      resource_name: postgres-test
+      namespace: testing
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [database, testing]
+    description: "PostgreSQL for integration tests"
+    health_check:
+      type: postgres
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        database: testdb
+        user: testuser
+        password: ${TEST_DB_PASSWORD:testpass}
+        host: localhost
+        port: 5433
+
+  # Message queue for async processing
+  - name: rabbitmq
+    technology: kubectl
+    local_port: 5672
+    remote_port: 5672
+    connection:
+      resource_name: rabbitmq
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [messaging, development]
+    description: "RabbitMQ for message queuing"
+    health_check:
+      type: tcp
+      interval: 20
+      timeout: 5.0
+      failure_threshold: 2
+
+  # RabbitMQ Management UI
+  - name: rabbitmq-ui
+    technology: kubectl
+    local_port: 15672
+    remote_port: 15672
+    connection:
+      resource_name: rabbitmq
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [messaging, development, ui]
+    description: "RabbitMQ management interface"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:15672/"
+        method: GET
+        expected_status: 200
+
+  # Elasticsearch for search functionality
+  - name: elasticsearch-dev
+    technology: kubectl
+    local_port: 9200
+    remote_port: 9200
+    connection:
+      resource_name: elasticsearch
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [search, development]
+    description: "Elasticsearch for development"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9200/_cluster/health"
+        method: GET
+        expected_status: 200
+
+  # Kibana for Elasticsearch visualization
+  - name: kibana-dev
+    technology: kubectl
+    local_port: 5601
+    remote_port: 5601
+    connection:
+      resource_name: kibana
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [search, development, ui]
+    description: "Kibana for Elasticsearch visualization"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:5601/api/status"
+        method: GET
+        expected_status: 200
+
+  # MinIO for S3-compatible object storage
+  - name: minio
+    technology: kubectl
+    local_port: 9000
+    remote_port: 9000
+    connection:
+      resource_name: minio
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [storage, development]
+    description: "MinIO S3-compatible object storage"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9000/minio/health/live"
+        method: GET
+        expected_status: 200
+
+  # MinIO Console
+  - name: minio-console
+    technology: kubectl
+    local_port: 9001
+    remote_port: 9001
+    connection:
+      resource_name: minio
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [storage, development, ui]
+    description: "MinIO management console"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9001/"
+        method: GET
+        expected_status: 200
+
+  # Jaeger for distributed tracing
+  - name: jaeger
+    technology: kubectl
+    local_port: 16686
+    remote_port: 16686
+    connection:
+      resource_name: jaeger-query
+      namespace: observability
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [observability, development]
+    description: "Jaeger UI for distributed tracing"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:16686/"
+        method: GET
+        expected_status: 200
+
+  # Mailhog for email testing
+  - name: mailhog
+    technology: kubectl
+    local_port: 8025
+    remote_port: 8025
+    connection:
+      resource_name: mailhog
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [email, development, testing]
+    description: "MailHog for email testing"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8025/"
+        method: GET
+        expected_status: 200
+
+  # SMTP server for MailHog
+  - name: mailhog-smtp
+    technology: kubectl
+    local_port: 1025
+    remote_port: 1025
+    connection:
+      resource_name: mailhog
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [email, development, testing]
+    description: "MailHog SMTP server"
+    health_check:
+      type: tcp
+      interval: 30
+      timeout: 3.0
+      failure_threshold: 2
+
+  # Adminer for database management
+  - name: adminer
+    technology: kubectl
+    local_port: 8081
+    remote_port: 8080
+    connection:
+      resource_name: adminer
+      namespace: development
+      context: ${DEV_KUBE_CONTEXT:kind-dev}
+    enabled: false
+    tags: [database, development, ui]
+    description: "Adminer for database management"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8081/"
+        method: GET
+        expected_status: 200

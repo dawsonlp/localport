@@ -1,0 +1,400 @@
+# SSH Tunnels Configuration
+# This example shows various SSH tunnel configurations for remote services
+
+version: "1.0"
+
+# SSH-focused defaults
+defaults:
+  health_check:
+    type: tcp
+    interval: 30
+    timeout: 5.0
+    failure_threshold: 3
+    success_threshold: 1
+  restart_policy:
+    enabled: true
+    max_attempts: 5
+    backoff_multiplier: 2.0
+    initial_delay: 2
+    max_delay: 120
+
+services:
+  # Production PostgreSQL database
+  - name: prod-postgres
+    technology: ssh
+    local_port: 5432
+    remote_port: 5432
+    connection:
+      host: ${PROD_DB_HOST:db.production.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: true
+    tags: [database, production, essential]
+    description: "Production PostgreSQL database"
+    health_check:
+      type: postgres
+      interval: 60
+      timeout: 15.0
+      failure_threshold: 2
+      config:
+        database: ${PROD_DB_NAME:production}
+        user: ${PROD_DB_USER:app_user}
+        password: ${PROD_DB_PASSWORD}
+        host: localhost
+        port: 5432
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 5
+      max_delay: 300
+
+  # Staging database
+  - name: staging-postgres
+    technology: ssh
+    local_port: 5433
+    remote_port: 5432
+    connection:
+      host: ${STAGING_DB_HOST:db.staging.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/staging_key}
+      port: 22
+    enabled: false
+    tags: [database, staging]
+    description: "Staging PostgreSQL database"
+    health_check:
+      type: postgres
+      interval: 45
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        database: ${STAGING_DB_NAME:staging}
+        user: ${STAGING_DB_USER:app_user}
+        password: ${STAGING_DB_PASSWORD}
+        host: localhost
+        port: 5433
+
+  # Redis cache cluster
+  - name: prod-redis
+    technology: ssh
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      host: ${REDIS_HOST:cache.production.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: true
+    tags: [cache, production, essential]
+    description: "Production Redis cache"
+    health_check:
+      type: tcp
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 5
+    restart_policy:
+      max_attempts: 10
+      backoff_multiplier: 1.5
+      initial_delay: 1
+      max_delay: 60
+
+  # MongoDB database
+  - name: prod-mongodb
+    technology: ssh
+    local_port: 27017
+    remote_port: 27017
+    connection:
+      host: ${MONGO_HOST:mongo.production.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [database, production, nosql]
+    description: "Production MongoDB database"
+    health_check:
+      type: tcp
+      interval: 45
+      timeout: 10.0
+      failure_threshold: 3
+
+  # Elasticsearch cluster
+  - name: prod-elasticsearch
+    technology: ssh
+    local_port: 9200
+    remote_port: 9200
+    connection:
+      host: ${ELASTIC_HOST:search.production.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [search, production]
+    description: "Production Elasticsearch cluster"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 15.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9200/_cluster/health"
+        method: GET
+        expected_status: 200
+
+  # RabbitMQ message broker
+  - name: prod-rabbitmq
+    technology: ssh
+    local_port: 5672
+    remote_port: 5672
+    connection:
+      host: ${RABBITMQ_HOST:queue.production.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [messaging, production]
+    description: "Production RabbitMQ message broker"
+    health_check:
+      type: tcp
+      interval: 45
+      timeout: 10.0
+      failure_threshold: 3
+
+  # RabbitMQ Management Interface
+  - name: prod-rabbitmq-mgmt
+    technology: ssh
+    local_port: 15672
+    remote_port: 15672
+    connection:
+      host: ${RABBITMQ_HOST:queue.production.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [messaging, production, ui]
+    description: "RabbitMQ management interface"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:15672/"
+        method: GET
+        expected_status: 200
+
+  # Internal API service
+  - name: internal-api
+    technology: ssh
+    local_port: 8080
+    remote_port: 8080
+    connection:
+      host: ${API_HOST:api.internal.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [api, internal]
+    description: "Internal API service"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8080/health"
+        method: GET
+        expected_status: 200
+        headers:
+          Authorization: "Bearer ${API_TOKEN}"
+
+  # Metrics and monitoring
+  - name: prometheus
+    technology: ssh
+    local_port: 9090
+    remote_port: 9090
+    connection:
+      host: ${MONITORING_HOST:monitoring.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/monitoring_key}
+      port: 22
+    enabled: false
+    tags: [monitoring, metrics]
+    description: "Prometheus metrics server"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9090/-/healthy"
+        method: GET
+        expected_status: 200
+
+  # Grafana dashboards
+  - name: grafana
+    technology: ssh
+    local_port: 3000
+    remote_port: 3000
+    connection:
+      host: ${MONITORING_HOST:monitoring.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/monitoring_key}
+      port: 22
+    enabled: false
+    tags: [monitoring, dashboards]
+    description: "Grafana monitoring dashboards"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:3000/api/health"
+        method: GET
+        expected_status: 200
+
+  # Legacy database (different SSH port)
+  - name: legacy-mysql
+    technology: ssh
+    local_port: 3306
+    remote_port: 3306
+    connection:
+      host: ${LEGACY_DB_HOST:legacy.example.com}
+      user: ${LEGACY_SSH_USER:admin}
+      key_file: ${LEGACY_SSH_KEY:~/.ssh/legacy_key}
+      port: 2222  # Non-standard SSH port
+    enabled: false
+    tags: [database, legacy, mysql]
+    description: "Legacy MySQL database"
+    health_check:
+      type: tcp
+      interval: 60
+      timeout: 15.0
+      failure_threshold: 2
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 10
+      max_delay: 600
+
+  # Development server with password auth (not recommended)
+  - name: dev-server
+    technology: ssh
+    local_port: 8081
+    remote_port: 8080
+    connection:
+      host: ${DEV_HOST:dev.example.com}
+      user: ${DEV_USER:developer}
+      password: ${DEV_PASSWORD}  # Not recommended - use keys instead
+      port: 22
+    enabled: false
+    tags: [development, api]
+    description: "Development server (password auth)"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8081/status"
+        method: GET
+        expected_status: 200
+
+  # Jump host configuration (bastion)
+  - name: bastion-postgres
+    technology: ssh
+    local_port: 5434
+    remote_port: 5432
+    connection:
+      host: ${BASTION_HOST:bastion.example.com}
+      user: ${BASTION_USER:jump}
+      key_file: ${BASTION_KEY:~/.ssh/bastion_key}
+      port: 22
+    enabled: false
+    tags: [database, bastion, secure]
+    description: "PostgreSQL via bastion host"
+    health_check:
+      type: postgres
+      interval: 60
+      timeout: 20.0
+      failure_threshold: 2
+      config:
+        database: ${SECURE_DB_NAME:secure_db}
+        user: ${SECURE_DB_USER:secure_user}
+        password: ${SECURE_DB_PASSWORD}
+        host: localhost
+        port: 5434
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 10
+      max_delay: 300
+
+  # Multiple services on same host
+  - name: multi-service-api
+    technology: ssh
+    local_port: 8082
+    remote_port: 8080
+    connection:
+      host: ${MULTI_HOST:services.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [api, microservices]
+    description: "API service on multi-service host"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8082/health"
+        method: GET
+        expected_status: 200
+
+  - name: multi-service-worker
+    technology: ssh
+    local_port: 8083
+    remote_port: 8081
+    connection:
+      host: ${MULTI_HOST:services.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/production_key}
+      port: 22
+    enabled: false
+    tags: [worker, microservices]
+    description: "Worker service on multi-service host"
+    health_check:
+      type: http
+      interval: 45
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8083/status"
+        method: GET
+        expected_status: 200
+
+  # High-security service with strict settings
+  - name: secure-vault
+    technology: ssh
+    local_port: 8200
+    remote_port: 8200
+    connection:
+      host: ${VAULT_HOST:vault.secure.example.com}
+      user: ${VAULT_USER:vault_admin}
+      key_file: ${VAULT_KEY:~/.ssh/vault_key}
+      port: 22
+    enabled: false
+    tags: [security, vault, sensitive]
+    description: "HashiCorp Vault (high security)"
+    health_check:
+      type: http
+      interval: 120
+      timeout: 30.0
+      failure_threshold: 1  # Fail fast for security
+      config:
+        url: "http://localhost:8200/v1/sys/health"
+        method: GET
+        expected_status: 200
+        headers:
+          X-Vault-Token: ${VAULT_TOKEN}
+    restart_policy:
+      enabled: false  # Manual restart only for security

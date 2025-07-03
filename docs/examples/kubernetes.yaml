@@ -1,0 +1,310 @@
+# Kubernetes Services Configuration
+# This example shows how to configure LocalPort for various Kubernetes services
+
+version: "1.0"
+
+# Global defaults for Kubernetes services
+defaults:
+  health_check:
+    type: tcp
+    interval: 30
+    timeout: 5.0
+    failure_threshold: 3
+    success_threshold: 1
+  restart_policy:
+    enabled: true
+    max_attempts: 5
+    backoff_multiplier: 2.0
+    initial_delay: 1
+    max_delay: 300
+
+services:
+  # PostgreSQL Database
+  - name: postgres
+    technology: kubectl
+    local_port: 5432
+    remote_port: 5432
+    connection:
+      resource_type: service
+      resource_name: postgres
+      namespace: ${POSTGRES_NAMESPACE:default}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [database, essential, backend]
+    description: "PostgreSQL database for application data"
+    health_check:
+      type: postgres
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 3
+      config:
+        database: ${POSTGRES_DB:postgres}
+        user: ${POSTGRES_USER:postgres}
+        password: ${POSTGRES_PASSWORD}
+        host: localhost
+        port: 5432
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 2
+      max_delay: 60
+
+  # Redis Cache
+  - name: redis
+    technology: kubectl
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      resource_type: service
+      resource_name: redis
+      namespace: ${REDIS_NAMESPACE:default}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [cache, essential, backend]
+    description: "Redis cache for session storage and caching"
+    health_check:
+      type: tcp
+      interval: 20
+      timeout: 3.0
+      failure_threshold: 5
+    restart_policy:
+      max_attempts: 10
+      backoff_multiplier: 1.5
+      initial_delay: 1
+      max_delay: 30
+
+  # Kafka Message Broker
+  - name: kafka
+    technology: kubectl
+    local_port: 9092
+    remote_port: 9092
+    connection:
+      resource_type: service
+      resource_name: kafka
+      namespace: ${KAFKA_NAMESPACE:kafka}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [messaging, essential, backend]
+    description: "Kafka message broker for event streaming"
+    health_check:
+      type: kafka
+      interval: 45
+      timeout: 15.0
+      failure_threshold: 2
+      config:
+        bootstrap_servers: "localhost:9092"
+    restart_policy:
+      max_attempts: 5
+      backoff_multiplier: 2.0
+      initial_delay: 5
+      max_delay: 120
+
+  # Elasticsearch
+  - name: elasticsearch
+    technology: kubectl
+    local_port: 9200
+    remote_port: 9200
+    connection:
+      resource_type: service
+      resource_name: elasticsearch
+      namespace: ${ELASTIC_NAMESPACE:elastic}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [search, backend]
+    description: "Elasticsearch for full-text search"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:9200/_cluster/health"
+        method: GET
+        expected_status: 200
+
+  # API Gateway
+  - name: api-gateway
+    technology: kubectl
+    local_port: 8080
+    remote_port: 80
+    connection:
+      resource_type: service
+      resource_name: api-gateway
+      namespace: ${API_NAMESPACE:default}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [api, frontend, essential]
+    description: "API Gateway for microservices"
+    health_check:
+      type: http
+      interval: 15
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8080/health"
+        method: GET
+        expected_status: 200
+        headers:
+          User-Agent: "LocalPort-HealthCheck/1.0"
+
+  # User Service
+  - name: user-service
+    technology: kubectl
+    local_port: 8081
+    remote_port: 8080
+    connection:
+      resource_type: deployment
+      resource_name: user-service
+      namespace: ${SERVICES_NAMESPACE:default}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [microservice, backend]
+    description: "User management microservice"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8081/actuator/health"
+        method: GET
+        expected_status: 200
+
+  # Order Service
+  - name: order-service
+    technology: kubectl
+    local_port: 8082
+    remote_port: 8080
+    connection:
+      resource_type: deployment
+      resource_name: order-service
+      namespace: ${SERVICES_NAMESPACE:default}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [microservice, backend]
+    description: "Order processing microservice"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8082/health"
+        method: GET
+        expected_status: 200
+
+  # Frontend Application
+  - name: frontend
+    technology: kubectl
+    local_port: 3000
+    remote_port: 80
+    connection:
+      resource_type: service
+      resource_name: frontend
+      namespace: ${FRONTEND_NAMESPACE:default}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: true
+    tags: [frontend, web]
+    description: "React frontend application"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:3000/"
+        method: GET
+        expected_status: 200
+
+  # Monitoring Services
+  - name: prometheus
+    technology: kubectl
+    local_port: 9090
+    remote_port: 9090
+    connection:
+      resource_type: service
+      resource_name: prometheus-server
+      namespace: ${MONITORING_NAMESPACE:monitoring}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: false
+    tags: [monitoring, optional]
+    description: "Prometheus metrics collection"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9090/-/healthy"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      enabled: false
+
+  - name: grafana
+    technology: kubectl
+    local_port: 3001
+    remote_port: 3000
+    connection:
+      resource_type: service
+      resource_name: grafana
+      namespace: ${MONITORING_NAMESPACE:monitoring}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: false
+    tags: [monitoring, optional]
+    description: "Grafana dashboards and visualization"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:3001/api/health"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      enabled: false
+
+  # Development Tools
+  - name: pgadmin
+    technology: kubectl
+    local_port: 8083
+    remote_port: 80
+    connection:
+      resource_type: service
+      resource_name: pgadmin
+      namespace: ${TOOLS_NAMESPACE:tools}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: false
+    tags: [tools, development]
+    description: "pgAdmin for PostgreSQL management"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8083/misc/ping"
+        method: GET
+        expected_status: 200
+
+  - name: kafka-ui
+    technology: kubectl
+    local_port: 8084
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: kafka-ui
+      namespace: ${TOOLS_NAMESPACE:tools}
+      context: ${KUBE_CONTEXT:minikube}
+    enabled: false
+    tags: [tools, development]
+    description: "Kafka UI for topic management"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8084/actuator/health"
+        method: GET
+        expected_status: 200

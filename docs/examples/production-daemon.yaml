@@ -1,0 +1,503 @@
+# Production Daemon Configuration
+# This example shows a production-ready configuration for daemon mode
+
+version: "1.0"
+
+# Production-focused defaults with robust health monitoring
+defaults:
+  health_check:
+    type: tcp
+    interval: 60
+    timeout: 10.0
+    failure_threshold: 2
+    success_threshold: 2
+  restart_policy:
+    enabled: true
+    max_attempts: 3
+    backoff_multiplier: 2.0
+    initial_delay: 5
+    max_delay: 600
+
+services:
+  # Critical production database
+  - name: primary-database
+    technology: kubectl
+    local_port: 5432
+    remote_port: 5432
+    connection:
+      resource_type: service
+      resource_name: postgres-primary
+      namespace: ${PROD_NAMESPACE:production}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [database, critical, production]
+    description: "Primary PostgreSQL database cluster"
+    health_check:
+      type: postgres
+      interval: 30
+      timeout: 15.0
+      failure_threshold: 2
+      success_threshold: 2
+      config:
+        database: ${PROD_DB_NAME:production}
+        user: ${PROD_DB_USER:app_readonly}
+        password: ${PROD_DB_PASSWORD}
+        host: localhost
+        port: 5432
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 10
+      max_delay: 300
+
+  # Read replica for reporting
+  - name: read-replica
+    technology: kubectl
+    local_port: 5433
+    remote_port: 5432
+    connection:
+      resource_type: service
+      resource_name: postgres-replica
+      namespace: ${PROD_NAMESPACE:production}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [database, replica, production]
+    description: "PostgreSQL read replica for reporting"
+    health_check:
+      type: postgres
+      interval: 60
+      timeout: 15.0
+      failure_threshold: 3
+      config:
+        database: ${PROD_DB_NAME:production}
+        user: ${REPLICA_DB_USER:readonly}
+        password: ${REPLICA_DB_PASSWORD}
+        host: localhost
+        port: 5433
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 15
+      max_delay: 600
+
+  # Redis cluster for caching
+  - name: redis-cluster
+    technology: kubectl
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      resource_type: service
+      resource_name: redis-cluster
+      namespace: ${PROD_NAMESPACE:production}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [cache, critical, production]
+    description: "Redis cluster for application caching"
+    health_check:
+      type: tcp
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 3
+      success_threshold: 2
+    restart_policy:
+      max_attempts: 5
+      backoff_multiplier: 1.5
+      initial_delay: 2
+      max_delay: 120
+
+  # Message queue cluster
+  - name: kafka-cluster
+    technology: kubectl
+    local_port: 9092
+    remote_port: 9092
+    connection:
+      resource_type: service
+      resource_name: kafka-cluster
+      namespace: ${MESSAGING_NAMESPACE:messaging}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [messaging, critical, production]
+    description: "Kafka cluster for event streaming"
+    health_check:
+      type: kafka
+      interval: 60
+      timeout: 20.0
+      failure_threshold: 2
+      config:
+        bootstrap_servers: "localhost:9092"
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 10
+      max_delay: 300
+
+  # Search cluster
+  - name: elasticsearch-cluster
+    technology: kubectl
+    local_port: 9200
+    remote_port: 9200
+    connection:
+      resource_type: service
+      resource_name: elasticsearch-cluster
+      namespace: ${SEARCH_NAMESPACE:search}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [search, production]
+    description: "Elasticsearch cluster for search functionality"
+    health_check:
+      type: http
+      interval: 90
+      timeout: 20.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:9200/_cluster/health"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 20
+      max_delay: 600
+
+  # API Gateway
+  - name: api-gateway
+    technology: kubectl
+    local_port: 8080
+    remote_port: 80
+    connection:
+      resource_type: service
+      resource_name: api-gateway
+      namespace: ${API_NAMESPACE:api}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [api, gateway, critical, production]
+    description: "Production API Gateway"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 2
+      success_threshold: 2
+      config:
+        url: "http://localhost:8080/health"
+        method: GET
+        expected_status: 200
+        headers:
+          User-Agent: "LocalPort-HealthCheck/1.0"
+          X-Health-Check: "true"
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 5
+      max_delay: 180
+
+  # User service
+  - name: user-service
+    technology: kubectl
+    local_port: 8081
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: user-service
+      namespace: ${SERVICES_NAMESPACE:services}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [microservice, user, production]
+    description: "User management microservice"
+    health_check:
+      type: http
+      interval: 45
+      timeout: 10.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8081/actuator/health"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 5
+      max_delay: 300
+
+  # Order service
+  - name: order-service
+    technology: kubectl
+    local_port: 8082
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: order-service
+      namespace: ${SERVICES_NAMESPACE:services}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [microservice, order, critical, production]
+    description: "Order processing microservice"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 10.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8082/health"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 5
+      max_delay: 300
+
+  # Payment service
+  - name: payment-service
+    technology: kubectl
+    local_port: 8083
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: payment-service
+      namespace: ${SERVICES_NAMESPACE:services}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [microservice, payment, critical, production]
+    description: "Payment processing microservice"
+    health_check:
+      type: http
+      interval: 30
+      timeout: 15.0
+      failure_threshold: 1  # Fail fast for payment issues
+      success_threshold: 3   # Require multiple successes
+      config:
+        url: "http://localhost:8083/health"
+        method: GET
+        expected_status: 200
+        headers:
+          Authorization: "Bearer ${PAYMENT_HEALTH_TOKEN}"
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 10
+      max_delay: 300
+
+  # Notification service
+  - name: notification-service
+    technology: kubectl
+    local_port: 8084
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: notification-service
+      namespace: ${SERVICES_NAMESPACE:services}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [microservice, notification, production]
+    description: "Notification delivery microservice"
+    health_check:
+      type: http
+      interval: 60
+      timeout: 10.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8084/health"
+        method: GET
+        expected_status: 200
+
+  # Analytics service
+  - name: analytics-service
+    technology: kubectl
+    local_port: 8085
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: analytics-service
+      namespace: ${ANALYTICS_NAMESPACE:analytics}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [microservice, analytics, production]
+    description: "Analytics and reporting service"
+    health_check:
+      type: http
+      interval: 120
+      timeout: 15.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:8085/health"
+        method: GET
+        expected_status: 200
+
+  # Monitoring and observability
+  - name: prometheus
+    technology: kubectl
+    local_port: 9090
+    remote_port: 9090
+    connection:
+      resource_type: service
+      resource_name: prometheus-server
+      namespace: ${MONITORING_NAMESPACE:monitoring}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [monitoring, observability, production]
+    description: "Prometheus metrics collection"
+    health_check:
+      type: http
+      interval: 120
+      timeout: 15.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:9090/-/healthy"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 15
+      max_delay: 600
+
+  - name: grafana
+    technology: kubectl
+    local_port: 3000
+    remote_port: 3000
+    connection:
+      resource_type: service
+      resource_name: grafana
+      namespace: ${MONITORING_NAMESPACE:monitoring}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [monitoring, dashboards, production]
+    description: "Grafana monitoring dashboards"
+    health_check:
+      type: http
+      interval: 120
+      timeout: 15.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:3000/api/health"
+        method: GET
+        expected_status: 200
+
+  # Jaeger tracing
+  - name: jaeger-query
+    technology: kubectl
+    local_port: 16686
+    remote_port: 16686
+    connection:
+      resource_type: service
+      resource_name: jaeger-query
+      namespace: ${TRACING_NAMESPACE:tracing}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [tracing, observability, production]
+    description: "Jaeger distributed tracing UI"
+    health_check:
+      type: http
+      interval: 180
+      timeout: 15.0
+      failure_threshold: 3
+      config:
+        url: "http://localhost:16686/"
+        method: GET
+        expected_status: 200
+
+  # External services via SSH (for hybrid cloud)
+  - name: legacy-mainframe
+    technology: ssh
+    local_port: 8090
+    remote_port: 8080
+    connection:
+      host: ${MAINFRAME_HOST:mainframe.legacy.example.com}
+      user: ${MAINFRAME_USER:integration}
+      key_file: ${MAINFRAME_KEY:~/.ssh/mainframe_key}
+      port: 22
+    enabled: true
+    tags: [legacy, mainframe, critical, production]
+    description: "Legacy mainframe integration service"
+    health_check:
+      type: http
+      interval: 300  # 5 minutes - legacy systems are slow
+      timeout: 60.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8090/status"
+        method: GET
+        expected_status: 200
+        headers:
+          X-Integration-Key: ${MAINFRAME_API_KEY}
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 30
+      max_delay: 1800  # 30 minutes max delay
+
+  # External partner API
+  - name: partner-api
+    technology: ssh
+    local_port: 8091
+    remote_port: 443
+    connection:
+      host: ${PARTNER_HOST:api.partner.example.com}
+      user: ${PARTNER_USER:api_user}
+      key_file: ${PARTNER_KEY:~/.ssh/partner_key}
+      port: 22
+    enabled: true
+    tags: [partner, api, production]
+    description: "External partner API integration"
+    health_check:
+      type: http
+      interval: 180
+      timeout: 30.0
+      failure_threshold: 2
+      config:
+        url: "https://localhost:8091/health"
+        method: GET
+        expected_status: 200
+        headers:
+          Authorization: "Bearer ${PARTNER_API_TOKEN}"
+          X-API-Version: "v2"
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 10
+      max_delay: 600
+
+  # Backup and disaster recovery
+  - name: backup-service
+    technology: kubectl
+    local_port: 8092
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: backup-service
+      namespace: ${BACKUP_NAMESPACE:backup}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: false  # Only enabled during backup windows
+    tags: [backup, disaster-recovery, production]
+    description: "Backup and disaster recovery service"
+    health_check:
+      type: http
+      interval: 600  # 10 minutes
+      timeout: 30.0
+      failure_threshold: 2
+      config:
+        url: "http://localhost:8092/health"
+        method: GET
+        expected_status: 200
+    restart_policy:
+      enabled: false  # Manual control for backup operations
+
+  # Security and compliance
+  - name: audit-service
+    technology: kubectl
+    local_port: 8093
+    remote_port: 8080
+    connection:
+      resource_type: service
+      resource_name: audit-service
+      namespace: ${SECURITY_NAMESPACE:security}
+      context: ${PROD_KUBE_CONTEXT:production-cluster}
+    enabled: true
+    tags: [security, audit, compliance, production]
+    description: "Security audit and compliance service"
+    health_check:
+      type: http
+      interval: 300
+      timeout: 20.0
+      failure_threshold: 1  # Security services must be highly available
+      success_threshold: 3
+      config:
+        url: "http://localhost:8093/health"
+        method: GET
+        expected_status: 200
+        headers:
+          X-Security-Token: ${AUDIT_SECURITY_TOKEN}
+    restart_policy:
+      max_attempts: 2
+      initial_delay: 15
+      max_delay: 300
