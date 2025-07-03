@@ -23,6 +23,8 @@ from ..utils.rich_utils import (
     format_service_name, format_port, format_technology, format_health_status,
     get_status_color, format_uptime, create_error_panel, create_success_panel
 )
+from ..formatters.format_router import FormatRouter
+from ..formatters.output_format import OutputFormat
 
 logger = structlog.get_logger()
 console = Console()
@@ -33,7 +35,8 @@ async def start_services_command(
     all_services: bool = False,
     tags: Optional[List[str]] = None,
     config_file: Optional[str] = None,
-    force: bool = False
+    force: bool = False,
+    output_format: OutputFormat = OutputFormat.TABLE
 ) -> None:
     """Start port forwarding services."""
     try:
@@ -222,7 +225,8 @@ async def stop_services_command(
 async def status_services_command(
     services: Optional[List[str]] = None,
     watch: bool = False,
-    refresh_interval: int = 5
+    refresh_interval: int = 5,
+    output_format: OutputFormat = OutputFormat.TABLE
 ) -> None:
     """Show service status."""
     try:
@@ -238,6 +242,9 @@ async def status_services_command(
             service_manager=service_manager
         )
         
+        # Initialize format router
+        format_router = FormatRouter(console)
+        
         async def show_status():
             """Show current status."""
             from ...application.use_cases.monitor_services import MonitorServicesCommand
@@ -248,75 +255,68 @@ async def status_services_command(
             )
             result = await monitor_use_case.execute(command)
             
-            # Create status table
-            table = Table(title="Service Status")
-            table.add_column("Service", style="bold blue")
-            table.add_column("Status", style="bold")
-            table.add_column("Technology", style="cyan")
-            table.add_column("Local Port", style="green")
-            table.add_column("Target", style="yellow")
-            table.add_column("Health", style="bold")
-            table.add_column("Uptime", style="dim")
+            # Format output based on requested format
+            formatted_output = format_router.format_service_status(result, output_format)
             
-            # Check if we have services to display
-            if result.services:
-                for service_info in result.services:
-                    status_color = get_status_color(service_info.status.value if hasattr(service_info.status, 'value') else str(service_info.status))
-                    health_status = format_health_status(
-                        service_info.is_healthy,
-                        0  # Placeholder for failure count
-                    )
-                    
-                    table.add_row(
-                        format_service_name(service_info.name),
-                        f"[{status_color}]{str(service_info.status).title()}[/{status_color}]",
-                        format_technology("kubectl"),  # Placeholder
-                        format_port(service_info.local_port),
-                        f"remote:{service_info.remote_port}",  # Placeholder
-                        health_status,
-                        format_uptime(service_info.uptime_seconds or 0)
-                    )
+            if output_format == OutputFormat.JSON:
+                # For JSON output, just print the JSON
+                console.print(formatted_output)
             else:
-                table.add_row("No services found", "-", "-", "-", "-", "-", "-")
-            
-            console.clear() if watch else None
-            console.print(table)
-            
-            # Show summary
-            summary = f"Total: {result.total_services} | Running: {result.running_services} | Healthy: {result.healthy_services}"
-            console.print(f"\n[dim]{summary}[/dim]")
+                # For table output, clear screen if watching and print formatted output
+                if watch:
+                    console.clear()
+                console.print(formatted_output)
         
         if watch:
             # Watch mode - refresh periodically
-            try:
-                while True:
-                    await show_status()
-                    await asyncio.sleep(refresh_interval)
-            except KeyboardInterrupt:
-                console.print("\n[yellow]Stopped watching[/yellow]")
+            if output_format == OutputFormat.JSON:
+                # For JSON watch mode, output one JSON object per refresh
+                try:
+                    while True:
+                        await show_status()
+                        await asyncio.sleep(refresh_interval)
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Stopped watching[/yellow]")
+            else:
+                # For table watch mode, clear and refresh
+                try:
+                    while True:
+                        await show_status()
+                        await asyncio.sleep(refresh_interval)
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Stopped watching[/yellow]")
         else:
             # Single status check
             await show_status()
             
     except Exception as e:
         logger.exception("Error getting service status")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs for more details."
-        ))
+        if output_format == OutputFormat.JSON:
+            # For JSON output, format error as JSON
+            error_formatter = format_router.service_status_json
+            error_output = error_formatter._format_error("service_status_error", str(e))
+            console.print(error_output)
+        else:
+            console.print(create_error_panel(
+                "Unexpected Error",
+                str(e),
+                "Check the logs for more details."
+            ))
         raise typer.Exit(1)
 
 
 # Sync wrappers for Typer (since Typer doesn't support async directly)
 def start_services_sync(
+    ctx: typer.Context,
     services: Optional[List[str]] = typer.Argument(None, help="Service names to start"),
     all_services: bool = typer.Option(False, "--all", "-a", help="Start all configured services"),
     tags: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Start services with specific tags"),
     force: bool = typer.Option(False, "--force", "-f", help="Force restart if already running")
 ) -> None:
     """Start port forwarding services."""
-    asyncio.run(start_services_command(services, all_services, tags, None, force))
+    # Get output format from context
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    asyncio.run(start_services_command(services, all_services, tags, None, force, output_format))
 
 
 def stop_services_sync(
@@ -329,9 +329,12 @@ def stop_services_sync(
 
 
 def status_services_sync(
+    ctx: typer.Context,
     services: Optional[List[str]] = typer.Argument(None, help="Service names to check"),
     watch: bool = typer.Option(False, "--watch", "-w", help="Watch mode - refresh periodically"),
     refresh_interval: int = typer.Option(5, "--interval", "-i", help="Refresh interval in seconds for watch mode")
 ) -> None:
     """Show service status."""
-    asyncio.run(status_services_command(services, watch, refresh_interval))
+    # Get output format from context
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    asyncio.run(status_services_command(services, watch, refresh_interval, output_format))

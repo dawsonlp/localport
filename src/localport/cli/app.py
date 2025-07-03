@@ -12,6 +12,7 @@ import structlog
 
 from ..config.settings import Settings
 from .utils.rich_utils import setup_rich_logging
+from .formatters.output_format import OutputFormat
 
 # Initialize console and logger
 console = Console()
@@ -93,6 +94,13 @@ def main(
         False,
         "--no-color",
         help="Disable colored output"
+    ),
+    output: str = typer.Option(
+        "table",
+        "--output",
+        "-o",
+        help="Output format (table, json)",
+        metavar="FORMAT"
     )
 ):
     """
@@ -149,6 +157,13 @@ def main(
         console.print(f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: {', '.join(valid_levels)}")
         raise typer.Exit(1)
     
+    # Validate output format
+    try:
+        output_format = OutputFormat.from_string(output)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+    
     # Setup logging
     setup_rich_logging(
         level=log_level.upper(),
@@ -173,7 +188,8 @@ def main(
             'verbose': verbose,
             'quiet': quiet,
             'log_level': log_level.upper(),
-            'no_color': no_color
+            'no_color': no_color,
+            'output_format': output_format
         })
         
         logger.debug("CLI initialized", 
