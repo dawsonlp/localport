@@ -1,0 +1,180 @@
+name: Test PyPI Publishing
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0-alpha.1)'
+        required: true
+        type: string
+      test_installation:
+        description: 'Test installation after publishing'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-publish-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install UV
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+    
+    - name: Set up Python
+      run: uv python install 3.13
+    
+    - name: Install dependencies
+      run: uv sync --dev
+    
+    - name: Update version for test release
+      run: |
+        # Update version in pyproject.toml for test release
+        sed -i 's/version = ".*"/version = "${{ inputs.version }}"/' pyproject.toml
+        echo "Updated version to ${{ inputs.version }}"
+        grep 'version = ' pyproject.toml
+    
+    - name: Run tests
+      run: |
+        uv run ruff check .
+        uv run black --check .
+        uv run mypy src/
+        uv run pytest tests/ -v --tb=short
+    
+    - name: Build package
+      run: uv build
+    
+    - name: Verify build
+      run: |
+        echo "Built packages:"
+        ls -la dist/
+        echo "Package contents:"
+        uv run python -c "
+        import tarfile
+        import zipfile
+        import os
+        
+        for file in os.listdir('dist/'):
+            print(f'\n=== {file} ===')
+            if file.endswith('.tar.gz'):
+                with tarfile.open(f'dist/{file}', 'r:gz') as tar:
+                    print('Contents:', tar.getnames()[:10])
+            elif file.endswith('.whl'):
+                with zipfile.ZipFile(f'dist/{file}', 'r') as zip:
+                    print('Contents:', zip.namelist()[:10])
+        "
+    
+    - name: Publish to Test PyPI
+      run: |
+        echo "Publishing to Test PyPI..."
+        uv publish --index-url https://test.pypi.org/legacy/
+      env:
+        UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    
+    - name: Wait for package availability
+      if: inputs.test_installation
+      run: |
+        echo "Waiting for package to be available on Test PyPI..."
+        sleep 30
+    
+    - name: Test installation from Test PyPI
+      if: inputs.test_installation
+      run: |
+        echo "Testing installation from Test PyPI..."
+        
+        # Create a fresh virtual environment for testing
+        python -m venv test_env
+        source test_env/bin/activate
+        
+        # Install from Test PyPI
+        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ localport==${{ inputs.version }}
+        
+        # Test basic functionality
+        echo "Testing basic functionality..."
+        localport --version
+        localport --help
+        
+        # Test specific commands
+        echo "Testing CLI commands..."
+        localport config --help
+        localport daemon --help
+        localport start --help
+        localport stop --help
+        localport status --help
+        localport logs --help
+        
+        echo "✅ Installation test passed!"
+    
+    - name: Create test report
+      if: always()
+      run: |
+        cat > test_report.md << EOF
+        # Test PyPI Publishing Report
+        
+        **Version:** ${{ inputs.version }}
+        **Date:** $(date -u)
+        **Status:** ${{ job.status }}
+        
+        ## Build Information
+        - Python Version: $(python --version)
+        - UV Version: $(uv --version)
+        - Package Size: $(du -h dist/*.whl | cut -f1)
+        
+        ## Test Results
+        - Build: ${{ steps.build-package.outcome }}
+        - Publish: ${{ steps.publish-to-test-pypi.outcome }}
+        - Installation Test: ${{ steps.test-installation-from-test-pypi.outcome }}
+        
+        ## Installation Command
+        \`\`\`bash
+        pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport==${{ inputs.version }}
+        \`\`\`
+        
+        ## Verification Commands
+        \`\`\`bash
+        localport --version
+        localport --help
+        \`\`\`
+        EOF
+        
+        echo "Test report created:"
+        cat test_report.md
+    
+    - name: Upload test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-pypi-report-${{ inputs.version }}
+        path: test_report.md
+    
+    - name: Upload build artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-pypi-dist-${{ inputs.version }}
+        path: dist/
+
+  notify-success:
+    needs: build-and-publish-test
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+    - name: Success notification
+      run: |
+        echo "🎉 Successfully published localport ${{ inputs.version }} to Test PyPI!"
+        echo ""
+        echo "📦 Installation command:"
+        echo "pipx install --index-url https://test.pypi.org/simple/ --pip-args=\"--extra-index-url https://pypi.org/simple/\" localport==${{ inputs.version }}"
+        echo ""
+        echo "🔗 Test PyPI page:"
+        echo "https://test.pypi.org/project/localport/${{ inputs.version }}/"
+        echo ""
+        echo "✅ Ready for testing!"

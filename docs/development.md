@@ -679,4 +679,93 @@ def complex_function(param: str) -> Optional[int]:
     pass
 ```
 
+## Test PyPI Publishing
+
+For testing package distribution before publishing to production PyPI:
+
+### Manual Test PyPI Publishing
+
+1. **Trigger Test PyPI workflow from GitHub**:
+   - Go to Actions tab in GitHub repository
+   - Select "Test PyPI Publishing" workflow
+   - Click "Run workflow"
+   - Enter version (e.g., `0.1.0-alpha.1`)
+   - Enable "Test installation after publishing"
+
+2. **Local Test PyPI publishing**:
+```bash
+# Update version for testing
+sed -i 's/version = ".*"/version = "0.1.0-alpha.1"/' pyproject.toml
+
+# Build package
+uv build
+
+# Publish to Test PyPI
+uv publish --index-url https://test.pypi.org/legacy/
+# Enter your Test PyPI API token when prompted
+```
+
+### Testing Installation from Test PyPI
+
+```bash
+# Install from Test PyPI
+pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport==0.1.0-alpha.1
+
+# Test functionality
+localport --version
+localport --help
+
+# Test all commands
+localport config --help
+localport daemon --help
+localport start --help
+
+# Clean up
+pipx uninstall localport
+```
+
+### Pre-release Versioning
+
+Use semantic versioning with pre-release identifiers:
+
+- **Alpha releases**: `0.1.0-alpha.1`, `0.1.0-alpha.2`
+- **Beta releases**: `0.1.0-beta.1`, `0.1.0-beta.2`
+- **Release candidates**: `0.1.0-rc.1`, `0.1.0-rc.2`
+
+### Automated Test PyPI Publishing
+
+Pre-release tags automatically publish to Test PyPI:
+
+```bash
+# Create and push pre-release tag
+git tag v0.1.0-alpha.1
+git push origin v0.1.0-alpha.1
+
+# This triggers:
+# 1. GitHub release creation
+# 2. Automatic Test PyPI publishing
+# 3. Installation testing
+```
+
+### Test PyPI Troubleshooting
+
+**Common Issues:**
+
+1. **Package name conflicts**: Test PyPI shares namespace with PyPI
+2. **Dependency resolution**: Use `--extra-index-url https://pypi.org/simple/`
+3. **Version conflicts**: Ensure version doesn't exist on Test PyPI
+4. **Token issues**: Verify `TEST_PYPI_API_TOKEN` secret is set correctly
+
+**Verification Commands:**
+```bash
+# Check package on Test PyPI
+curl -s https://test.pypi.org/pypi/localport/json | jq '.info.version'
+
+# List available versions
+curl -s https://test.pypi.org/pypi/localport/json | jq '.releases | keys'
+
+# Check package metadata
+pipx run --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport --version
+```
+
 This development guide provides the foundation for effective LocalPort development. For specific architectural details, see the [Architecture Guide](architecture.md), and for contribution guidelines, see [CONTRIBUTING.md](../CONTRIBUTING.md).

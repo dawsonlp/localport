@@ -159,6 +159,48 @@ jobs:
         asset_name: localport-${{ github.ref_name }}-${{ matrix.asset_name }}.zip
         asset_content_type: application/zip
 
+  publish-test-pypi:
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: "contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')"
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install UV
+      uses: astral-sh/setup-uv@v3
+    
+    - name: Set up Python
+      run: uv python install 3.13
+    
+    - name: Install dependencies
+      run: uv sync --dev
+    
+    - name: Build package
+      run: uv build
+    
+    - name: Publish to Test PyPI
+      run: uv publish --index-url https://test.pypi.org/legacy/
+      env:
+        UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    
+    - name: Update release with Test PyPI info
+      run: |
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        gh release edit $TAG_NAME --notes-file - << EOF
+        $(gh release view $TAG_NAME --json body -q .body)
+        
+        ## Test PyPI Release
+        This pre-release is available on Test PyPI for testing:
+        \`\`\`bash
+        pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport==$TAG_NAME
+        \`\`\`
+        
+        **Note:** This is a pre-release version for testing purposes only.
+        EOF
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-pypi:
     needs: create-release
     runs-on: ubuntu-latest
