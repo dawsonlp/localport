@@ -81,10 +81,21 @@ git config user.name "Your Name"
 git config user.email "your.email@example.com"
 ```
 
+### Branching Strategy
+
+We use a structured branching model:
+
+- **`main`**: Production-ready code, tagged releases only
+- **`qa`**: Pre-release testing, integration testing, release candidates  
+- **`dev`**: Active development, feature integration
+- **`feature/*`**: Individual feature development (short-lived)
+
 ### Development Workflow
 
-1. **Create a feature branch**:
+1. **Create a feature branch from dev**:
 ```bash
+git checkout dev
+git pull origin dev
 git checkout -b feature/your-feature-name
 ```
 
@@ -110,11 +121,17 @@ git add .
 git commit -m "feat: add new feature description"
 ```
 
-5. **Push and create PR**:
+5. **Push and create PR to dev**:
 ```bash
 git push origin feature/your-feature-name
-# Then create a Pull Request on GitHub
+# Then create a Pull Request targeting the 'dev' branch on GitHub
 ```
+
+### Release Process
+
+- **Features**: `feature/*` → `dev` → `qa` → `main`
+- **Hotfixes**: `hotfix/*` → `main` (with backport to `dev`)
+- **Releases**: Tagged on `main` branch, trigger automated releases
 
 ## How to Contribute
 
