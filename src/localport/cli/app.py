@@ -212,6 +212,7 @@ from .commands.daemon_commands import (
     status_daemon_sync, reload_daemon_sync
 )
 from .commands.log_commands import logs_sync
+from .commands.config_commands import export_config_sync, validate_config_sync
 
 # Service management commands
 app.command(name="start")(start_services_sync)
@@ -236,6 +237,21 @@ daemon_app.command(name="reload")(reload_daemon_sync)
 
 # Add daemon subcommand
 app.add_typer(daemon_app, name="daemon")
+
+
+# Config command group
+config_app = typer.Typer(
+    name="config",
+    help="Configuration management commands",
+    no_args_is_help=True
+)
+
+# Add config commands
+config_app.command(name="export")(export_config_sync)
+config_app.command(name="validate")(validate_config_sync)
+
+# Add config subcommand
+app.add_typer(config_app, name="config")
 
 
 def cli_main():
