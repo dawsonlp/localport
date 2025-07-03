@@ -250,10 +250,18 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Install UV
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+    
+    - name: Set up Python 3.13
+      run: uv python install 3.13
+    
     - name: Test installation from release
       run: |
-        # Test installation from GitHub
-        pipx install git+https://github.com/dawsonlp/localport.git@${{ github.ref_name }}
+        # Test installation from GitHub with Python 3.13
+        pipx install --python $(uv python find 3.13) git+https://github.com/dawsonlp/localport.git@${{ github.ref_name }}
         
         # Verify installation
         localport --version
