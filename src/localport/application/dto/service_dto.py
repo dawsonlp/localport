@@ -277,3 +277,75 @@ class ConfigValidationResult:
     def add_warning(self, warning: str) -> None:
         """Add a validation warning."""
         self.warnings.append(warning)
+
+
+@dataclass
+class ServiceMonitorResult:
+    """Result of service monitoring operation."""
+    service_name: str
+    is_healthy: bool
+    last_check: datetime
+    failure_count: int
+    restart_attempted: bool = False
+    restart_success: bool = False
+    error: Optional[str] = None
+
+
+@dataclass
+class DaemonStatusResult:
+    """Result of daemon status check."""
+    running: bool
+    pid: Optional[int] = None
+    uptime_seconds: Optional[float] = None
+    active_services: int = 0
+    
+    @property
+    def uptime_formatted(self) -> str:
+        """Get formatted uptime string."""
+        if not self.uptime_seconds:
+            return "N/A"
+        
+        hours, remainder = divmod(int(self.uptime_seconds), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            return f"{minutes}m {seconds}s"
+        else:
+            return f"{seconds}s"
+
+
+@dataclass
+class DaemonOperationResult:
+    """Result of daemon operation."""
+    command: str
+    success: bool
+    pid: Optional[int] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    status: Optional[DaemonStatusResult] = None
+    
+    @classmethod
+    def success_result(
+        cls, 
+        command: str, 
+        message: str,
+        pid: Optional[int] = None
+    ) -> "DaemonOperationResult":
+        """Create a successful operation result."""
+        return cls(
+            command=command,
+            success=True,
+            message=message,
+            pid=pid
+        )
+    
+    @classmethod
+    def failure_result(cls, command: str, error: str) -> "DaemonOperationResult":
+        """Create a failed operation result."""
+        return cls(
+            command=command,
+            success=False,
+            error=error
+        )

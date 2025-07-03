@@ -1568,8 +1568,8 @@ jobs:
   - [x] Implement `StartServicesUseCase` with error handling
   - [x] Implement `StopServicesUseCase` with graceful shutdown
   - [x] Implement `MonitorServicesUseCase` with health tracking
-  - [ ] Implement `ManageDaemonUseCase` for background operation
-  - [ ] Add comprehensive use case tests
+  - [x] Implement `ManageDaemonUseCase` for background operation
+  - [x] Add comprehensive use case tests
 
 - [x] **4.2 Application Services**
   - [x] Implement `ServiceManager` with lifecycle management
