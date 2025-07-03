@@ -1,6 +1,13 @@
 """LocalPort - Universal port forwarding manager with health monitoring."""
 
-__version__ = "0.1.0"
+import importlib.metadata
+
+try:
+    __version__ = importlib.metadata.version("localport")
+except importlib.metadata.PackageNotFoundError:
+    # Fallback for development/editable installs
+    __version__ = "0.0.0+dev"
+
 __author__ = "LocalPort Team"
 __email__ = "contact@localport.dev"
 __description__ = "Universal port forwarding manager with health monitoring"
