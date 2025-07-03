@@ -275,7 +275,7 @@ class ConfigurationDiffer:
             return False
 
         # Handle different types
-        if type(old_value) != type(new_value):
+        if not isinstance(old_value, type(new_value)) and not isinstance(new_value, type(old_value)):
             return False
 
         # Handle dictionaries recursively

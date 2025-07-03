@@ -7,7 +7,7 @@ from pathlib import Path
 import structlog
 
 try:
-    from watchdog.events import FileModifiedEvent, FileSystemEventHandler
+    from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
     WATCHDOG_AVAILABLE = True
 except ImportError:
