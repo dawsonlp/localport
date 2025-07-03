@@ -48,7 +48,17 @@ def setup_rich_logging(
         handlers=[rich_handler]
     )
     
-    # Configure structlog
+    # Configure structlog to work properly with Rich
+    if verbose:
+        # For verbose mode, use JSON renderer for structured output
+        final_processor = structlog.processors.JSONRenderer()
+    else:
+        # For normal mode, use a simple key-value renderer that works with Rich
+        final_processor = structlog.processors.KeyValueRenderer(
+            key_order=['timestamp', 'level', 'event'],
+            drop_missing=True
+        )
+    
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
@@ -59,7 +69,7 @@ def setup_rich_logging(
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer() if verbose else structlog.dev.ConsoleRenderer(),
+            final_processor,
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),

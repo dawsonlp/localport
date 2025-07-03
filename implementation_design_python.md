@@ -1612,7 +1612,7 @@ jobs:
 - [x] **5.3 Output Formatting** 🔄 PARTIALLY COMPLETED
   - [x] Create table formatters for service status
   - [x] Add Rich console styling and colors
-  - [ ] Create JSON formatters for scripting
+  - [x] Create JSON formatters for scripting
   - [ ] Implement log viewing and filtering
   - [ ] Create export functionality for configurations
 

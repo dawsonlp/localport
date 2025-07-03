@@ -143,14 +143,15 @@ class FormatRouter:
         else:
             table.add_row("No services found", "-", "-", "-", "-", "-", "-")
         
-        # Capture table output
-        with self.console.capture() as capture:
-            self.console.print(table)
+        # For table format, we should directly print to console, not capture
+        # The FormatRouter should return a signal to print directly
+        self.console.print(table)
         
         # Add summary
         summary = f"Total: {data.total_services} | Running: {data.running_services} | Healthy: {data.healthy_services}"
+        self.console.print(f"\n[dim]{summary}[/dim]")
         
-        return f"{capture.get()}\n{summary}"
+        return ""  # Return empty string since we printed directly
     
     def _format_service_operation_table(self, data: Any, command_name: str) -> str:
         """Format service operation as Rich table.

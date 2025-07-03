@@ -256,16 +256,15 @@ async def status_services_command(
             result = await monitor_use_case.execute(command)
             
             # Format output based on requested format
-            formatted_output = format_router.format_service_status(result, output_format)
-            
             if output_format == OutputFormat.JSON:
-                # For JSON output, just print the JSON
+                # For JSON output, get the formatted string and print it
+                formatted_output = format_router.format_service_status(result, output_format)
                 console.print(formatted_output)
             else:
-                # For table output, clear screen if watching and print formatted output
+                # For table output, clear screen if watching, then let formatter print directly
                 if watch:
                     console.clear()
-                console.print(formatted_output)
+                format_router.format_service_status(result, output_format)
         
         if watch:
             # Watch mode - refresh periodically
