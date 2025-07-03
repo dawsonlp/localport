@@ -46,7 +46,7 @@ class ServiceManager:
         logger.info("Starting service", service_name=service.name)
 
         try:
-            # Check if service is already running
+            # Check if service is already running by service ID
             if service.id in self._active_forwards:
                 existing_forward = self._active_forwards[service.id]
                 if existing_forward.is_process_alive():
@@ -64,6 +64,47 @@ class ServiceManager:
                                service_name=service.name,
                                process_id=existing_forward.process_id)
                     del self._active_forwards[service.id]
+
+            # Check if there's already a running process with the same port mapping
+            # This handles cases where the service config changed but the process is still running
+            if await self.is_service_running(service):
+                logger.info("Service already running with correct port mapping",
+                           service_name=service.name,
+                           local_port=service.local_port,
+                           remote_port=service.remote_port)
+                
+                # Find and track the existing process
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                    try:
+                        if (proc.info['cmdline'] and 
+                            len(proc.info['cmdline']) > 0 and
+                            'kubectl' in proc.info['cmdline'][0] and 
+                            'port-forward' in proc.info['cmdline']):
+                            
+                            cmdline = ' '.join(proc.info['cmdline'])
+                            if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
+                                # Found the existing process, track it under this service
+                                port_forward = PortForward(
+                                    service_id=service.id,
+                                    process_id=proc.info['pid'],
+                                    local_port=service.local_port,
+                                    remote_port=service.remote_port,
+                                    started_at=datetime.now()  # We don't know the real start time
+                                )
+                                self._active_forwards[service.id] = port_forward
+                                self._persist_state()
+                                
+                                logger.info("Tracked existing process for service",
+                                          service_name=service.name,
+                                          process_id=proc.info['pid'])
+                                
+                                return ServiceStartResult.success_result(
+                                    service_name=service.name,
+                                    process_id=proc.info['pid'],
+                                    started_at=port_forward.started_at
+                                )
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                        continue
 
             # Check if local port is available
             if not await self._is_port_available(service.local_port):
@@ -161,9 +202,9 @@ class ServiceManager:
                             'kubectl' in proc.info['cmdline'][0] and 
                             'port-forward' in proc.info['cmdline']):
                             
-                            # Check if this kubectl process is forwarding our local port
+                            # Check if this kubectl process is forwarding our exact port mapping
                             cmdline = ' '.join(proc.info['cmdline'])
-                            if f'{service.local_port}:' in cmdline:
+                            if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
                                 process_id = proc.info['pid']
                                 logger.info("Found running kubectl process for service",
                                            service_name=service.name,
@@ -279,9 +320,9 @@ class ServiceManager:
                     'kubectl' in proc.info['cmdline'][0] and 
                     'port-forward' in proc.info['cmdline']):
                     
-                    # Check if this kubectl process is forwarding our local port
+                    # Check if this kubectl process is forwarding our exact port mapping
                     cmdline = ' '.join(proc.info['cmdline'])
-                    if f'{service.local_port}:' in cmdline:
+                    if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
                         logger.debug("Found running kubectl process for service",
                                    service_name=service.name,
                                    process_id=proc.info['pid'],
@@ -326,11 +367,60 @@ class ServiceManager:
             # Check if process is actually alive
             if port_forward.is_process_alive():
                 status_info.is_healthy = True
+                service.update_status(ServiceStatus.RUNNING)
+                status_info.status = ServiceStatus.RUNNING
             else:
                 # Process is dead but we still have a record
                 status_info.is_healthy = False
                 service.update_status(ServiceStatus.FAILED)
                 status_info.status = ServiceStatus.FAILED
+        else:
+            # No active forward in memory, check if service is actually running
+            is_running = await self.is_service_running(service)
+            if is_running:
+                # Service is running but not tracked - this shouldn't happen normally
+                # but can occur if state was lost or process started externally
+                logger.warning("Found running service not tracked in memory",
+                             service_name=service.name,
+                             local_port=service.local_port)
+                status_info.is_healthy = True
+                service.update_status(ServiceStatus.RUNNING)
+                status_info.status = ServiceStatus.RUNNING
+                
+                # Try to find the process and add it to active forwards
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                    try:
+                        if (proc.info['cmdline'] and 
+                            len(proc.info['cmdline']) > 0 and
+                            'kubectl' in proc.info['cmdline'][0] and 
+                            'port-forward' in proc.info['cmdline']):
+                            
+                            cmdline = ' '.join(proc.info['cmdline'])
+                            if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
+                                # Found the process, add it to active forwards
+                                port_forward = PortForward(
+                                    service_id=service.id,
+                                    process_id=proc.info['pid'],
+                                    local_port=service.local_port,
+                                    remote_port=service.remote_port,
+                                    started_at=datetime.now()  # We don't know the real start time
+                                )
+                                self._active_forwards[service.id] = port_forward
+                                self._persist_state()
+                                
+                                status_info.process_id = proc.info['pid']
+                                status_info.started_at = port_forward.started_at
+                                logger.info("Re-tracked running service",
+                                          service_name=service.name,
+                                          process_id=proc.info['pid'])
+                                break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                        continue
+            else:
+                # Service is not running
+                status_info.is_healthy = False
+                service.update_status(ServiceStatus.STOPPED)
+                status_info.status = ServiceStatus.STOPPED
 
         return status_info
 
@@ -498,7 +588,7 @@ class ServiceManager:
                     process_id = forward_data['process_id']
                     
                     # Validate process still exists and matches expected command
-                    if self._validate_process(process_id, forward_data.get('local_port')):
+                    if self._validate_process(process_id, forward_data.get('local_port'), forward_data.get('remote_port')):
                         port_forward = PortForward(
                             service_id=service_id,
                             process_id=process_id,
@@ -535,30 +625,98 @@ class ServiceManager:
             logger.error("Error loading persisted state", error=str(e))
             self._active_forwards = {}
 
-    def _validate_process(self, process_id: int, expected_port: int | None = None) -> bool:
+    def _validate_port_mapping(self, cmdline: str, local_port: int, remote_port: int) -> bool:
+        """Validate that a command line contains the expected port mapping.
+        
+        Args:
+            cmdline: Command line string to check
+            local_port: Expected local port
+            remote_port: Expected remote port
+            
+        Returns:
+            True if the exact port mapping is found, False otherwise
+        """
+        port_pattern = f'{local_port}:{remote_port}'
+        
+        # Check for exact port mapping pattern
+        if port_pattern in cmdline:
+            logger.debug("Port mapping validation successful",
+                        local_port=local_port,
+                        remote_port=remote_port,
+                        pattern=port_pattern)
+            return True
+        
+        logger.debug("Port mapping validation failed",
+                    local_port=local_port,
+                    remote_port=remote_port,
+                    pattern=port_pattern,
+                    cmdline=cmdline)
+        return False
+
+    def _validate_process(self, process_id: int, expected_local_port: int | None = None, expected_remote_port: int | None = None) -> bool:
         """Validate that a process exists and matches expected criteria.
         
         Args:
             process_id: Process ID to validate
-            expected_port: Expected local port (optional)
+            expected_local_port: Expected local port (optional)
+            expected_remote_port: Expected remote port (optional)
             
         Returns:
             True if process is valid, False otherwise
         """
         try:
             proc = psutil.Process(process_id)
-            cmdline = ' '.join(proc.cmdline())
+            cmdline_list = proc.cmdline()
+            cmdline = ' '.join(cmdline_list)
+            
+            logger.debug("Validating process", 
+                        process_id=process_id,
+                        cmdline=cmdline,
+                        expected_local_port=expected_local_port,
+                        expected_remote_port=expected_remote_port)
             
             # Check if it's a kubectl port-forward process
-            if 'kubectl' in cmdline and 'port-forward' in cmdline:
-                # If we have an expected port, verify it matches
-                if expected_port and f'{expected_port}:' not in cmdline:
-                    return False
-                return True
-                
-            return False
+            # Look for kubectl in the command (handle different paths)
+            has_kubectl = any('kubectl' in arg for arg in cmdline_list)
+            has_port_forward = 'port-forward' in cmdline
             
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            if has_kubectl and has_port_forward:
+                # If we have expected ports, verify they match exactly
+                if expected_local_port is not None and expected_remote_port is not None:
+                    if not self._validate_port_mapping(cmdline, expected_local_port, expected_remote_port):
+                        logger.debug("Port mapping validation failed",
+                                   process_id=process_id,
+                                   expected_local_port=expected_local_port,
+                                   expected_remote_port=expected_remote_port,
+                                   cmdline=cmdline)
+                        return False
+                elif expected_local_port is not None:
+                    # Fallback to local port only validation for backward compatibility
+                    port_pattern = f'{expected_local_port}:'
+                    if port_pattern not in cmdline:
+                        logger.debug("Local port validation failed",
+                                   process_id=process_id,
+                                   expected_local_port=expected_local_port,
+                                   cmdline=cmdline)
+                        return False
+                
+                logger.debug("Process validation successful",
+                           process_id=process_id,
+                           expected_local_port=expected_local_port,
+                           expected_remote_port=expected_remote_port)
+                return True
+            else:
+                logger.debug("Process validation failed - not kubectl port-forward",
+                           process_id=process_id,
+                           has_kubectl=has_kubectl,
+                           has_port_forward=has_port_forward,
+                           cmdline=cmdline)
+                return False
+                
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+            logger.debug("Process validation failed - process error",
+                       process_id=process_id,
+                       error=str(e))
             return False
 
     def _persist_state(self) -> None:

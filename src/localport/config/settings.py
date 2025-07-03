@@ -59,6 +59,7 @@ class Settings(BaseSettings):
         env_prefix = "LOCALPORT_"
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
     def __init__(self, **kwargs):
         """Initialize settings with runtime directory setup."""
