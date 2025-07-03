@@ -8,6 +8,7 @@ class OutputFormat(str, Enum):
     
     TABLE = "table"
     JSON = "json"
+    TEXT = "text"
     YAML = "yaml"  # Future extension
     
     def __str__(self) -> str:

@@ -99,7 +99,7 @@ def main(
         "table",
         "--output",
         "-o",
-        help="Output format (table, json)",
+        help="Output format (table, json, text)",
         metavar="FORMAT"
     )
 ):
@@ -211,11 +211,13 @@ from .commands.daemon_commands import (
     start_daemon_sync, stop_daemon_sync, restart_daemon_sync, 
     status_daemon_sync, reload_daemon_sync
 )
+from .commands.log_commands import logs_sync
 
 # Service management commands
 app.command(name="start")(start_services_sync)
 app.command(name="stop")(stop_services_sync)
 app.command(name="status")(status_services_sync)
+app.command(name="logs")(logs_sync)
 
 
 # Daemon command group
