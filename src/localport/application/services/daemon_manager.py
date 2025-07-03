@@ -14,6 +14,8 @@ from ...domain.repositories.service_repository import ServiceRepository
 from ...domain.repositories.config_repository import ConfigRepository
 from .service_manager import ServiceManager
 from .health_monitor_scheduler import HealthMonitorScheduler
+from .configuration_manager import ConfigurationManager
+from .configuration_differ import ConfigurationDiff
 
 logger = structlog.get_logger()
 
@@ -41,6 +43,12 @@ class DaemonManager:
         self._service_manager = service_manager
         self._health_monitor = health_monitor
         
+        # Initialize configuration manager
+        self._config_manager = ConfigurationManager(
+            config_repository=config_repository,
+            service_repository=service_repository
+        )
+        
         # Daemon state
         self._is_running = False
         self._started_at: Optional[datetime] = None
@@ -51,6 +59,7 @@ class DaemonManager:
         self._auto_start_services = True
         self._enable_health_monitoring = True
         self._config_reload_enabled = True
+        self._hot_reload_enabled = True
         self._graceful_shutdown_timeout = 30  # seconds
         
         # Signal handlers
@@ -86,6 +95,10 @@ class DaemonManager:
             # Start health monitoring
             if self._enable_health_monitoring:
                 await self._start_health_monitoring()
+            
+            # Start configuration hot reloading
+            if self._hot_reload_enabled:
+                await self._start_hot_reloading()
             
             # Start background tasks
             await self._start_background_tasks()
@@ -532,3 +545,134 @@ class DaemonManager:
         """
         self._config_reload_enabled = enabled
         logger.info("Configuration reload updated", enabled=enabled)
+    
+    async def set_hot_reload(self, enabled: bool) -> None:
+        """Set hot configuration reloading capability.
+        
+        Args:
+            enabled: Whether to enable hot reload
+        """
+        self._hot_reload_enabled = enabled
+        
+        if self._is_running:
+            if enabled and not self._config_manager.is_watching:
+                await self._start_hot_reloading()
+            elif not enabled and self._config_manager.is_watching:
+                await self._config_manager.stop_hot_reloading()
+        
+        logger.info("Configuration hot reload updated", enabled=enabled)
+    
+    async def _start_hot_reloading(self) -> None:
+        """Start configuration hot reloading."""
+        try:
+            success = await self._config_manager.start_hot_reloading(
+                reload_callback=self._handle_configuration_change
+            )
+            
+            if success:
+                logger.info("Configuration hot reloading started", 
+                          watcher_type=self._config_manager.watcher_type,
+                          config_path=str(self._config_manager.config_path))
+            else:
+                logger.warning("Failed to start configuration hot reloading")
+                
+        except Exception as e:
+            logger.error("Error starting configuration hot reloading", error=str(e))
+    
+    async def _handle_configuration_change(self, diff: ConfigurationDiff) -> None:
+        """Handle configuration changes from hot reloading.
+        
+        Args:
+            diff: Configuration diff describing changes
+        """
+        if not diff.has_changes:
+            return
+        
+        logger.info("Processing configuration changes", 
+                   summary=self._config_manager._differ.format_diff_summary(diff))
+        
+        try:
+            # Update service repository with new configuration
+            await self._load_configuration()
+            
+            # Handle service changes
+            await self._apply_service_changes(diff)
+            
+            # Restart health monitoring if needed
+            if diff.requires_health_monitor_restart:
+                logger.info("Restarting health monitoring due to configuration changes")
+                await self._health_monitor.stop_monitoring()
+                if self._enable_health_monitoring:
+                    await self._start_health_monitoring()
+            
+            logger.info("Configuration changes applied successfully")
+            
+        except Exception as e:
+            logger.error("Failed to apply configuration changes", error=str(e))
+    
+    async def _apply_service_changes(self, diff: ConfigurationDiff) -> None:
+        """Apply service configuration changes.
+        
+        Args:
+            diff: Configuration diff
+        """
+        # Get services that need to be restarted
+        services_to_restart = diff.services_requiring_restart
+        
+        if not services_to_restart:
+            logger.debug("No services require restart")
+            return
+        
+        logger.info("Restarting services due to configuration changes", 
+                   services=services_to_restart)
+        
+        # Stop and restart affected services
+        for service_name in services_to_restart:
+            try:
+                # Find the service
+                service = await self._service_repository.find_by_name(service_name)
+                if not service:
+                    logger.warning("Service not found for restart", service_name=service_name)
+                    continue
+                
+                # Stop the service if it's running
+                if service.status == ServiceStatus.RUNNING:
+                    logger.info("Stopping service for configuration update", service_name=service_name)
+                    await self._stop_service_safe(service)
+                
+                # Start the service if it's enabled
+                if getattr(service, 'enabled', True):
+                    logger.info("Starting service with new configuration", service_name=service_name)
+                    await self._start_service_safe(service)
+                
+            except Exception as e:
+                logger.error("Error restarting service", 
+                           service_name=service_name, 
+                           error=str(e))
+    
+    async def get_configuration_status(self) -> Dict[str, Any]:
+        """Get configuration management status.
+        
+        Returns:
+            Configuration status information
+        """
+        try:
+            config_status = await self._config_manager.get_configuration_status()
+            
+            # Add daemon-specific information
+            config_status.update({
+                'daemon_running': self._is_running,
+                'config_reload_enabled': self._config_reload_enabled,
+                'hot_reload_enabled': self._hot_reload_enabled,
+            })
+            
+            return config_status
+            
+        except Exception as e:
+            logger.error("Error getting configuration status", error=str(e))
+            return {
+                'error': str(e),
+                'daemon_running': self._is_running,
+                'config_reload_enabled': self._config_reload_enabled,
+                'hot_reload_enabled': self._hot_reload_enabled,
+            }
