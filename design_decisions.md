@@ -226,3 +226,27 @@
   - Store only PIDs in process tracking, not process objects
 - **Testing**: Verified with PostgreSQL connection through kubectl port-forward
 - **Impact**: Enables reliable, persistent port forwarding that survives CLI command completion
+
+### Hybrid State Management for Cross-Session Process Tracking
+- **Problem**: Stop command couldn't find processes started in previous LocalPort sessions, leading to "zombie" processes
+- **Root Cause**: ServiceManager used only in-memory state (`_active_forwards`) which was reset on each LocalPort startup
+- **Solution**: Implemented hybrid state management combining persistent storage with OS process discovery
+- **Architecture**:
+  - **Fast Path**: In-memory state for current session processes (high performance)
+  - **Slow Path**: OS process discovery using psutil for cross-session processes
+  - **Persistent State**: JSON file at `~/.local/share/localport/state.json` (cross-platform)
+  - **Self-Healing**: Automatic validation and cleanup of stale process entries
+- **Implementation Details**:
+  - State persisted on every start/stop operation using atomic writes
+  - Process validation on state load to ensure processes still exist
+  - Enhanced `is_service_running()` to use hybrid approach
+  - Cross-platform state directory handling (Linux/macOS vs Windows)
+  - Robust kubectl process detection handling different installation paths
+- **Benefits**:
+  - **Reliability**: Stop command now actually terminates processes across sessions
+  - **Performance**: Fast in-memory lookups with OS fallback only when needed
+  - **Persistence**: Process state survives LocalPort restarts
+  - **Cross-Platform**: Works on Linux, macOS, and Windows
+  - **Self-Healing**: Automatic cleanup of dead/orphaned processes
+- **Testing**: Verified complete start/stop cycle with cross-session process termination
+- **Impact**: Stop command is now semantically correct and functionally complete
