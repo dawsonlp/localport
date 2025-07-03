@@ -26,7 +26,11 @@ jobs:
       run: |
         TAG_NAME=${GITHUB_REF#refs/tags/}
         echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-        echo "is_prerelease=$(echo $TAG_NAME | grep -E '(alpha|beta|rc)' && echo true || echo false)" >> $GITHUB_OUTPUT
+        if echo "$TAG_NAME" | grep -E '(alpha|beta|rc)' > /dev/null; then
+          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+        else
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+        fi
     
     - name: Generate changelog
       id: changelog
