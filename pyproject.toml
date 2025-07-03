@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "localport"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Universal port forwarding manager with health monitoring"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -67,8 +67,15 @@ Documentation = "https://github.com/dawsonlp/localport#readme"
 [project.scripts]
 localport = "localport.main:main"
 
+[tool.hatch.version]
+source = "vcs"
+raw-options = { local_scheme = "no-local-version" }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/localport"]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/localport/_version.py"
 
 [tool.black]
 line-length = 88
