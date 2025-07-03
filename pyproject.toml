@@ -24,7 +24,7 @@ classifiers = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "typer[all]>=0.12.0",
+    "typer>=0.12.0",
     "rich>=13.7.0",
     "pydantic>=2.8.0",
     "pydantic-settings>=2.4.0",
@@ -158,4 +158,12 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.1",
 ]

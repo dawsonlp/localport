@@ -6,8 +6,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-# Import will be available once CLI is implemented
-# from .cli.app import app
+from .cli.app import cli_main
 
 console = Console()
 
@@ -15,13 +14,8 @@ console = Console()
 def main() -> None:
     """Main entry point for the LocalPort CLI."""
     try:
-        # Placeholder until CLI is implemented
-        console.print("🚧 LocalPort is under development!")
-        console.print("See implementation_design_python.md for progress.")
-        console.print("Run 'python -m pytest tests/' to run tests.")
-        
-        # This will be uncommented once CLI is implemented:
-        # app()
+        # Run the CLI application
+        cli_main()
         
     except KeyboardInterrupt:
         console.print("\n👋 Goodbye!")

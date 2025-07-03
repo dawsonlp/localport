@@ -11,7 +11,13 @@ try:
 except ImportError:
     yaml = None
 
-from ...domain.repositories.config_repository import ConfigRepository
+from ...domain.repositories.config_repository import (
+    ConfigRepository, ConfigurationError, ConfigurationNotFoundError, 
+    InvalidConfigurationError, MissingEnvironmentVariableError
+)
+from ...domain.entities.service import Service
+from ...domain.value_objects.port import Port
+from ...domain.value_objects.connection_info import ConnectionInfo
 
 logger = structlog.get_logger()
 
@@ -499,3 +505,117 @@ class YamlConfigRepository(ConfigRepository):
                    backup=str(backup_path))
         
         return str(backup_path)
+    
+    # Abstract method implementations
+    async def load_services(self, config_path: Optional[Path] = None) -> List[Service]:
+        """Load services from configuration."""
+        if config_path:
+            old_path = self.config_path
+            self.config_path = config_path
+            try:
+                config = await self._load_config_internal()
+            finally:
+                self.config_path = old_path
+        else:
+            config = await self._load_config_internal()
+        
+        services = []
+        
+        for service_config in config.get('services', []):
+            try:
+                # Create Service entity from configuration
+                service = Service(
+                    name=service_config['name'],
+                    technology=service_config['technology'],
+                    local_port=Port(service_config['local_port']),
+                    remote_port=Port(service_config['remote_port']),
+                    connection_info=ConnectionInfo(service_config['connection']),
+                    enabled=service_config.get('enabled', True),
+                    tags=service_config.get('tags', []),
+                    description=service_config.get('description'),
+                    health_check_config=service_config.get('health_check'),
+                    restart_policy=service_config.get('restart_policy')
+                )
+                services.append(service)
+            except Exception as e:
+                logger.error("Failed to create service from config", 
+                           service_name=service_config.get('name', 'unknown'),
+                           error=str(e))
+                raise ConfigurationError(f"Invalid service configuration: {e}")
+        
+        return services
+    
+    async def _load_config_internal(self) -> Dict[str, Any]:
+        """Internal method to load configuration without recursion."""
+        if yaml is None:
+            raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
+        
+        if not self.config_path.exists():
+            logger.warning("Configuration file not found", path=str(self.config_path))
+            return await self.get_default_configuration()
+        
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Substitute environment variables
+            content = self._substitute_environment_variables(content)
+            
+            # Parse YAML
+            config = yaml.safe_load(content) or {}
+            
+            # Cache the configuration
+            self._config_cache = config
+            
+            logger.info("Loaded configuration", 
+                       path=str(self.config_path),
+                       services_count=len(config.get('services', [])))
+            
+            return config
+            
+        except yaml.YAMLError as e:
+            logger.error("Failed to parse YAML configuration", 
+                        path=str(self.config_path),
+                        error=str(e))
+            raise
+        except Exception as e:
+            logger.error("Failed to load configuration", 
+                        path=str(self.config_path),
+                        error=str(e))
+            raise
+    
+    async def get_default_config_paths(self) -> List[Path]:
+        """Get list of default configuration file paths to search."""
+        return [
+            Path.cwd() / "localport.yaml",
+            Path.cwd() / "localport.yml", 
+            Path.cwd() / ".localport.yaml",
+            Path.home() / ".localport.yaml",
+            Path.home() / ".config" / "localport" / "config.yaml",
+            Path("/etc/localport/config.yaml"),
+        ]
+    
+    async def find_config_file(self) -> Optional[Path]:
+        """Find the first existing configuration file in default locations."""
+        search_paths = await self.get_default_config_paths()
+        
+        for path in search_paths:
+            if path.exists():
+                logger.info("Found configuration file", path=str(path))
+                return path
+        
+        logger.debug("No configuration file found in default locations")
+        return None
+    
+    async def substitute_environment_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Substitute environment variables in configuration."""
+        import json
+        
+        # Convert config to JSON string, substitute variables, then parse back
+        config_str = json.dumps(config)
+        substituted_str = self._substitute_environment_variables(config_str)
+        
+        try:
+            return json.loads(substituted_str)
+        except json.JSONDecodeError as e:
+            raise ConfigurationError(f"Failed to parse configuration after environment variable substitution: {e}")
