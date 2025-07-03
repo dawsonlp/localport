@@ -3,10 +3,8 @@
 import importlib.metadata
 
 try:
-    # Get the raw version from package metadata to preserve pre-release identifiers
-    _dist = importlib.metadata.distribution("localport")
-    __version__ = _dist.metadata["Version"]
-except (importlib.metadata.PackageNotFoundError, KeyError):
+    __version__ = importlib.metadata.version("localport")
+except importlib.metadata.PackageNotFoundError:
     # Fallback for development/editable installs
     __version__ = "0.0.0+dev"
 
