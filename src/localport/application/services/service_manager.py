@@ -1,9 +1,13 @@
 """Service manager for managing the lifecycle of port forwarding services."""
 
 import asyncio
+import json
+import os
 from datetime import datetime
+from pathlib import Path
 from uuid import UUID
 
+import psutil
 import structlog
 
 from ...domain.entities.port_forward import PortForward
@@ -27,6 +31,8 @@ class ServiceManager:
             ForwardingTechnology.SSH: SSHAdapter(),
         }
         self._tcp_health_check = TCPHealthCheck()
+        self._state_file = self._get_state_file_path()
+        self._load_persisted_state()
 
     async def start_service(self, service: Service) -> ServiceStartResult:
         """Start a port forwarding service.
@@ -93,6 +99,9 @@ class ServiceManager:
             # Store active forward
             self._active_forwards[service.id] = port_forward
 
+            # Persist state to disk
+            self._persist_state()
+
             # Update service status
             service.update_status(ServiceStatus.RUNNING)
 
@@ -129,8 +138,43 @@ class ServiceManager:
 
         try:
             port_forward = self._active_forwards.get(service.id)
-            if not port_forward:
-                logger.warning("No active forward found", service_name=service.name)
+            process_id = None
+            
+            if port_forward:
+                process_id = port_forward.process_id
+                logger.info("Found active forward in memory", 
+                           service_name=service.name, 
+                           process_id=process_id)
+            else:
+                # No active forward in memory, but there might be a running process
+                # Try to find kubectl processes that match this service
+                logger.info("No active forward in memory, searching for running processes", 
+                           service_name=service.name)
+                
+                # Look for kubectl processes using this local port
+                import psutil
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                    try:
+                        # Check if this is a kubectl process (handle different paths like /snap/kubectl/xxx/kubectl)
+                        if (proc.info['cmdline'] and 
+                            len(proc.info['cmdline']) > 0 and
+                            'kubectl' in proc.info['cmdline'][0] and 
+                            'port-forward' in proc.info['cmdline']):
+                            
+                            # Check if this kubectl process is forwarding our local port
+                            cmdline = ' '.join(proc.info['cmdline'])
+                            if f'{service.local_port}:' in cmdline:
+                                process_id = proc.info['pid']
+                                logger.info("Found running kubectl process for service",
+                                           service_name=service.name,
+                                           process_id=process_id,
+                                           cmdline=cmdline)
+                                break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                        continue
+
+            if not process_id:
+                logger.info("No running process found for service", service_name=service.name)
                 service.update_status(ServiceStatus.STOPPED)
                 return ServiceStopResult.success_result(service.name)
 
@@ -138,18 +182,20 @@ class ServiceManager:
             adapter = self._adapters[service.technology]
 
             # Stop the port forward
-            if port_forward.process_id:
-                await adapter.stop_port_forward(port_forward.process_id)
+            await adapter.stop_port_forward(process_id)
 
-            # Remove from active forwards
-            del self._active_forwards[service.id]
+            # Remove from active forwards if it was there
+            if service.id in self._active_forwards:
+                del self._active_forwards[service.id]
+                # Persist state after removing the forward
+                self._persist_state()
 
             # Update service status
             service.update_status(ServiceStatus.STOPPED)
 
             logger.info("Service stopped successfully",
                        service_name=service.name,
-                       process_id=port_forward.process_id)
+                       process_id=process_id)
 
             return ServiceStopResult.success_result(service.name)
 
@@ -212,10 +258,39 @@ class ServiceManager:
             True if service is running, False otherwise
         """
         port_forward = self._active_forwards.get(service.id)
-        if not port_forward:
-            return False
-
-        return port_forward.is_process_alive()
+        
+        # Check in-memory state first (fast path)
+        if port_forward:
+            if port_forward.is_process_alive():
+                return True
+            else:
+                # Process is dead, clean up
+                del self._active_forwards[service.id]
+                self._persist_state()
+        
+        # No active forward in memory, search for running processes (slow path)
+        logger.debug("Checking for running processes", service_name=service.name)
+        
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                # Check if this is a kubectl process (handle different paths like /snap/kubectl/xxx/kubectl)
+                if (proc.info['cmdline'] and 
+                    len(proc.info['cmdline']) > 0 and
+                    'kubectl' in proc.info['cmdline'][0] and 
+                    'port-forward' in proc.info['cmdline']):
+                    
+                    # Check if this kubectl process is forwarding our local port
+                    cmdline = ' '.join(proc.info['cmdline'])
+                    if f'{service.local_port}:' in cmdline:
+                        logger.debug("Found running kubectl process for service",
+                                   service_name=service.name,
+                                   process_id=proc.info['pid'],
+                                   cmdline=cmdline)
+                        return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+        
+        return False
 
     async def get_service_status(self, service: Service) -> ServiceStatusInfo:
         """Get detailed status information for a service.
@@ -386,3 +461,132 @@ class ServiceManager:
             Dictionary of active port forwards by service ID
         """
         return self._active_forwards.copy()
+
+    def _get_state_file_path(self) -> Path:
+        """Get platform-appropriate state file location.
+        
+        Returns:
+            Path to the state file
+        """
+        if os.name == 'nt':  # Windows
+            state_dir = Path.home() / "AppData/Local/localport"
+        else:  # Linux/macOS
+            state_dir = Path.home() / ".local/share/localport"
+        
+        # Ensure directory exists
+        state_dir.mkdir(parents=True, exist_ok=True)
+        return state_dir / "state.json"
+
+    def _load_persisted_state(self) -> None:
+        """Load persisted state from disk and validate processes."""
+        if not self._state_file.exists():
+            logger.debug("No state file found, starting with empty state")
+            return
+
+        try:
+            with open(self._state_file, 'r') as f:
+                data = json.load(f)
+
+            active_forwards_data = data.get('active_forwards', {})
+            logger.info("Loading persisted state", count=len(active_forwards_data))
+
+            # Reconstruct PortForward objects and validate processes
+            validated_forwards = {}
+            for service_id_str, forward_data in active_forwards_data.items():
+                try:
+                    service_id = UUID(service_id_str)
+                    process_id = forward_data['process_id']
+                    
+                    # Validate process still exists and matches expected command
+                    if self._validate_process(process_id, forward_data.get('local_port')):
+                        port_forward = PortForward(
+                            service_id=service_id,
+                            process_id=process_id,
+                            local_port=forward_data['local_port'],
+                            remote_port=forward_data['remote_port'],
+                            started_at=datetime.fromisoformat(forward_data['started_at'])
+                        )
+                        port_forward.restart_count = forward_data.get('restart_count', 0)
+                        validated_forwards[service_id] = port_forward
+                        logger.info("Restored active forward", 
+                                   service_id=service_id,
+                                   process_id=process_id,
+                                   local_port=forward_data['local_port'])
+                    else:
+                        logger.info("Process no longer valid, skipping", 
+                                   service_id=service_id,
+                                   process_id=process_id)
+                        
+                except Exception as e:
+                    logger.warning("Error loading forward state", 
+                                  service_id=service_id_str,
+                                  error=str(e))
+
+            self._active_forwards = validated_forwards
+            logger.info("State loaded successfully", 
+                       total_loaded=len(active_forwards_data),
+                       validated=len(validated_forwards))
+
+            # Persist the cleaned state
+            if len(validated_forwards) != len(active_forwards_data):
+                self._persist_state()
+
+        except Exception as e:
+            logger.error("Error loading persisted state", error=str(e))
+            self._active_forwards = {}
+
+    def _validate_process(self, process_id: int, expected_port: int | None = None) -> bool:
+        """Validate that a process exists and matches expected criteria.
+        
+        Args:
+            process_id: Process ID to validate
+            expected_port: Expected local port (optional)
+            
+        Returns:
+            True if process is valid, False otherwise
+        """
+        try:
+            proc = psutil.Process(process_id)
+            cmdline = ' '.join(proc.cmdline())
+            
+            # Check if it's a kubectl port-forward process
+            if 'kubectl' in cmdline and 'port-forward' in cmdline:
+                # If we have an expected port, verify it matches
+                if expected_port and f'{expected_port}:' not in cmdline:
+                    return False
+                return True
+                
+            return False
+            
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return False
+
+    def _persist_state(self) -> None:
+        """Persist current state to disk."""
+        try:
+            # Convert active forwards to serializable format
+            active_forwards_data = {}
+            for service_id, port_forward in self._active_forwards.items():
+                active_forwards_data[str(service_id)] = {
+                    'process_id': port_forward.process_id,
+                    'local_port': port_forward.local_port,
+                    'remote_port': port_forward.remote_port,
+                    'started_at': port_forward.started_at.isoformat(),
+                    'restart_count': port_forward.restart_count
+                }
+
+            data = {
+                'active_forwards': active_forwards_data,
+                'last_updated': datetime.now().isoformat()
+            }
+
+            # Write atomically by writing to temp file then renaming
+            temp_file = self._state_file.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            temp_file.replace(self._state_file)
+            logger.debug("State persisted successfully", count=len(active_forwards_data))
+
+        except Exception as e:
+            logger.error("Error persisting state", error=str(e))
