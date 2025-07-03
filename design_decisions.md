@@ -250,3 +250,22 @@
   - **Self-Healing**: Automatic cleanup of dead/orphaned processes
 - **Testing**: Verified complete start/stop cycle with cross-session process termination
 - **Impact**: Stop command is now semantically correct and functionally complete
+
+## Release Management
+
+### Proper Release Workflow
+- **Problem**: Hatch VCS auto-increments versions when commits exist after tags, causing version mismatches
+- **Solution**: Implement a clean release workflow that ensures tags match published versions
+- **Workflow**:
+  1. **Complete all development work** (code, tests, documentation)
+  2. **Commit and push all changes** to main branch
+  3. **Create and push the release tag** immediately (no additional commits)
+  4. **Let GitHub Actions handle the release** automatically
+  5. **Any post-release documentation updates** go in the next development cycle
+- **Benefits**:
+  - **Version Consistency**: Git tags match published package versions exactly
+  - **Clean Releases**: No `.dev0` suffixes in release versions
+  - **Predictable Versioning**: Users can rely on version numbers matching tags
+  - **Automated Process**: Minimal manual intervention reduces errors
+- **Example**: Tag `v0.1.0-alpha.11` → Package version `0.1.0a11` (exact match)
+- **Anti-pattern**: Tag `v0.1.0-alpha.11` + commits → Package version `0.1.0a12.dev0` (mismatch)
