@@ -1,17 +1,17 @@
 """Configuration repository interface for loading and managing configuration."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
 from pathlib import Path
+from typing import Any
 
 from ..entities.service import Service
 
 
 class ConfigRepository(ABC):
     """Repository interface for configuration management."""
-    
+
     @abstractmethod
-    async def load_configuration(self, config_path: Optional[Path] = None) -> Dict[str, Any]:
+    async def load_configuration(self, config_path: Path | None = None) -> dict[str, Any]:
         """Load configuration from file or default locations.
         
         Args:
@@ -24,9 +24,9 @@ class ConfigRepository(ABC):
             ConfigurationError: If configuration cannot be loaded or is invalid
         """
         pass
-    
+
     @abstractmethod
-    async def save_configuration(self, config: Dict[str, Any], config_path: Path) -> None:
+    async def save_configuration(self, config: dict[str, Any], config_path: Path) -> None:
         """Save configuration to file.
         
         Args:
@@ -37,9 +37,9 @@ class ConfigRepository(ABC):
             ConfigurationError: If configuration cannot be saved
         """
         pass
-    
+
     @abstractmethod
-    async def load_services(self, config_path: Optional[Path] = None) -> List[Service]:
+    async def load_services(self, config_path: Path | None = None) -> list[Service]:
         """Load services from configuration.
         
         Args:
@@ -52,9 +52,9 @@ class ConfigRepository(ABC):
             ConfigurationError: If services cannot be loaded or are invalid
         """
         pass
-    
+
     @abstractmethod
-    async def validate_configuration(self, config: Dict[str, Any]) -> bool:
+    async def validate_configuration(self, config: dict[str, Any]) -> bool:
         """Validate configuration structure and values.
         
         Args:
@@ -67,27 +67,27 @@ class ConfigRepository(ABC):
             ConfigurationError: If configuration is invalid
         """
         pass
-    
+
     @abstractmethod
-    async def get_default_config_paths(self) -> List[Path]:
+    async def get_default_config_paths(self) -> list[Path]:
         """Get list of default configuration file paths to search.
         
         Returns:
             List of paths in order of preference
         """
         pass
-    
+
     @abstractmethod
-    async def find_config_file(self) -> Optional[Path]:
+    async def find_config_file(self) -> Path | None:
         """Find the first existing configuration file in default locations.
         
         Returns:
             Path to configuration file if found, None otherwise
         """
         pass
-    
+
     @abstractmethod
-    async def substitute_environment_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def substitute_environment_variables(self, config: dict[str, Any]) -> dict[str, Any]:
         """Substitute environment variables in configuration.
         
         Args:
@@ -109,8 +109,8 @@ class ConfigurationError(Exception):
 
 class ConfigurationNotFoundError(ConfigurationError):
     """Raised when configuration file is not found."""
-    
-    def __init__(self, config_path: Optional[Path] = None):
+
+    def __init__(self, config_path: Path | None = None):
         if config_path:
             message = f"Configuration file not found: {config_path}"
         else:
@@ -121,15 +121,15 @@ class ConfigurationNotFoundError(ConfigurationError):
 
 class InvalidConfigurationError(ConfigurationError):
     """Raised when configuration is invalid."""
-    
-    def __init__(self, message: str, field: Optional[str] = None):
+
+    def __init__(self, message: str, field: str | None = None):
         super().__init__(message)
         self.field = field
 
 
 class MissingEnvironmentVariableError(ConfigurationError):
     """Raised when a required environment variable is missing."""
-    
+
     def __init__(self, variable_name: str):
         super().__init__(f"Required environment variable not found: {variable_name}")
         self.variable_name = variable_name

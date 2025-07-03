@@ -3,7 +3,8 @@
 import os
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 import structlog
 
 try:
@@ -11,30 +12,30 @@ try:
 except ImportError:
     yaml = None
 
-from ...domain.repositories.config_repository import (
-    ConfigRepository, ConfigurationError, ConfigurationNotFoundError, 
-    InvalidConfigurationError, MissingEnvironmentVariableError
-)
 from ...domain.entities.service import Service
-from ...domain.value_objects.port import Port
+from ...domain.repositories.config_repository import (
+    ConfigRepository,
+    ConfigurationError,
+)
 from ...domain.value_objects.connection_info import ConnectionInfo
+from ...domain.value_objects.port import Port
 
 logger = structlog.get_logger()
 
 
 class YamlConfigRepository(ConfigRepository):
     """YAML file-based configuration repository with environment variable substitution."""
-    
-    def __init__(self, config_path: Optional[str] = None):
+
+    def __init__(self, config_path: str | None = None):
         """Initialize YAML configuration repository.
         
         Args:
             config_path: Path to YAML configuration file
         """
         self.config_path = Path(config_path) if config_path else self._find_config_file()
-        self._config_cache: Optional[Dict[str, Any]] = None
+        self._config_cache: dict[str, Any] | None = None
         self._env_var_pattern = re.compile(r'\$\{([^}]+)\}')
-    
+
     def _find_config_file(self) -> Path:
         """Find configuration file in standard locations.
         
@@ -50,18 +51,18 @@ class YamlConfigRepository(ConfigRepository):
             Path.home() / ".config" / "localport" / "config.yaml",
             Path("/etc/localport/config.yaml"),
         ]
-        
+
         for path in search_paths:
             if path.exists():
                 logger.info("Found configuration file", path=str(path))
                 return path
-        
+
         # Default to localport.yaml in current directory
         default_path = Path.cwd() / "localport.yaml"
         logger.debug("Using default configuration path", path=str(default_path))
         return default_path
-    
-    async def load_configuration(self) -> Dict[str, Any]:
+
+    async def load_configuration(self) -> dict[str, Any]:
         """Load configuration from YAML file.
         
         Returns:
@@ -73,42 +74,42 @@ class YamlConfigRepository(ConfigRepository):
         """
         if yaml is None:
             raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
-        
+
         if not self.config_path.exists():
             logger.warning("Configuration file not found", path=str(self.config_path))
             return await self.get_default_configuration()
-        
+
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, encoding='utf-8') as f:
                 content = f.read()
-            
+
             # Substitute environment variables
             content = self._substitute_environment_variables(content)
-            
+
             # Parse YAML
             config = yaml.safe_load(content) or {}
-            
+
             # Cache the configuration
             self._config_cache = config
-            
-            logger.info("Loaded configuration", 
+
+            logger.info("Loaded configuration",
                        path=str(self.config_path),
                        services_count=len(config.get('services', [])))
-            
+
             return config
-            
+
         except yaml.YAMLError as e:
-            logger.error("Failed to parse YAML configuration", 
+            logger.error("Failed to parse YAML configuration",
                         path=str(self.config_path),
                         error=str(e))
             raise
         except Exception as e:
-            logger.error("Failed to load configuration", 
+            logger.error("Failed to load configuration",
                         path=str(self.config_path),
                         error=str(e))
             raise
-    
-    async def save_configuration(self, config: Dict[str, Any]) -> None:
+
+    async def save_configuration(self, config: dict[str, Any]) -> None:
         """Save configuration to YAML file.
         
         Args:
@@ -116,11 +117,11 @@ class YamlConfigRepository(ConfigRepository):
         """
         if yaml is None:
             raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
-        
+
         try:
             # Ensure parent directory exists
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Write YAML file
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(
@@ -131,21 +132,21 @@ class YamlConfigRepository(ConfigRepository):
                     indent=2,
                     allow_unicode=True
                 )
-            
+
             # Update cache
             self._config_cache = config
-            
-            logger.info("Saved configuration", 
+
+            logger.info("Saved configuration",
                        path=str(self.config_path),
                        services_count=len(config.get('services', [])))
-            
+
         except Exception as e:
-            logger.error("Failed to save configuration", 
+            logger.error("Failed to save configuration",
                         path=str(self.config_path),
                         error=str(e))
             raise
-    
-    async def validate_configuration(self, config: Dict[str, Any]) -> List[str]:
+
+    async def validate_configuration(self, config: dict[str, Any]) -> list[str]:
         """Validate configuration structure and content.
         
         Args:
@@ -155,19 +156,19 @@ class YamlConfigRepository(ConfigRepository):
             List of validation errors (empty if valid)
         """
         errors = []
-        
+
         # Check required top-level fields
         if not isinstance(config, dict):
             errors.append("Configuration must be a dictionary")
             return errors
-        
+
         # Validate version
         version = config.get('version')
         if not version:
             errors.append("Missing required field: version")
         elif not isinstance(version, str):
             errors.append("Version must be a string")
-        
+
         # Validate services
         services = config.get('services')
         if not services:
@@ -180,7 +181,7 @@ class YamlConfigRepository(ConfigRepository):
             for i, service in enumerate(services):
                 service_errors = self._validate_service(service, i)
                 errors.extend(service_errors)
-                
+
                 # Check for duplicate service names
                 name = service.get('name')
                 if name:
@@ -188,7 +189,7 @@ class YamlConfigRepository(ConfigRepository):
                         errors.append(f"Duplicate service name: {name}")
                     else:
                         service_names.add(name)
-        
+
         # Validate defaults (optional)
         defaults = config.get('defaults')
         if defaults is not None:
@@ -197,17 +198,17 @@ class YamlConfigRepository(ConfigRepository):
             else:
                 defaults_errors = self._validate_defaults(defaults)
                 errors.extend(defaults_errors)
-        
+
         if errors:
-            logger.warning("Configuration validation failed", 
+            logger.warning("Configuration validation failed",
                           errors=errors,
                           error_count=len(errors))
         else:
             logger.debug("Configuration validation passed")
-        
+
         return errors
-    
-    def _validate_service(self, service: Dict[str, Any], index: int) -> List[str]:
+
+    def _validate_service(self, service: dict[str, Any], index: int) -> list[str]:
         """Validate a single service configuration.
         
         Args:
@@ -219,74 +220,74 @@ class YamlConfigRepository(ConfigRepository):
         """
         errors = []
         prefix = f"Service {index}"
-        
+
         if not isinstance(service, dict):
             errors.append(f"{prefix}: must be a dictionary")
             return errors
-        
+
         # Required fields
         required_fields = ['name', 'technology', 'local_port', 'remote_port', 'connection']
         for field in required_fields:
             if field not in service:
                 errors.append(f"{prefix}: missing required field '{field}'")
-        
+
         # Validate name
         name = service.get('name')
         if name is not None:
             if not isinstance(name, str) or not name.strip():
                 errors.append(f"{prefix}: name must be a non-empty string")
-        
+
         # Validate technology
         technology = service.get('technology')
         if technology is not None:
             valid_technologies = ['kubectl', 'ssh']
             if technology not in valid_technologies:
                 errors.append(f"{prefix}: technology must be one of {valid_technologies}")
-        
+
         # Validate ports
         for port_field in ['local_port', 'remote_port']:
             port = service.get(port_field)
             if port is not None:
                 if not isinstance(port, int) or not (1 <= port <= 65535):
                     errors.append(f"{prefix}: {port_field} must be an integer between 1 and 65535")
-        
+
         # Validate connection
         connection = service.get('connection')
         if connection is not None:
             if not isinstance(connection, dict):
                 errors.append(f"{prefix}: connection must be a dictionary")
-        
+
         # Validate optional fields
         enabled = service.get('enabled')
         if enabled is not None and not isinstance(enabled, bool):
             errors.append(f"{prefix}: enabled must be a boolean")
-        
+
         tags = service.get('tags')
         if tags is not None:
             if not isinstance(tags, list):
                 errors.append(f"{prefix}: tags must be a list")
             elif not all(isinstance(tag, str) for tag in tags):
                 errors.append(f"{prefix}: all tags must be strings")
-        
+
         description = service.get('description')
         if description is not None and not isinstance(description, str):
             errors.append(f"{prefix}: description must be a string")
-        
+
         # Validate health_check
         health_check = service.get('health_check')
         if health_check is not None:
             health_errors = self._validate_health_check(health_check, f"{prefix}.health_check")
             errors.extend(health_errors)
-        
+
         # Validate restart_policy
         restart_policy = service.get('restart_policy')
         if restart_policy is not None:
             restart_errors = self._validate_restart_policy(restart_policy, f"{prefix}.restart_policy")
             errors.extend(restart_errors)
-        
+
         return errors
-    
-    def _validate_health_check(self, health_check: Dict[str, Any], prefix: str) -> List[str]:
+
+    def _validate_health_check(self, health_check: dict[str, Any], prefix: str) -> list[str]:
         """Validate health check configuration.
         
         Args:
@@ -297,11 +298,11 @@ class YamlConfigRepository(ConfigRepository):
             List of validation errors
         """
         errors = []
-        
+
         if not isinstance(health_check, dict):
             errors.append(f"{prefix}: must be a dictionary")
             return errors
-        
+
         # Validate type
         check_type = health_check.get('type')
         if not check_type:
@@ -310,7 +311,7 @@ class YamlConfigRepository(ConfigRepository):
             valid_types = ['tcp', 'http', 'https', 'kafka', 'postgres', 'postgresql']
             if check_type not in valid_types:
                 errors.append(f"{prefix}: type must be one of {valid_types}")
-        
+
         # Validate numeric fields
         numeric_fields = {
             'interval': (1, 3600),  # 1 second to 1 hour
@@ -318,16 +319,16 @@ class YamlConfigRepository(ConfigRepository):
             'failure_threshold': (1, 100),
             'success_threshold': (1, 100)
         }
-        
+
         for field, (min_val, max_val) in numeric_fields.items():
             value = health_check.get(field)
             if value is not None:
                 if not isinstance(value, (int, float)) or not (min_val <= value <= max_val):
                     errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
-        
+
         return errors
-    
-    def _validate_restart_policy(self, restart_policy: Dict[str, Any], prefix: str) -> List[str]:
+
+    def _validate_restart_policy(self, restart_policy: dict[str, Any], prefix: str) -> list[str]:
         """Validate restart policy configuration.
         
         Args:
@@ -338,16 +339,16 @@ class YamlConfigRepository(ConfigRepository):
             List of validation errors
         """
         errors = []
-        
+
         if not isinstance(restart_policy, dict):
             errors.append(f"{prefix}: must be a dictionary")
             return errors
-        
+
         # Validate enabled
         enabled = restart_policy.get('enabled')
         if enabled is not None and not isinstance(enabled, bool):
             errors.append(f"{prefix}.enabled: must be a boolean")
-        
+
         # Validate numeric fields
         numeric_fields = {
             'max_attempts': (1, 100),
@@ -355,16 +356,16 @@ class YamlConfigRepository(ConfigRepository):
             'max_delay': (1, 86400),  # 1 day
             'backoff_multiplier': (1.0, 10.0)
         }
-        
+
         for field, (min_val, max_val) in numeric_fields.items():
             value = restart_policy.get(field)
             if value is not None:
                 if not isinstance(value, (int, float)) or not (min_val <= value <= max_val):
                     errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
-        
+
         return errors
-    
-    def _validate_defaults(self, defaults: Dict[str, Any]) -> List[str]:
+
+    def _validate_defaults(self, defaults: dict[str, Any]) -> list[str]:
         """Validate defaults configuration.
         
         Args:
@@ -374,22 +375,22 @@ class YamlConfigRepository(ConfigRepository):
             List of validation errors
         """
         errors = []
-        
+
         # Validate health_check defaults
         health_check = defaults.get('health_check')
         if health_check is not None:
             health_errors = self._validate_health_check(health_check, "defaults.health_check")
             errors.extend(health_errors)
-        
+
         # Validate restart_policy defaults
         restart_policy = defaults.get('restart_policy')
         if restart_policy is not None:
             restart_errors = self._validate_restart_policy(restart_policy, "defaults.restart_policy")
             errors.extend(restart_errors)
-        
+
         return errors
-    
-    async def get_default_configuration(self) -> Dict[str, Any]:
+
+    async def get_default_configuration(self) -> dict[str, Any]:
         """Get default configuration template.
         
         Returns:
@@ -415,7 +416,7 @@ class YamlConfigRepository(ConfigRepository):
                 }
             }
         }
-    
+
     def _substitute_environment_variables(self, content: str) -> str:
         """Substitute environment variables in configuration content.
         
@@ -427,7 +428,7 @@ class YamlConfigRepository(ConfigRepository):
         """
         def replace_var(match):
             var_expr = match.group(1)
-            
+
             # Handle default values: ${VAR:default}
             if ':' in var_expr:
                 var_name, default_value = var_expr.split(':', 1)
@@ -435,27 +436,27 @@ class YamlConfigRepository(ConfigRepository):
             else:
                 var_name = var_expr.strip()
                 value = os.getenv(var_name)
-                
+
                 if value is None:
-                    logger.warning("Environment variable not found", 
+                    logger.warning("Environment variable not found",
                                   variable=var_name,
                                   placeholder=match.group(0))
                     # Return the original placeholder if variable not found
                     return match.group(0)
-                
+
                 return value
-        
+
         # Substitute all ${VAR} and ${VAR:default} patterns
         substituted = self._env_var_pattern.sub(replace_var, content)
-        
+
         # Log substitutions for debugging
         if substituted != content:
             substitution_count = len(self._env_var_pattern.findall(content))
-            logger.debug("Substituted environment variables", 
+            logger.debug("Substituted environment variables",
                         count=substitution_count)
-        
+
         return substituted
-    
+
     def get_config_path(self) -> Path:
         """Get the path to the configuration file.
         
@@ -463,13 +464,13 @@ class YamlConfigRepository(ConfigRepository):
             Path to configuration file
         """
         return self.config_path
-    
+
     def clear_cache(self) -> None:
         """Clear the configuration cache."""
         self._config_cache = None
         logger.debug("Cleared configuration cache")
-    
-    async def reload_configuration(self) -> Dict[str, Any]:
+
+    async def reload_configuration(self) -> dict[str, Any]:
         """Reload configuration from file, bypassing cache.
         
         Returns:
@@ -477,8 +478,8 @@ class YamlConfigRepository(ConfigRepository):
         """
         self.clear_cache()
         return await self.load_configuration()
-    
-    async def backup_configuration(self, backup_path: Optional[str] = None) -> str:
+
+    async def backup_configuration(self, backup_path: str | None = None) -> str:
         """Create a backup of the current configuration file.
         
         Args:
@@ -489,25 +490,25 @@ class YamlConfigRepository(ConfigRepository):
         """
         if not self.config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
-        
+
         if backup_path is None:
             timestamp = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
             backup_path = f"{self.config_path}.backup_{timestamp}"
-        
+
         backup_path = Path(backup_path)
-        
+
         # Copy configuration file
         import shutil
         shutil.copy2(self.config_path, backup_path)
-        
-        logger.info("Created configuration backup", 
+
+        logger.info("Created configuration backup",
                    original=str(self.config_path),
                    backup=str(backup_path))
-        
+
         return str(backup_path)
-    
+
     # Abstract method implementations
-    async def load_services(self, config_path: Optional[Path] = None) -> List[Service]:
+    async def load_services(self, config_path: Path | None = None) -> list[Service]:
         """Load services from configuration."""
         if config_path:
             old_path = self.config_path
@@ -518,9 +519,9 @@ class YamlConfigRepository(ConfigRepository):
                 self.config_path = old_path
         else:
             config = await self._load_config_internal()
-        
+
         services = []
-        
+
         for service_config in config.get('services', []):
             try:
                 # Create Service entity from configuration
@@ -538,83 +539,83 @@ class YamlConfigRepository(ConfigRepository):
                 )
                 services.append(service)
             except Exception as e:
-                logger.error("Failed to create service from config", 
+                logger.error("Failed to create service from config",
                            service_name=service_config.get('name', 'unknown'),
                            error=str(e))
                 raise ConfigurationError(f"Invalid service configuration: {e}")
-        
+
         return services
-    
-    async def _load_config_internal(self) -> Dict[str, Any]:
+
+    async def _load_config_internal(self) -> dict[str, Any]:
         """Internal method to load configuration without recursion."""
         if yaml is None:
             raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
-        
+
         if not self.config_path.exists():
             logger.warning("Configuration file not found", path=str(self.config_path))
             return await self.get_default_configuration()
-        
+
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, encoding='utf-8') as f:
                 content = f.read()
-            
+
             # Substitute environment variables
             content = self._substitute_environment_variables(content)
-            
+
             # Parse YAML
             config = yaml.safe_load(content) or {}
-            
+
             # Cache the configuration
             self._config_cache = config
-            
-            logger.info("Loaded configuration", 
+
+            logger.info("Loaded configuration",
                        path=str(self.config_path),
                        services_count=len(config.get('services', [])))
-            
+
             return config
-            
+
         except yaml.YAMLError as e:
-            logger.error("Failed to parse YAML configuration", 
+            logger.error("Failed to parse YAML configuration",
                         path=str(self.config_path),
                         error=str(e))
             raise
         except Exception as e:
-            logger.error("Failed to load configuration", 
+            logger.error("Failed to load configuration",
                         path=str(self.config_path),
                         error=str(e))
             raise
-    
-    async def get_default_config_paths(self) -> List[Path]:
+
+    async def get_default_config_paths(self) -> list[Path]:
         """Get list of default configuration file paths to search."""
         return [
             Path.cwd() / "localport.yaml",
-            Path.cwd() / "localport.yml", 
+            Path.cwd() / "localport.yml",
             Path.cwd() / ".localport.yaml",
             Path.home() / ".localport.yaml",
             Path.home() / ".config" / "localport" / "config.yaml",
             Path("/etc/localport/config.yaml"),
         ]
-    
-    async def find_config_file(self) -> Optional[Path]:
+
+    async def find_config_file(self) -> Path | None:
         """Find the first existing configuration file in default locations."""
         search_paths = await self.get_default_config_paths()
-        
+
         for path in search_paths:
             if path.exists():
                 logger.info("Found configuration file", path=str(path))
                 return path
-        
+
         logger.debug("No configuration file found in default locations")
         return None
-    
-    async def substitute_environment_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def substitute_environment_variables(self, config: dict[str, Any]) -> dict[str, Any]:
         """Substitute environment variables in configuration."""
         import json
-        
+
         # Convert config to JSON string, substitute variables, then parse back
         config_str = json.dumps(config)
         substituted_str = self._substitute_environment_variables(config_str)
-        
+
         try:
             return json.loads(substituted_str)
         except json.JSONDecodeError as e:

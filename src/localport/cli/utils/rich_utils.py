@@ -1,18 +1,17 @@
 """Rich utilities for CLI formatting and logging."""
 
 import logging
-import sys
-from typing import Optional
+
+import structlog
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install
-import structlog
 
 
 def setup_rich_logging(
     level: str = "INFO",
     verbose: bool = False,
-    console: Optional[Console] = None
+    console: Console | None = None
 ) -> None:
     """Setup Rich-based logging for the CLI.
     
@@ -23,13 +22,13 @@ def setup_rich_logging(
     """
     if console is None:
         console = Console()
-    
+
     # Install rich traceback handler
     install(console=console, show_locals=verbose)
-    
+
     # Configure log level
     log_level = getattr(logging, level.upper(), logging.INFO)
-    
+
     # Setup Rich handler for standard logging
     rich_handler = RichHandler(
         console=console,
@@ -39,7 +38,7 @@ def setup_rich_logging(
         tracebacks_show_locals=verbose
     )
     rich_handler.setLevel(log_level)
-    
+
     # Configure root logger
     logging.basicConfig(
         level=log_level,
@@ -47,7 +46,7 @@ def setup_rich_logging(
         datefmt="[%X]",
         handlers=[rich_handler]
     )
-    
+
     # Configure structlog to work properly with Rich
     if verbose:
         # For verbose mode, use JSON renderer for structured output
@@ -58,7 +57,7 @@ def setup_rich_logging(
             key_order=['timestamp', 'level', 'event'],
             drop_missing=True
         )
-    
+
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
@@ -181,7 +180,7 @@ def format_health_status(is_healthy: bool, failure_count: int = 0) -> str:
             return "[red]✗ Unhealthy[/red]"
 
 
-def create_error_panel(title: str, message: str, suggestion: Optional[str] = None) -> str:
+def create_error_panel(title: str, message: str, suggestion: str | None = None) -> str:
     """Create a formatted error panel.
     
     Args:
@@ -194,22 +193,22 @@ def create_error_panel(title: str, message: str, suggestion: Optional[str] = Non
     """
     from rich.panel import Panel
     from rich.text import Text
-    
+
     content = Text()
     content.append(message, style="red")
-    
+
     if suggestion:
         content.append("\n\n")
         content.append("💡 Suggestion: ", style="yellow")
         content.append(suggestion, style="white")
-    
+
     panel = Panel(
         content,
         title=f"[bold red]{title}[/bold red]",
         border_style="red",
         padding=(1, 2)
     )
-    
+
     return panel
 
 
@@ -225,18 +224,18 @@ def create_success_panel(title: str, message: str) -> str:
     """
     from rich.panel import Panel
     from rich.text import Text
-    
+
     content = Text()
     content.append("✓ ", style="green")
     content.append(message, style="white")
-    
+
     panel = Panel(
         content,
         title=f"[bold green]{title}[/bold green]",
         border_style="green",
         padding=(1, 2)
     )
-    
+
     return panel
 
 
@@ -252,16 +251,16 @@ def create_info_panel(title: str, message: str) -> str:
     """
     from rich.panel import Panel
     from rich.text import Text
-    
+
     content = Text()
     content.append("ℹ ", style="blue")
     content.append(message, style="white")
-    
+
     panel = Panel(
         content,
         title=f"[bold blue]{title}[/bold blue]",
         border_style="blue",
         padding=(1, 2)
     )
-    
+
     return panel

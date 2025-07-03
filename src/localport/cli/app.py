@@ -1,18 +1,17 @@
 """Main CLI application using Typer and Rich."""
 
+import os
+import sys
+
+import structlog
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-from typing import Optional
-import sys
-import os
-from pathlib import Path
-import structlog
 
 from ..config.settings import Settings
-from .utils.rich_utils import setup_rich_logging
 from .formatters.output_format import OutputFormat
+from .utils.rich_utils import setup_rich_logging
 
 # Initialize console and logger
 console = Console()
@@ -29,26 +28,26 @@ app = typer.Typer(
 )
 
 # Global settings instance
-settings: Optional[Settings] = None
+settings: Settings | None = None
 
 
 def version_callback(value: bool):
     """Show version information."""
     if value:
         from .. import __version__
-        
+
         # Create a rich version display
         version_text = Text()
         version_text.append("LocalPort ", style="bold blue")
         version_text.append(f"v{__version__}", style="bold green")
-        
+
         panel = Panel(
             version_text,
             title="[bold]Version Information[/bold]",
             border_style="blue",
             padding=(1, 2)
         )
-        
+
         console.print(panel)
         raise typer.Exit()
 
@@ -56,7 +55,7 @@ def version_callback(value: bool):
 @app.callback()
 def main(
     ctx: typer.Context,
-    version: Optional[bool] = typer.Option(
+    version: bool | None = typer.Option(
         None,
         "--version",
         "-V",
@@ -64,7 +63,7 @@ def main(
         is_eager=True,
         help="Show version information and exit"
     ),
-    config_file: Optional[str] = typer.Option(
+    config_file: str | None = typer.Option(
         None,
         "--config",
         "-c",
@@ -133,44 +132,44 @@ def main(
     Use --config to specify a custom configuration file.
     """
     global settings
-    
+
     # Initialize context object
     ctx.ensure_object(dict)
-    
+
     # Handle no-color option
     if no_color:
         console._color_system = None
         os.environ["NO_COLOR"] = "1"
-    
+
     # Handle quiet mode
     if quiet:
         log_level = "ERROR"
         verbose = False
-    
+
     # Handle verbose mode
     if verbose:
         log_level = "DEBUG"
-    
+
     # Validate log level
     valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
     if log_level.upper() not in valid_levels:
         console.print(f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: {', '.join(valid_levels)}")
         raise typer.Exit(1)
-    
+
     # Validate output format
     try:
         output_format = OutputFormat.from_string(output)
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
-    
+
     # Setup logging
     setup_rich_logging(
         level=log_level.upper(),
         verbose=verbose,
         console=console
     )
-    
+
     # Initialize settings
     try:
         settings = Settings(
@@ -179,7 +178,7 @@ def main(
             verbose=verbose,
             quiet=quiet
         )
-        
+
         # Store in context for commands
         ctx.obj.update({
             'settings': settings,
@@ -191,13 +190,13 @@ def main(
             'no_color': no_color,
             'output_format': output_format
         })
-        
-        logger.debug("CLI initialized", 
+
+        logger.debug("CLI initialized",
                     config_file=config_file,
                     log_level=log_level,
                     verbose=verbose,
                     quiet=quiet)
-        
+
     except Exception as e:
         console.print(f"[red]Error initializing LocalPort:[/red] {e}")
         if verbose:
@@ -206,13 +205,20 @@ def main(
 
 
 # Import command implementations
-from .commands.service_commands import start_services_sync, stop_services_sync, status_services_sync
+from .commands.config_commands import export_config_sync, validate_config_sync
 from .commands.daemon_commands import (
-    start_daemon_sync, stop_daemon_sync, restart_daemon_sync, 
-    status_daemon_sync, reload_daemon_sync
+    reload_daemon_sync,
+    restart_daemon_sync,
+    start_daemon_sync,
+    status_daemon_sync,
+    stop_daemon_sync,
 )
 from .commands.log_commands import logs_sync
-from .commands.config_commands import export_config_sync, validate_config_sync
+from .commands.service_commands import (
+    start_services_sync,
+    status_services_sync,
+    stop_services_sync,
+)
 
 # Service management commands
 app.command(name="start")(start_services_sync)

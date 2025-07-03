@@ -1,7 +1,8 @@
 """Kafka-specific health check implementation."""
 
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -9,7 +10,7 @@ logger = structlog.get_logger()
 
 class KafkaHealthCheck:
     """Kafka-specific health check using bootstrap servers."""
-    
+
     def __init__(self, timeout: float = 10.0):
         """Initialize Kafka health check.
         
@@ -17,8 +18,8 @@ class KafkaHealthCheck:
             timeout: Connection timeout in seconds
         """
         self.timeout = timeout
-    
-    async def check(self, config: Dict[str, Any]) -> bool:
+
+    async def check(self, config: dict[str, Any]) -> bool:
         """Check Kafka connectivity via bootstrap servers.
         
         Args:
@@ -28,7 +29,7 @@ class KafkaHealthCheck:
             True if Kafka is healthy, False otherwise
         """
         bootstrap_servers = config.get('bootstrap_servers', 'localhost:9092')
-        
+
         try:
             # Import kafka-python here to make it optional
             try:
@@ -37,18 +38,18 @@ class KafkaHealthCheck:
             except ImportError:
                 logger.error("kafka-python not installed. Install with: pip install kafka-python")
                 return False
-            
+
             # Run the blocking Kafka operations in a thread pool
             return await asyncio.get_event_loop().run_in_executor(
                 None, self._check_kafka_sync, bootstrap_servers
             )
-            
+
         except Exception as e:
-            logger.debug("Kafka health check failed", 
+            logger.debug("Kafka health check failed",
                         bootstrap_servers=bootstrap_servers,
                         error=str(e))
             return False
-    
+
     def _check_kafka_sync(self, bootstrap_servers: str) -> bool:
         """Synchronous Kafka connectivity check.
         
@@ -61,7 +62,7 @@ class KafkaHealthCheck:
         try:
             from kafka import KafkaConsumer
             from kafka.errors import KafkaError, NoBrokersAvailable
-            
+
             # Create a consumer to test connectivity
             consumer = KafkaConsumer(
                 bootstrap_servers=bootstrap_servers.split(','),
@@ -72,34 +73,34 @@ class KafkaHealthCheck:
                 enable_auto_commit=False,
                 auto_offset_reset='earliest'
             )
-            
+
             try:
                 # Try to get cluster metadata - this will test connectivity
                 metadata = consumer.list_consumer_groups()
-                logger.debug("Kafka health check passed", 
+                logger.debug("Kafka health check passed",
                             bootstrap_servers=bootstrap_servers,
                             consumer_groups_count=len(metadata))
                 return True
-                
+
             finally:
                 consumer.close()
-                
+
         except NoBrokersAvailable:
-            logger.debug("Kafka health check failed - no brokers available", 
+            logger.debug("Kafka health check failed - no brokers available",
                         bootstrap_servers=bootstrap_servers)
             return False
         except KafkaError as e:
-            logger.debug("Kafka health check failed - Kafka error", 
+            logger.debug("Kafka health check failed - Kafka error",
                         bootstrap_servers=bootstrap_servers,
                         error=str(e))
             return False
         except Exception as e:
-            logger.debug("Kafka health check failed - unexpected error", 
+            logger.debug("Kafka health check failed - unexpected error",
                         bootstrap_servers=bootstrap_servers,
                         error=str(e))
             return False
-    
-    async def check_topic_exists(self, config: Dict[str, Any], topic_name: str) -> bool:
+
+    async def check_topic_exists(self, config: dict[str, Any], topic_name: str) -> bool:
         """Check if a specific Kafka topic exists.
         
         Args:
@@ -110,22 +111,20 @@ class KafkaHealthCheck:
             True if topic exists, False otherwise
         """
         bootstrap_servers = config.get('bootstrap_servers', 'localhost:9092')
-        
+
         try:
-            from kafka import KafkaConsumer
-            from kafka.errors import KafkaError
-            
+
             return await asyncio.get_event_loop().run_in_executor(
                 None, self._check_topic_sync, bootstrap_servers, topic_name
             )
-            
+
         except Exception as e:
-            logger.debug("Kafka topic check failed", 
+            logger.debug("Kafka topic check failed",
                         topic=topic_name,
                         bootstrap_servers=bootstrap_servers,
                         error=str(e))
             return False
-    
+
     def _check_topic_sync(self, bootstrap_servers: str, topic_name: str) -> bool:
         """Synchronous Kafka topic existence check.
         
@@ -138,8 +137,7 @@ class KafkaHealthCheck:
         """
         try:
             from kafka import KafkaConsumer
-            from kafka.errors import KafkaError
-            
+
             consumer = KafkaConsumer(
                 bootstrap_servers=bootstrap_servers.split(','),
                 consumer_timeout_ms=int(self.timeout * 1000),
@@ -147,28 +145,28 @@ class KafkaHealthCheck:
                 request_timeout_ms=int(self.timeout * 1000),
                 enable_auto_commit=False
             )
-            
+
             try:
                 # Get topic metadata
                 topics = consumer.topics()
                 exists = topic_name in topics
-                
-                logger.debug("Kafka topic check completed", 
+
+                logger.debug("Kafka topic check completed",
                             topic=topic_name,
                             exists=exists,
                             available_topics=len(topics))
                 return exists
-                
+
             finally:
                 consumer.close()
-                
+
         except Exception as e:
-            logger.debug("Kafka topic check failed", 
+            logger.debug("Kafka topic check failed",
                         topic=topic_name,
                         error=str(e))
             return False
-    
-    async def check_producer_connectivity(self, config: Dict[str, Any]) -> bool:
+
+    async def check_producer_connectivity(self, config: dict[str, Any]) -> bool:
         """Check Kafka producer connectivity.
         
         Args:
@@ -178,21 +176,19 @@ class KafkaHealthCheck:
             True if producer can connect, False otherwise
         """
         bootstrap_servers = config.get('bootstrap_servers', 'localhost:9092')
-        
+
         try:
-            from kafka import KafkaProducer
-            from kafka.errors import KafkaError
-            
+
             return await asyncio.get_event_loop().run_in_executor(
                 None, self._check_producer_sync, bootstrap_servers
             )
-            
+
         except Exception as e:
-            logger.debug("Kafka producer check failed", 
+            logger.debug("Kafka producer check failed",
                         bootstrap_servers=bootstrap_servers,
                         error=str(e))
             return False
-    
+
     def _check_producer_sync(self, bootstrap_servers: str) -> bool:
         """Synchronous Kafka producer connectivity check.
         
@@ -204,8 +200,7 @@ class KafkaHealthCheck:
         """
         try:
             from kafka import KafkaProducer
-            from kafka.errors import KafkaError
-            
+
             producer = KafkaProducer(
                 bootstrap_servers=bootstrap_servers.split(','),
                 request_timeout_ms=int(self.timeout * 1000),
@@ -213,19 +208,19 @@ class KafkaHealthCheck:
                 # Don't actually send any messages
                 max_block_ms=int(self.timeout * 1000)
             )
-            
+
             try:
                 # Try to get cluster metadata
                 metadata = producer.partitions_for('__test_topic__')
-                logger.debug("Kafka producer check passed", 
+                logger.debug("Kafka producer check passed",
                             bootstrap_servers=bootstrap_servers)
                 return True
-                
+
             finally:
                 producer.close()
-                
+
         except Exception as e:
-            logger.debug("Kafka producer check failed", 
+            logger.debug("Kafka producer check failed",
                         bootstrap_servers=bootstrap_servers,
                         error=str(e))
             return False

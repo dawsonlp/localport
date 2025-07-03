@@ -1,7 +1,8 @@
 """Base adapter interface for port forwarding implementations."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -9,13 +10,13 @@ logger = structlog.get_logger()
 
 class PortForwardingAdapter(ABC):
     """Abstract base class for port forwarding adapters."""
-    
+
     @abstractmethod
     async def start_port_forward(
         self,
         local_port: int,
         remote_port: int,
-        connection_info: Dict[str, Any]
+        connection_info: dict[str, Any]
     ) -> int:
         """Start a port forwarding process.
         
@@ -31,7 +32,7 @@ class PortForwardingAdapter(ABC):
             RuntimeError: If port forward fails to start
         """
         pass
-    
+
     @abstractmethod
     async def stop_port_forward(self, process_id: int) -> None:
         """Stop a port forwarding process.
@@ -43,7 +44,7 @@ class PortForwardingAdapter(ABC):
             RuntimeError: If process cannot be stopped
         """
         pass
-    
+
     @abstractmethod
     async def is_port_forward_running(self, process_id: int) -> bool:
         """Check if a port forward process is still running.
@@ -55,9 +56,9 @@ class PortForwardingAdapter(ABC):
             True if process is running, False otherwise
         """
         pass
-    
+
     @abstractmethod
-    async def validate_connection_info(self, connection_info: Dict[str, Any]) -> list[str]:
+    async def validate_connection_info(self, connection_info: dict[str, Any]) -> list[str]:
         """Validate connection information for this adapter.
         
         Args:
@@ -67,7 +68,7 @@ class PortForwardingAdapter(ABC):
             List of validation errors (empty if valid)
         """
         pass
-    
+
     @abstractmethod
     def get_adapter_name(self) -> str:
         """Get the name of this adapter.
@@ -76,7 +77,7 @@ class PortForwardingAdapter(ABC):
             Human-readable adapter name
         """
         pass
-    
+
     @abstractmethod
     def get_required_tools(self) -> list[str]:
         """Get list of required external tools for this adapter.
@@ -85,7 +86,7 @@ class PortForwardingAdapter(ABC):
             List of required tool names (e.g., ['kubectl', 'ssh'])
         """
         pass
-    
+
     async def check_prerequisites(self) -> bool:
         """Check if all prerequisites for this adapter are met.
         
@@ -93,26 +94,26 @@ class PortForwardingAdapter(ABC):
             True if prerequisites are met, False otherwise
         """
         import shutil
-        
+
         required_tools = self.get_required_tools()
         missing_tools = []
-        
+
         for tool in required_tools:
             if not shutil.which(tool):
                 missing_tools.append(tool)
-        
+
         if missing_tools:
-            logger.warning("Missing required tools for adapter", 
+            logger.warning("Missing required tools for adapter",
                           adapter=self.get_adapter_name(),
                           missing_tools=missing_tools)
             return False
-        
-        logger.debug("Prerequisites check passed", 
+
+        logger.debug("Prerequisites check passed",
                     adapter=self.get_adapter_name(),
                     required_tools=required_tools)
         return True
-    
-    async def get_port_forward_status(self, process_id: int) -> Dict[str, Any]:
+
+    async def get_port_forward_status(self, process_id: int) -> dict[str, Any]:
         """Get detailed status of a port forward process.
         
         Args:
@@ -123,16 +124,16 @@ class PortForwardingAdapter(ABC):
         """
         try:
             import psutil
-            
+
             if not psutil.pid_exists(process_id):
                 return {
                     'running': False,
                     'status': 'not_found',
                     'error': 'Process not found'
                 }
-            
+
             process = psutil.Process(process_id)
-            
+
             return {
                 'running': True,
                 'status': process.status(),
@@ -141,9 +142,9 @@ class PortForwardingAdapter(ABC):
                 'create_time': process.create_time(),
                 'cmdline': process.cmdline()
             }
-            
+
         except Exception as e:
-            logger.error("Failed to get port forward status", 
+            logger.error("Failed to get port forward status",
                         process_id=process_id,
                         error=str(e))
             return {
@@ -151,7 +152,7 @@ class PortForwardingAdapter(ABC):
                 'status': 'error',
                 'error': str(e)
             }
-    
+
     async def cleanup_dead_processes(self) -> int:
         """Clean up any dead port forward processes created by this adapter.
         
@@ -161,41 +162,41 @@ class PortForwardingAdapter(ABC):
         # Default implementation - subclasses can override for adapter-specific cleanup
         try:
             import psutil
-            
+
             cleaned_count = 0
             adapter_name = self.get_adapter_name().lower()
-            
+
             # Look for processes that might be from this adapter
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     cmdline = proc.info.get('cmdline', [])
                     if not cmdline:
                         continue
-                    
+
                     # Check if this looks like a process from this adapter
                     cmdline_str = ' '.join(cmdline).lower()
-                    
+
                     if adapter_name in cmdline_str and 'port-forward' in cmdline_str:
                         # Check if process is actually dead/zombie
                         if proc.status() in [psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD]:
                             proc.terminate()
                             cleaned_count += 1
-                            logger.debug("Cleaned up dead process", 
+                            logger.debug("Cleaned up dead process",
                                         adapter=self.get_adapter_name(),
                                         pid=proc.pid)
-                            
+
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
-            
+
             if cleaned_count > 0:
-                logger.info("Cleaned up dead processes", 
+                logger.info("Cleaned up dead processes",
                            adapter=self.get_adapter_name(),
                            count=cleaned_count)
-            
+
             return cleaned_count
-            
+
         except Exception as e:
-            logger.error("Failed to cleanup dead processes", 
+            logger.error("Failed to cleanup dead processes",
                         adapter=self.get_adapter_name(),
                         error=str(e))
             return 0

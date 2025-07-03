@@ -5,31 +5,35 @@ from typing import Any
 from rich.console import Console
 from rich.table import Table
 
-from .output_format import OutputFormat
-from .json_formatter import (
-    ServiceStatusJSONFormatter,
-    ServiceOperationJSONFormatter,
-    DaemonStatusJSONFormatter,
-    DaemonOperationJSONFormatter
-)
 from ..utils.rich_utils import (
-    format_service_name, format_port, format_technology, format_health_status,
-    get_status_color, format_uptime
+    format_health_status,
+    format_port,
+    format_service_name,
+    format_technology,
+    format_uptime,
+    get_status_color,
 )
+from .json_formatter import (
+    DaemonOperationJSONFormatter,
+    DaemonStatusJSONFormatter,
+    ServiceOperationJSONFormatter,
+    ServiceStatusJSONFormatter,
+)
+from .output_format import OutputFormat
 
 
 class FormatRouter:
     """Routes output formatting based on the requested format."""
-    
+
     def __init__(self, console: Console):
         self.console = console
-        
+
         # Initialize JSON formatters
         self.service_status_json = ServiceStatusJSONFormatter()
         self.service_operation_json = ServiceOperationJSONFormatter()
         self.daemon_status_json = DaemonStatusJSONFormatter()
         self.daemon_operation_json = DaemonOperationJSONFormatter()
-    
+
     def format_service_status(self, data: Any, output_format: OutputFormat) -> str:
         """Format service status output.
         
@@ -46,7 +50,7 @@ class FormatRouter:
             return self._format_service_status_table(data)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
-    
+
     def format_service_operation(self, data: Any, output_format: OutputFormat, command_name: str) -> str:
         """Format service operation output.
         
@@ -64,7 +68,7 @@ class FormatRouter:
             return self._format_service_operation_table(data, command_name)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
-    
+
     def format_daemon_status(self, data: Any, output_format: OutputFormat) -> str:
         """Format daemon status output.
         
@@ -81,7 +85,7 @@ class FormatRouter:
             return self._format_daemon_status_table(data)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
-    
+
     def format_daemon_operation(self, data: Any, output_format: OutputFormat, command_name: str) -> str:
         """Format daemon operation output.
         
@@ -99,7 +103,7 @@ class FormatRouter:
             return self._format_daemon_operation_table(data, command_name)
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
-    
+
     def _format_service_status_table(self, data: Any) -> str:
         """Format service status as Rich table.
         
@@ -118,19 +122,19 @@ class FormatRouter:
         table.add_column("Target", style="yellow")
         table.add_column("Health", style="bold")
         table.add_column("Uptime", style="dim")
-        
+
         # Check if we have services to display
         if data.services:
             for service_info in data.services:
                 status_color = get_status_color(
-                    service_info.status.value if hasattr(service_info.status, 'value') 
+                    service_info.status.value if hasattr(service_info.status, 'value')
                     else str(service_info.status)
                 )
                 health_status = format_health_status(
                     service_info.is_healthy,
                     getattr(service_info, 'failure_count', 0)
                 )
-                
+
                 table.add_row(
                     format_service_name(service_info.name),
                     f"[{status_color}]{str(service_info.status).title()}[/{status_color}]",
@@ -142,17 +146,17 @@ class FormatRouter:
                 )
         else:
             table.add_row("No services found", "-", "-", "-", "-", "-", "-")
-        
+
         # For table format, we should directly print to console, not capture
         # The FormatRouter should return a signal to print directly
         self.console.print(table)
-        
+
         # Add summary
         summary = f"Total: {data.total_services} | Running: {data.running_services} | Healthy: {data.healthy_services}"
         self.console.print(f"\n[dim]{summary}[/dim]")
-        
+
         return ""  # Return empty string since we printed directly
-    
+
     def _format_service_operation_table(self, data: Any, command_name: str) -> str:
         """Format service operation as Rich table.
         
@@ -172,7 +176,7 @@ class FormatRouter:
                 return f"✗ Service {command_name} operation failed: {getattr(data, 'error', 'Unknown error')}"
         else:
             return f"Service {command_name} operation completed"
-    
+
     def _format_daemon_status_table(self, data: Any) -> str:
         """Format daemon status as Rich table.
         
@@ -186,15 +190,15 @@ class FormatRouter:
         table = Table(title="Daemon Status")
         table.add_column("Property", style="bold blue")
         table.add_column("Value", style="white")
-        
+
         # Check if we have status information
         if hasattr(data, 'status') and data.status:
             status_info = data.status
             is_running = getattr(status_info, 'running', False)
-            
+
             # Add daemon information
-            table.add_row("Status", f"[green]Running[/green]" if is_running else f"[red]Stopped[/red]")
-            
+            table.add_row("Status", "[green]Running[/green]" if is_running else "[red]Stopped[/red]")
+
             if is_running:
                 if hasattr(status_info, 'pid') and status_info.pid:
                     table.add_row("PID", str(status_info.pid))
@@ -204,15 +208,15 @@ class FormatRouter:
                     table.add_row("Active Services", str(status_info.active_services or 0))
         else:
             # Fallback - show basic status based on success
-            table.add_row("Status", f"[red]Stopped[/red]")
+            table.add_row("Status", "[red]Stopped[/red]")
             table.add_row("Message", getattr(data, 'message', 'Daemon is not running'))
-        
+
         # Capture table output
         with self.console.capture() as capture:
             self.console.print(table)
-        
+
         return capture.get()
-    
+
     def _format_daemon_operation_table(self, data: Any, command_name: str) -> str:
         """Format daemon operation as Rich table.
         

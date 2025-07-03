@@ -1,9 +1,7 @@
 """Main entry point for LocalPort CLI application."""
 
 import sys
-from typing import Optional
 
-import typer
 from rich.console import Console
 
 from .cli.app import cli_main
@@ -16,7 +14,7 @@ def main() -> None:
     try:
         # Run the CLI application
         cli_main()
-        
+
     except KeyboardInterrupt:
         console.print("\n👋 Goodbye!")
         sys.exit(0)

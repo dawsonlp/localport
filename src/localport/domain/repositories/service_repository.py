@@ -1,7 +1,6 @@
 """Service repository interface for service persistence."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
 from uuid import UUID
 
 from ..entities.service import Service
@@ -9,7 +8,7 @@ from ..entities.service import Service
 
 class ServiceRepository(ABC):
     """Repository interface for service persistence."""
-    
+
     @abstractmethod
     async def save(self, service: Service) -> None:
         """Save a service.
@@ -21,9 +20,9 @@ class ServiceRepository(ABC):
             RepositoryError: If the service cannot be saved
         """
         pass
-    
+
     @abstractmethod
-    async def find_by_id(self, service_id: UUID) -> Optional[Service]:
+    async def find_by_id(self, service_id: UUID) -> Service | None:
         """Find a service by ID.
         
         Args:
@@ -36,9 +35,9 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
-    async def find_by_name(self, name: str) -> Optional[Service]:
+    async def find_by_name(self, name: str) -> Service | None:
         """Find a service by name.
         
         Args:
@@ -51,9 +50,9 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
-    async def find_all(self) -> List[Service]:
+    async def find_all(self) -> list[Service]:
         """Find all services.
         
         Returns:
@@ -63,9 +62,9 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
-    async def find_by_tags(self, tags: List[str]) -> List[Service]:
+    async def find_by_tags(self, tags: list[str]) -> list[Service]:
         """Find services by tags.
         
         Args:
@@ -78,9 +77,9 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
-    async def find_enabled(self) -> List[Service]:
+    async def find_enabled(self) -> list[Service]:
         """Find all enabled services.
         
         Returns:
@@ -90,7 +89,7 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
     async def delete(self, service_id: UUID) -> bool:
         """Delete a service.
@@ -105,7 +104,7 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
     async def exists(self, service_id: UUID) -> bool:
         """Check if a service exists.
@@ -120,7 +119,7 @@ class ServiceRepository(ABC):
             RepositoryError: If there's an error accessing the repository
         """
         pass
-    
+
     @abstractmethod
     async def count(self) -> int:
         """Count the total number of services.
@@ -141,8 +140,8 @@ class RepositoryError(Exception):
 
 class ServiceNotFoundError(RepositoryError):
     """Raised when a service is not found."""
-    
-    def __init__(self, service_id: Optional[UUID] = None, service_name: Optional[str] = None):
+
+    def __init__(self, service_id: UUID | None = None, service_name: str | None = None):
         if service_id:
             message = f"Service with ID {service_id} not found"
         elif service_name:
@@ -156,7 +155,7 @@ class ServiceNotFoundError(RepositoryError):
 
 class DuplicateServiceError(RepositoryError):
     """Raised when attempting to create a service with a duplicate name."""
-    
+
     def __init__(self, service_name: str):
         super().__init__(f"Service with name '{service_name}' already exists")
         self.service_name = service_name

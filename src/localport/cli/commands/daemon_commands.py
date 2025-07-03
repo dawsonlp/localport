@@ -1,27 +1,29 @@
 """Daemon management commands for LocalPort CLI."""
 
 import asyncio
-from typing import Optional
-from pathlib import Path
 
+import structlog
 import typer
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
-import structlog
+from rich.table import Table
 
-from ...application.use_cases.manage_daemon import ManageDaemonUseCase
 from ...application.services.daemon_manager import DaemonManager
 from ...application.services.health_monitor_scheduler import HealthMonitorScheduler
 from ...application.services.restart_manager import RestartManager
 from ...application.services.service_manager import ServiceManager
-from ...infrastructure.repositories.memory_service_repository import MemoryServiceRepository
-from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from ...application.use_cases.manage_daemon import ManageDaemonUseCase
 from ...infrastructure.adapters.adapter_factory import AdapterFactory
 from ...infrastructure.health_checks.health_check_factory import HealthCheckFactory
+from ...infrastructure.repositories.memory_service_repository import (
+    MemoryServiceRepository,
+)
+from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
 from ..utils.rich_utils import (
-    format_uptime, create_error_panel, create_success_panel, create_info_panel
+    create_error_panel,
+    create_info_panel,
+    create_success_panel,
+    format_uptime,
 )
 
 logger = structlog.get_logger()
@@ -29,7 +31,7 @@ console = Console()
 
 
 async def start_daemon_command(
-    config_file: Optional[str] = None,
+    config_file: str | None = None,
     auto_start: bool = True,
     detach: bool = False
 ) -> None:
@@ -40,24 +42,24 @@ async def start_daemon_command(
         config_repo = YamlConfigRepository()
         adapter_factory = AdapterFactory()
         health_check_factory = HealthCheckFactory()
-        
+
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
-        
+
         daemon_manager = DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
             health_monitor=health_monitor
         )
-        
+
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
             service_repository=service_repo,
             service_manager=service_manager
         )
-        
+
         # Start daemon with progress indication
         with Progress(
             SpinnerColumn(),
@@ -65,30 +67,33 @@ async def start_daemon_command(
             console=console
         ) as progress:
             task = progress.add_task("Starting daemon...", total=None)
-            
-            from ...application.use_cases.manage_daemon import ManageDaemonCommand, DaemonCommand
-            
+
+            from ...application.use_cases.manage_daemon import (
+                DaemonCommand,
+                ManageDaemonCommand,
+            )
+
             command = ManageDaemonCommand(
                 command=DaemonCommand.START,
                 config_file=config_file
             )
             result = await daemon_use_case.execute(command)
-            
+
             progress.update(task, completed=True)
-        
+
         # Display results
         if result.success:
             console.print(create_success_panel(
                 "Daemon Started",
                 f"LocalPort daemon started successfully (PID: {result.pid})"
             ))
-            
+
             if auto_start:
                 console.print(create_info_panel(
                     "Auto-start Enabled",
                     "Configured services will be started automatically"
                 ))
-            
+
             if not detach:
                 console.print("[dim]Press Ctrl+C to stop the daemon[/dim]")
                 try:
@@ -110,7 +115,7 @@ async def start_daemon_command(
                 "Check if another daemon is already running or check the logs."
             ))
             raise typer.Exit(1)
-            
+
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
         raise
@@ -132,24 +137,24 @@ async def stop_daemon_command(force: bool = False) -> None:
         config_repo = YamlConfigRepository()
         adapter_factory = AdapterFactory()
         health_check_factory = HealthCheckFactory()
-        
+
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
-        
+
         daemon_manager = DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
             health_monitor=health_monitor
         )
-        
+
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
             service_repository=service_repo,
             service_manager=service_manager
         )
-        
+
         # Stop daemon with progress indication
         with Progress(
             SpinnerColumn(),
@@ -157,17 +162,20 @@ async def stop_daemon_command(force: bool = False) -> None:
             console=console
         ) as progress:
             task = progress.add_task("Stopping daemon...", total=None)
-            
-            from ...application.use_cases.manage_daemon import ManageDaemonCommand, DaemonCommand
-            
+
+            from ...application.use_cases.manage_daemon import (
+                DaemonCommand,
+                ManageDaemonCommand,
+            )
+
             command = ManageDaemonCommand(
                 command=DaemonCommand.STOP,
                 force=force
             )
             result = await daemon_use_case.execute(command)
-            
+
             progress.update(task, completed=True)
-        
+
         # Display results
         if result.success:
             console.print(create_success_panel(
@@ -181,7 +189,7 @@ async def stop_daemon_command(force: bool = False) -> None:
                 "Try using --force flag or check if daemon is running."
             ))
             raise typer.Exit(1)
-            
+
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
         raise
@@ -196,7 +204,7 @@ async def stop_daemon_command(force: bool = False) -> None:
 
 
 async def restart_daemon_command(
-    config_file: Optional[str] = None,
+    config_file: str | None = None,
     force: bool = False
 ) -> None:
     """Restart the LocalPort daemon."""
@@ -206,24 +214,24 @@ async def restart_daemon_command(
         config_repo = YamlConfigRepository()
         adapter_factory = AdapterFactory()
         health_check_factory = HealthCheckFactory()
-        
+
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
-        
+
         daemon_manager = DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
             health_monitor=health_monitor
         )
-        
+
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
             service_repository=service_repo,
             service_manager=service_manager
         )
-        
+
         # Restart daemon with progress indication
         with Progress(
             SpinnerColumn(),
@@ -231,18 +239,21 @@ async def restart_daemon_command(
             console=console
         ) as progress:
             task = progress.add_task("Restarting daemon...", total=None)
-            
-            from ...application.use_cases.manage_daemon import ManageDaemonCommand, DaemonCommand
-            
+
+            from ...application.use_cases.manage_daemon import (
+                DaemonCommand,
+                ManageDaemonCommand,
+            )
+
             command = ManageDaemonCommand(
                 command=DaemonCommand.RESTART,
                 config_file=config_file,
                 force=force
             )
             result = await daemon_use_case.execute(command)
-            
+
             progress.update(task, completed=True)
-        
+
         # Display results
         if result.success:
             console.print(create_success_panel(
@@ -256,7 +267,7 @@ async def restart_daemon_command(
                 "Check the logs for more details."
             ))
             raise typer.Exit(1)
-            
+
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
         raise
@@ -278,51 +289,54 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
         config_repo = YamlConfigRepository()
         adapter_factory = AdapterFactory()
         health_check_factory = HealthCheckFactory()
-        
+
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
-        
+
         daemon_manager = DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
             health_monitor=health_monitor
         )
-        
+
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
             service_repository=service_repo,
             service_manager=service_manager
         )
-        
+
         async def show_status():
             """Show current daemon status."""
-            from ...application.use_cases.manage_daemon import ManageDaemonCommand, DaemonCommand
-            
+            from ...application.use_cases.manage_daemon import (
+                DaemonCommand,
+                ManageDaemonCommand,
+            )
+
             command = ManageDaemonCommand(command=DaemonCommand.STATUS)
             result = await daemon_use_case.execute(command)
-            
+
             if not result.success:
                 console.print(create_error_panel(
                     "Failed to Get Daemon Status",
                     result.error or "Unknown error occurred"
                 ))
                 return
-            
+
             # Create status table
             table = Table(title="Daemon Status")
             table.add_column("Property", style="bold blue")
             table.add_column("Value", style="white")
-            
+
             # Check if we have status information
             if hasattr(result, 'status') and result.status:
                 status_info = result.status
                 is_running = getattr(status_info, 'running', False)
-                
+
                 # Add daemon information
-                table.add_row("Status", f"[green]Running[/green]" if is_running else f"[red]Stopped[/red]")
-                
+                table.add_row("Status", "[green]Running[/green]" if is_running else "[red]Stopped[/red]")
+
                 if is_running:
                     if hasattr(status_info, 'pid') and status_info.pid:
                         table.add_row("PID", str(status_info.pid))
@@ -332,16 +346,16 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
                         table.add_row("Active Services", str(status_info.active_services or 0))
             else:
                 # Fallback - show basic status based on success
-                table.add_row("Status", f"[red]Stopped[/red]")
+                table.add_row("Status", "[red]Stopped[/red]")
                 table.add_row("Message", result.message or "Daemon is not running")
-            
+
             console.clear() if watch else None
             console.print(table)
-            
+
             # Show additional info
             if result.message and not result.success:
                 console.print(f"\n[yellow]Note:[/yellow] {result.message}")
-        
+
         if watch:
             # Watch mode - refresh periodically
             try:
@@ -353,7 +367,7 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
         else:
             # Single status check
             await show_status()
-            
+
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
         raise
@@ -375,24 +389,24 @@ async def reload_daemon_command() -> None:
         config_repo = YamlConfigRepository()
         adapter_factory = AdapterFactory()
         health_check_factory = HealthCheckFactory()
-        
+
         service_manager = ServiceManager()
         restart_manager = RestartManager(service_manager)
         health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
-        
+
         daemon_manager = DaemonManager(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
             health_monitor=health_monitor
         )
-        
+
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
             service_repository=service_repo,
             service_manager=service_manager
         )
-        
+
         # Reload daemon configuration
         with Progress(
             SpinnerColumn(),
@@ -400,14 +414,17 @@ async def reload_daemon_command() -> None:
             console=console
         ) as progress:
             task = progress.add_task("Reloading configuration...", total=None)
-            
-            from ...application.use_cases.manage_daemon import ManageDaemonCommand, DaemonCommand
-            
+
+            from ...application.use_cases.manage_daemon import (
+                DaemonCommand,
+                ManageDaemonCommand,
+            )
+
             command = ManageDaemonCommand(command=DaemonCommand.RELOAD)
             result = await daemon_use_case.execute(command)
-            
+
             progress.update(task, completed=True)
-        
+
         # Display results
         if result.success:
             console.print(create_success_panel(
@@ -421,7 +438,7 @@ async def reload_daemon_command() -> None:
                 "Check if daemon is running and configuration file is valid."
             ))
             raise typer.Exit(1)
-            
+
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
         raise
@@ -437,7 +454,7 @@ async def reload_daemon_command() -> None:
 
 # Sync wrappers for Typer (since Typer doesn't support async directly)
 def start_daemon_sync(
-    config_file: Optional[str] = typer.Option(None, "--config", "-c", help="Configuration file path"),
+    config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     auto_start: bool = typer.Option(True, "--auto-start/--no-auto-start", help="Auto-start configured services"),
     detach: bool = typer.Option(False, "--detach", "-d", help="Run daemon in background")
 ) -> None:
@@ -453,7 +470,7 @@ def stop_daemon_sync(
 
 
 def restart_daemon_sync(
-    config_file: Optional[str] = typer.Option(None, "--config", "-c", help="Configuration file path"),
+    config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     force: bool = typer.Option(False, "--force", "-f", help="Force restart daemon")
 ) -> None:
     """Restart the LocalPort daemon."""

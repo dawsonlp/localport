@@ -5,16 +5,16 @@ from enum import Enum
 
 class OutputFormat(str, Enum):
     """Supported output formats for CLI commands."""
-    
+
     TABLE = "table"
     JSON = "json"
     TEXT = "text"
     YAML = "yaml"  # Future extension
-    
+
     def __str__(self) -> str:
         """Return the string value of the format."""
         return self.value
-    
+
     @classmethod
     def from_string(cls, value: str) -> "OutputFormat":
         """Create OutputFormat from string value.

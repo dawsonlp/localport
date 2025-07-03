@@ -1,6 +1,7 @@
 """Entry point for running LocalPort as a module."""
 
 import sys
+
 from .daemon import main
 
 if __name__ == "__main__":

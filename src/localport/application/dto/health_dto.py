@@ -2,22 +2,21 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 
 @dataclass
 class HealthCheckResult:
     """Result of a health check operation."""
-    
+
     service_id: UUID
     service_name: str
     check_type: str
     is_healthy: bool
     checked_at: datetime
     response_time: float  # in seconds
-    error: Optional[str] = None
-    
+    error: str | None = None
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
@@ -34,25 +33,25 @@ class HealthCheckResult:
 @dataclass
 class HealthMetrics:
     """Health metrics for a service over time."""
-    
+
     service_id: UUID
     service_name: str
     total_checks: int
     successful_checks: int
     failed_checks: int
     average_response_time: float
-    last_check_time: Optional[datetime] = None
+    last_check_time: datetime | None = None
     current_failure_streak: int = 0
     max_failure_streak: int = 0
     uptime_percentage: float = 0.0
-    
+
     @property
     def success_rate(self) -> float:
         """Calculate success rate as percentage."""
         if self.total_checks == 0:
             return 0.0
         return (self.successful_checks / self.total_checks) * 100.0
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
@@ -73,16 +72,16 @@ class HealthMetrics:
 @dataclass
 class RestartAttempt:
     """Information about a service restart attempt."""
-    
+
     service_id: UUID
     service_name: str
     attempt_number: int
     triggered_at: datetime
     trigger_reason: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
     delay_before_attempt: float = 0.0  # in seconds
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {

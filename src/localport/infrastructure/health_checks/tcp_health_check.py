@@ -2,26 +2,27 @@
 
 import asyncio
 import socket
-from typing import Dict, Any
-import structlog
 from datetime import datetime
+from typing import Any
 
-from ...domain.entities.health_check import HealthCheckResult, HealthCheckStatus
+import structlog
+
+from ...domain.entities.health_check import HealthCheckResult
 
 logger = structlog.get_logger()
 
 
 class TCPHealthCheck:
     """TCP connectivity health check implementation."""
-    
+
     def __init__(self) -> None:
         """Initialize the TCP health check."""
         pass
-    
+
     async def check(
-        self, 
-        host: str = "localhost", 
-        port: int = 80, 
+        self,
+        host: str = "localhost",
+        port: int = 80,
         timeout: float = 5.0,
         **kwargs: Any
     ) -> HealthCheckResult:
@@ -37,73 +38,73 @@ class TCPHealthCheck:
             HealthCheckResult with the check outcome
         """
         start_time = datetime.now()
-        
+
         try:
             # Create connection with timeout
             future = asyncio.open_connection(host, port)
             reader, writer = await asyncio.wait_for(future, timeout=timeout)
-            
+
             # Calculate response time
             end_time = datetime.now()
             response_time_ms = (end_time - start_time).total_seconds() * 1000
-            
+
             # Close connection immediately
             writer.close()
             await writer.wait_closed()
-            
-            logger.debug("TCP health check passed", 
-                        host=host, 
+
+            logger.debug("TCP health check passed",
+                        host=host,
                         port=port,
                         response_time_ms=response_time_ms)
-            
+
             return HealthCheckResult.healthy(
                 message=f"TCP connection to {host}:{port} successful",
                 response_time_ms=response_time_ms
             )
-            
-        except asyncio.TimeoutError:
-            logger.debug("TCP health check timed out", 
-                        host=host, 
-                        port=port, 
+
+        except TimeoutError:
+            logger.debug("TCP health check timed out",
+                        host=host,
+                        port=port,
                         timeout=timeout)
-            
+
             return HealthCheckResult.unhealthy(
                 message=f"TCP connection to {host}:{port} timed out after {timeout}s",
                 error="Connection timeout"
             )
-            
+
         except ConnectionRefusedError:
-            logger.debug("TCP health check connection refused", 
-                        host=host, 
+            logger.debug("TCP health check connection refused",
+                        host=host,
                         port=port)
-            
+
             return HealthCheckResult.unhealthy(
                 message=f"TCP connection to {host}:{port} refused",
                 error="Connection refused"
             )
-            
+
         except OSError as e:
-            logger.debug("TCP health check OS error", 
-                        host=host, 
-                        port=port, 
+            logger.debug("TCP health check OS error",
+                        host=host,
+                        port=port,
                         error=str(e))
-            
+
             return HealthCheckResult.unhealthy(
                 message=f"TCP connection to {host}:{port} failed",
                 error=str(e)
             )
-            
+
         except Exception as e:
-            logger.error("TCP health check unexpected error", 
-                        host=host, 
-                        port=port, 
+            logger.error("TCP health check unexpected error",
+                        host=host,
+                        port=port,
                         error=str(e))
-            
+
             return HealthCheckResult.error(
                 error=f"Unexpected error during TCP health check: {e}"
             )
-    
-    async def check_with_config(self, config: Dict[str, Any]) -> HealthCheckResult:
+
+    async def check_with_config(self, config: dict[str, Any]) -> HealthCheckResult:
         """Perform TCP health check with configuration dictionary.
         
         Args:
@@ -115,10 +116,10 @@ class TCPHealthCheck:
         host = config.get('host', 'localhost')
         port = config.get('port', 80)
         timeout = config.get('timeout', 5.0)
-        
+
         return await self.check(host=host, port=port, timeout=timeout)
-    
-    def validate_config(self, config: Dict[str, Any]) -> bool:
+
+    def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate TCP health check configuration.
         
         Args:
@@ -132,31 +133,31 @@ class TCPHealthCheck:
             if 'port' not in config:
                 logger.error("TCP health check missing required 'port' field")
                 return False
-            
+
             # Validate port
             port = config['port']
             if not isinstance(port, int) or not 1 <= port <= 65535:
                 logger.error("TCP health check invalid port", port=port)
                 return False
-            
+
             # Validate optional host
             host = config.get('host', 'localhost')
             if not isinstance(host, str) or not host.strip():
                 logger.error("TCP health check invalid host", host=host)
                 return False
-            
+
             # Validate optional timeout
             timeout = config.get('timeout', 5.0)
             if not isinstance(timeout, (int, float)) or timeout <= 0:
                 logger.error("TCP health check invalid timeout", timeout=timeout)
                 return False
-            
+
             return True
-            
+
         except Exception as e:
             logger.error("Error validating TCP health check config", error=str(e))
             return False
-    
+
     async def check_port_available(self, port: int, host: str = "localhost") -> bool:
         """Check if a port is available (not in use).
         
@@ -174,24 +175,24 @@ class TCPHealthCheck:
             sock.bind((host, port))
             sock.close()
             return True
-            
+
         except OSError:
             # Port is in use or cannot be bound
             return False
         except Exception as e:
-            logger.error("Error checking port availability", 
-                        port=port, 
-                        host=host, 
+            logger.error("Error checking port availability",
+                        port=port,
+                        host=host,
                         error=str(e))
             return False
-    
+
     async def scan_port_range(
-        self, 
-        start_port: int, 
-        end_port: int, 
+        self,
+        start_port: int,
+        end_port: int,
         host: str = "localhost",
         timeout: float = 1.0
-    ) -> Dict[int, bool]:
+    ) -> dict[int, bool]:
         """Scan a range of ports for connectivity.
         
         Args:
@@ -204,27 +205,27 @@ class TCPHealthCheck:
             Dictionary mapping port numbers to connectivity status
         """
         results = {}
-        
+
         # Create tasks for concurrent scanning
         tasks = []
         for port in range(start_port, end_port + 1):
             task = asyncio.create_task(self._check_single_port(host, port, timeout))
             tasks.append((port, task))
-        
+
         # Wait for all tasks to complete
         for port, task in tasks:
             try:
                 is_open = await task
                 results[port] = is_open
             except Exception as e:
-                logger.debug("Error scanning port", 
-                           port=port, 
-                           host=host, 
+                logger.debug("Error scanning port",
+                           port=port,
+                           host=host,
                            error=str(e))
                 results[port] = False
-        
+
         return results
-    
+
     async def _check_single_port(self, host: str, port: int, timeout: float) -> bool:
         """Check a single port for connectivity.
         
@@ -242,13 +243,13 @@ class TCPHealthCheck:
             writer.close()
             await writer.wait_closed()
             return True
-            
-        except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
+
+        except (TimeoutError, ConnectionRefusedError, OSError):
             return False
         except Exception:
             return False
-    
-    def get_default_config(self) -> Dict[str, Any]:
+
+    def get_default_config(self) -> dict[str, Any]:
         """Get default configuration for TCP health checks.
         
         Returns:
@@ -259,8 +260,8 @@ class TCPHealthCheck:
             "port": 80,
             "timeout": 5.0
         }
-    
-    def get_config_schema(self) -> Dict[str, Any]:
+
+    def get_config_schema(self) -> dict[str, Any]:
         """Get configuration schema for TCP health checks.
         
         Returns:

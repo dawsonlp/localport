@@ -1,7 +1,8 @@
 """PostgreSQL-specific health check implementation."""
 
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -9,7 +10,7 @@ logger = structlog.get_logger()
 
 class PostgreSQLHealthCheck:
     """PostgreSQL-specific health check using database connectivity."""
-    
+
     def __init__(self, timeout: float = 10.0):
         """Initialize PostgreSQL health check.
         
@@ -17,8 +18,8 @@ class PostgreSQLHealthCheck:
             timeout: Connection timeout in seconds
         """
         self.timeout = timeout
-    
-    async def check(self, config: Dict[str, Any]) -> bool:
+
+    async def check(self, config: dict[str, Any]) -> bool:
         """Check PostgreSQL connectivity via database connection.
         
         Args:
@@ -31,14 +32,14 @@ class PostgreSQLHealthCheck:
             # Import psycopg here to make it optional
             try:
                 import psycopg
-                from psycopg import OperationalError, DatabaseError
+                from psycopg import DatabaseError, OperationalError
             except ImportError:
                 logger.error("psycopg not installed. Install with: pip install psycopg[binary]")
                 return False
-            
+
             # Build connection string
             connection_string = self._build_connection_string(config)
-            
+
             # Test connection
             try:
                 async with psycopg.AsyncConnection.connect(
@@ -49,31 +50,31 @@ class PostgreSQLHealthCheck:
                     async with conn.cursor() as cur:
                         await cur.execute("SELECT 1")
                         result = await cur.fetchone()
-                        
+
                         if result and result[0] == 1:
-                            logger.debug("PostgreSQL health check passed", 
+                            logger.debug("PostgreSQL health check passed",
                                         host=config.get('host', 'localhost'),
                                         database=config.get('database', 'postgres'))
                             return True
                         else:
                             logger.debug("PostgreSQL health check failed - unexpected query result")
                             return False
-                            
+
             except (OperationalError, DatabaseError) as e:
-                logger.debug("PostgreSQL health check failed - database error", 
+                logger.debug("PostgreSQL health check failed - database error",
                             host=config.get('host', 'localhost'),
                             database=config.get('database', 'postgres'),
                             error=str(e))
                 return False
-                
+
         except Exception as e:
-            logger.debug("PostgreSQL health check failed - unexpected error", 
+            logger.debug("PostgreSQL health check failed - unexpected error",
                         host=config.get('host', 'localhost'),
                         database=config.get('database', 'postgres'),
                         error=str(e))
             return False
-    
-    def _build_connection_string(self, config: Dict[str, Any]) -> str:
+
+    def _build_connection_string(self, config: dict[str, Any]) -> str:
         """Build PostgreSQL connection string from configuration.
         
         Args:
@@ -88,7 +89,7 @@ class PostgreSQLHealthCheck:
         database = config.get('database', 'postgres')
         user = config.get('user', 'postgres')
         password = config.get('password', '')
-        
+
         # Build connection string
         conn_parts = [
             f"host={host}",
@@ -96,21 +97,21 @@ class PostgreSQLHealthCheck:
             f"dbname={database}",
             f"user={user}"
         ]
-        
+
         if password:
             conn_parts.append(f"password={password}")
-        
+
         # Add SSL configuration if specified
         sslmode = config.get('sslmode')
         if sslmode:
             conn_parts.append(f"sslmode={sslmode}")
-        
+
         # Add connection timeout
         conn_parts.append(f"connect_timeout={int(self.timeout)}")
-        
+
         return " ".join(conn_parts)
-    
-    async def check_database_exists(self, config: Dict[str, Any], database_name: str) -> bool:
+
+    async def check_database_exists(self, config: dict[str, Any], database_name: str) -> bool:
         """Check if a specific database exists.
         
         Args:
@@ -122,14 +123,13 @@ class PostgreSQLHealthCheck:
         """
         try:
             import psycopg
-            from psycopg import OperationalError, DatabaseError
-            
+
             # Connect to the default postgres database to check for existence
             check_config = config.copy()
             check_config['database'] = 'postgres'  # Connect to default database
-            
+
             connection_string = self._build_connection_string(check_config)
-            
+
             async with psycopg.AsyncConnection.connect(
                 connection_string,
                 connect_timeout=self.timeout
@@ -140,20 +140,20 @@ class PostgreSQLHealthCheck:
                         (database_name,)
                     )
                     result = await cur.fetchone()
-                    
+
                     exists = result is not None
-                    logger.debug("PostgreSQL database existence check", 
+                    logger.debug("PostgreSQL database existence check",
                                 database=database_name,
                                 exists=exists)
                     return exists
-                    
+
         except Exception as e:
-            logger.debug("PostgreSQL database existence check failed", 
+            logger.debug("PostgreSQL database existence check failed",
                         database=database_name,
                         error=str(e))
             return False
-    
-    async def check_table_exists(self, config: Dict[str, Any], table_name: str, schema: str = 'public') -> bool:
+
+    async def check_table_exists(self, config: dict[str, Any], table_name: str, schema: str = 'public') -> bool:
         """Check if a specific table exists.
         
         Args:
@@ -166,10 +166,9 @@ class PostgreSQLHealthCheck:
         """
         try:
             import psycopg
-            from psycopg import OperationalError, DatabaseError
-            
+
             connection_string = self._build_connection_string(config)
-            
+
             async with psycopg.AsyncConnection.connect(
                 connection_string,
                 connect_timeout=self.timeout
@@ -183,20 +182,20 @@ class PostgreSQLHealthCheck:
                         (schema, table_name)
                     )
                     result = await cur.fetchone()
-                    
+
                     exists = result is not None
-                    logger.debug("PostgreSQL table existence check", 
+                    logger.debug("PostgreSQL table existence check",
                                 table=f"{schema}.{table_name}",
                                 exists=exists)
                     return exists
-                    
+
         except Exception as e:
-            logger.debug("PostgreSQL table existence check failed", 
+            logger.debug("PostgreSQL table existence check failed",
                         table=f"{schema}.{table_name}",
                         error=str(e))
             return False
-    
-    async def check_user_permissions(self, config: Dict[str, Any], required_permissions: list = None) -> bool:
+
+    async def check_user_permissions(self, config: dict[str, Any], required_permissions: list = None) -> bool:
         """Check if the user has required permissions.
         
         Args:
@@ -208,15 +207,14 @@ class PostgreSQLHealthCheck:
         """
         if required_permissions is None:
             required_permissions = ['CONNECT']
-        
+
         try:
             import psycopg
-            from psycopg import OperationalError, DatabaseError
-            
+
             connection_string = self._build_connection_string(config)
             user = config.get('user', 'postgres')
             database = config.get('database', 'postgres')
-            
+
             async with psycopg.AsyncConnection.connect(
                 connection_string,
                 connect_timeout=self.timeout
@@ -230,20 +228,20 @@ class PostgreSQLHealthCheck:
                         (user, database, 'CONNECT')
                     )
                     result = await cur.fetchone()
-                    
+
                     has_connect = result and result[0]
-                    
+
                     if not has_connect:
-                        logger.debug("PostgreSQL user lacks CONNECT permission", 
+                        logger.debug("PostgreSQL user lacks CONNECT permission",
                                     user=user,
                                     database=database)
                         return False
-                    
+
                     # Check for additional permissions if specified
                     for permission in required_permissions:
                         if permission.upper() == 'CONNECT':
                             continue  # Already checked
-                        
+
                         # Check table-level permissions (simplified check)
                         if permission.upper() in ['SELECT', 'INSERT', 'UPDATE', 'DELETE']:
                             await cur.execute(
@@ -253,25 +251,25 @@ class PostgreSQLHealthCheck:
                                 (user,)
                             )
                             result = await cur.fetchone()
-                            
+
                             if not (result and result[0]):
-                                logger.debug("PostgreSQL user lacks schema permissions", 
+                                logger.debug("PostgreSQL user lacks schema permissions",
                                             user=user,
                                             permission=permission)
                                 return False
-                    
-                    logger.debug("PostgreSQL user permissions check passed", 
+
+                    logger.debug("PostgreSQL user permissions check passed",
                                 user=user,
                                 permissions=required_permissions)
                     return True
-                    
+
         except Exception as e:
-            logger.debug("PostgreSQL user permissions check failed", 
+            logger.debug("PostgreSQL user permissions check failed",
                         user=config.get('user', 'postgres'),
                         error=str(e))
             return False
-    
-    async def get_server_version(self, config: Dict[str, Any]) -> Optional[str]:
+
+    async def get_server_version(self, config: dict[str, Any]) -> str | None:
         """Get PostgreSQL server version.
         
         Args:
@@ -282,10 +280,9 @@ class PostgreSQLHealthCheck:
         """
         try:
             import psycopg
-            from psycopg import OperationalError, DatabaseError
-            
+
             connection_string = self._build_connection_string(config)
-            
+
             async with psycopg.AsyncConnection.connect(
                 connection_string,
                 connect_timeout=self.timeout
@@ -293,21 +290,21 @@ class PostgreSQLHealthCheck:
                 async with conn.cursor() as cur:
                     await cur.execute("SELECT version()")
                     result = await cur.fetchone()
-                    
+
                     if result:
                         version = result[0]
-                        logger.debug("PostgreSQL server version retrieved", 
+                        logger.debug("PostgreSQL server version retrieved",
                                     version=version)
                         return version
-                    
+
                     return None
-                    
+
         except Exception as e:
-            logger.debug("PostgreSQL server version check failed", 
+            logger.debug("PostgreSQL server version check failed",
                         error=str(e))
             return None
-    
-    async def check_connection_pool(self, config: Dict[str, Any], pool_size: int = 5) -> bool:
+
+    async def check_connection_pool(self, config: dict[str, Any], pool_size: int = 5) -> bool:
         """Check if multiple connections can be established (connection pool test).
         
         Args:
@@ -319,10 +316,9 @@ class PostgreSQLHealthCheck:
         """
         try:
             import psycopg
-            from psycopg import OperationalError, DatabaseError
-            
+
             connection_string = self._build_connection_string(config)
-            
+
             # Create multiple connections concurrently
             async def test_connection():
                 async with psycopg.AsyncConnection.connect(
@@ -333,23 +329,23 @@ class PostgreSQLHealthCheck:
                         await cur.execute("SELECT 1")
                         result = await cur.fetchone()
                         return result and result[0] == 1
-            
+
             # Test multiple connections
             tasks = [test_connection() for _ in range(pool_size)]
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Check if all connections succeeded
             successful_connections = sum(1 for result in results if result is True)
-            
-            logger.debug("PostgreSQL connection pool test", 
+
+            logger.debug("PostgreSQL connection pool test",
                         pool_size=pool_size,
                         successful=successful_connections,
                         all_successful=successful_connections == pool_size)
-            
+
             return successful_connections == pool_size
-            
+
         except Exception as e:
-            logger.debug("PostgreSQL connection pool test failed", 
+            logger.debug("PostgreSQL connection pool test failed",
                         pool_size=pool_size,
                         error=str(e))
             return False

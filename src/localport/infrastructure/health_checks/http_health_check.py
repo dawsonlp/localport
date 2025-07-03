@@ -1,7 +1,7 @@
 """HTTP health check implementation."""
 
-import asyncio
-from typing import Dict, Any
+from typing import Any
+
 import aiohttp
 import structlog
 
@@ -10,8 +10,8 @@ logger = structlog.get_logger()
 
 class HTTPHealthCheck:
     """HTTP-based health check implementation."""
-    
-    def __init__(self, config: Dict[str, Any]):
+
+    def __init__(self, config: dict[str, Any]):
         """Initialize HTTP health checker.
         
         Args:
@@ -23,7 +23,7 @@ class HTTPHealthCheck:
         self.headers = config.get('headers', {})
         self.method = config.get('method', 'GET').upper()
         self.verify_ssl = config.get('verify_ssl', True)
-        
+
     async def check(self, url: str, timeout: float = 5.0, **kwargs) -> bool:
         """Perform HTTP health check.
         
@@ -41,15 +41,15 @@ class HTTPHealthCheck:
                 limit=1,
                 limit_per_host=1
             )
-            
+
             timeout_config = aiohttp.ClientTimeout(total=timeout)
-            
+
             async with aiohttp.ClientSession(
                 connector=connector,
                 timeout=timeout_config,
                 headers=self.headers
             ) as session:
-                
+
                 async with session.request(self.method, url) as response:
                     # Check status code
                     if response.status not in self.expected_status_codes:
@@ -58,7 +58,7 @@ class HTTPHealthCheck:
                                    status_code=response.status,
                                    expected_codes=self.expected_status_codes)
                         return False
-                    
+
                     # Check content if specified
                     if self.expected_content:
                         try:
@@ -73,13 +73,13 @@ class HTTPHealthCheck:
                                        url=url,
                                        error=str(e))
                             return False
-                    
+
                     logger.debug("HTTP health check passed",
                                url=url,
                                status_code=response.status)
                     return True
-                    
-        except asyncio.TimeoutError:
+
+        except TimeoutError:
             logger.debug("HTTP health check failed - timeout",
                        url=url,
                        timeout=timeout)

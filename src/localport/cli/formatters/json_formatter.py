@@ -3,7 +3,7 @@
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -13,7 +13,7 @@ logger = structlog.get_logger()
 
 class JSONEncoder(json.JSONEncoder):
     """Custom JSON encoder for LocalPort objects."""
-    
+
     def default(self, obj: Any) -> Any:
         """Convert objects to JSON-serializable format.
         
@@ -39,10 +39,10 @@ class JSONEncoder(json.JSONEncoder):
 
 class BaseJSONFormatter(ABC):
     """Base class for JSON formatters."""
-    
+
     def __init__(self):
         self.encoder = JSONEncoder()
-    
+
     def format(self, data: Any, **kwargs) -> str:
         """Format data as JSON string.
         
@@ -59,9 +59,9 @@ class BaseJSONFormatter(ABC):
         except Exception as e:
             logger.error("Failed to format JSON output", error=str(e))
             return self._format_error("JSON formatting failed", str(e))
-    
+
     @abstractmethod
-    def _prepare_data(self, data: Any, **kwargs) -> Dict[str, Any]:
+    def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare data for JSON serialization.
         
         Args:
@@ -72,8 +72,8 @@ class BaseJSONFormatter(ABC):
             Dictionary ready for JSON serialization
         """
         pass
-    
-    def _format_error(self, error_type: str, message: str, details: Optional[Dict[str, Any]] = None) -> str:
+
+    def _format_error(self, error_type: str, message: str, details: dict[str, Any] | None = None) -> str:
         """Format an error as JSON.
         
         Args:
@@ -93,14 +93,14 @@ class BaseJSONFormatter(ABC):
                 "details": details
             }
         }
-        
+
         try:
             return json.dumps(error_data, cls=JSONEncoder, indent=2, ensure_ascii=False)
         except Exception:
             # Fallback to minimal JSON if even error formatting fails
             return '{"success": false, "error": {"type": "formatting_error", "message": "Failed to format error as JSON"}}'
-    
-    def _add_metadata(self, data: Dict[str, Any], command: str) -> Dict[str, Any]:
+
+    def _add_metadata(self, data: dict[str, Any], command: str) -> dict[str, Any]:
         """Add common metadata to JSON output.
         
         Args:
@@ -119,8 +119,8 @@ class BaseJSONFormatter(ABC):
 
 class ServiceStatusJSONFormatter(BaseJSONFormatter):
     """JSON formatter for service status output."""
-    
-    def _prepare_data(self, data: Any, **kwargs) -> Dict[str, Any]:
+
+    def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare service status data for JSON serialization.
         
         Args:
@@ -141,7 +141,7 @@ class ServiceStatusJSONFormatter(BaseJSONFormatter):
             "success_rate": round(data.success_rate, 2) if hasattr(data, 'success_rate') else 0.0,
             "health_rate": round(data.health_rate, 2) if hasattr(data, 'health_rate') else 0.0
         }
-        
+
         # Extract service details
         services = []
         for service_info in data.services:
@@ -161,7 +161,7 @@ class ServiceStatusJSONFormatter(BaseJSONFormatter):
                 "description": getattr(service_info, 'description', None)
             }
             services.append(service_data)
-        
+
         return self._add_metadata({
             "summary": summary,
             "services": services
@@ -170,8 +170,8 @@ class ServiceStatusJSONFormatter(BaseJSONFormatter):
 
 class ServiceOperationJSONFormatter(BaseJSONFormatter):
     """JSON formatter for service start/stop operations."""
-    
-    def _prepare_data(self, data: Any, **kwargs) -> Dict[str, Any]:
+
+    def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare service operation data for JSON serialization.
         
         Args:
@@ -182,7 +182,7 @@ class ServiceOperationJSONFormatter(BaseJSONFormatter):
             Dictionary ready for JSON serialization
         """
         command_name = kwargs.get('command_name', 'operation')
-        
+
         # Handle different result types
         if hasattr(data, 'success'):
             # Single operation result
@@ -196,17 +196,17 @@ class ServiceOperationJSONFormatter(BaseJSONFormatter):
             # Fallback for unknown data types
             results = []
             overall_success = False
-        
+
         # Calculate summary
         successful_operations = sum(1 for r in results if getattr(r, 'success', False))
         failed_operations = len(results) - successful_operations
-        
+
         summary = {
             "requested_services": len(results),
             "successful_operations": successful_operations,
             "failed_operations": failed_operations
         }
-        
+
         # Format individual results
         formatted_results = []
         for result in results:
@@ -219,7 +219,7 @@ class ServiceOperationJSONFormatter(BaseJSONFormatter):
                 "duration_ms": getattr(result, 'duration_ms', None)
             }
             formatted_results.append(result_data)
-        
+
         return self._add_metadata({
             "success": overall_success,
             "summary": summary,
@@ -229,8 +229,8 @@ class ServiceOperationJSONFormatter(BaseJSONFormatter):
 
 class DaemonStatusJSONFormatter(BaseJSONFormatter):
     """JSON formatter for daemon status output."""
-    
-    def _prepare_data(self, data: Any, **kwargs) -> Dict[str, Any]:
+
+    def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare daemon status data for JSON serialization.
         
         Args:
@@ -250,7 +250,7 @@ class DaemonStatusJSONFormatter(BaseJSONFormatter):
             "health_monitor_active": getattr(data, 'health_monitor_active', False),
             "last_reload": None  # Would need to be tracked
         }
-        
+
         # Add status information if available
         if hasattr(data, 'status') and data.status:
             status_info = data.status
@@ -260,7 +260,7 @@ class DaemonStatusJSONFormatter(BaseJSONFormatter):
                 "uptime_seconds": getattr(status_info, 'uptime_seconds', None),
                 "active_services": getattr(status_info, 'active_services', 0)
             })
-        
+
         return self._add_metadata({
             "daemon": daemon_info
         }, "daemon status")
@@ -268,8 +268,8 @@ class DaemonStatusJSONFormatter(BaseJSONFormatter):
 
 class DaemonOperationJSONFormatter(BaseJSONFormatter):
     """JSON formatter for daemon management operations."""
-    
-    def _prepare_data(self, data: Any, **kwargs) -> Dict[str, Any]:
+
+    def _prepare_data(self, data: Any, **kwargs) -> dict[str, Any]:
         """Prepare daemon operation data for JSON serialization.
         
         Args:
@@ -280,13 +280,13 @@ class DaemonOperationJSONFormatter(BaseJSONFormatter):
             Dictionary ready for JSON serialization
         """
         command_name = kwargs.get('command_name', 'daemon operation')
-        
+
         daemon_info = {
             "pid": getattr(data, 'pid', None),
             "config_file": getattr(data, 'config_file', None),
             "auto_start_enabled": getattr(data, 'auto_start_enabled', False)
         }
-        
+
         return self._add_metadata({
             "success": getattr(data, 'success', False),
             "message": getattr(data, 'message', ''),
