@@ -3,7 +3,7 @@
 import typer
 from rich.console import Console
 
-from localport._version import __version__
+from localport import __version__
 
 console = Console()
 
