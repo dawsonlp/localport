@@ -4,7 +4,7 @@ import asyncio
 import signal
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from uuid import UUID
 import structlog
 

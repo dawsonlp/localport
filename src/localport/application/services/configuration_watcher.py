@@ -11,6 +11,10 @@ try:
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
+    # Create a dummy base class when watchdog is not available
+    class FileSystemEventHandler:
+        def __init__(self):
+            pass
 
 logger = structlog.get_logger()
 
