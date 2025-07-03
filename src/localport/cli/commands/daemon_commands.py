@@ -13,7 +13,8 @@ import structlog
 
 from ...application.use_cases.manage_daemon import ManageDaemonUseCase
 from ...application.services.daemon_manager import DaemonManager
-from ...application.services.health_monitor import HealthMonitor
+from ...application.services.health_monitor_scheduler import HealthMonitorScheduler
+from ...application.services.restart_manager import RestartManager
 from ...application.services.service_manager import ServiceManager
 from ...infrastructure.repositories.memory_service_repository import MemoryServiceRepository
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
@@ -41,12 +42,8 @@ async def start_daemon_command(
         health_check_factory = HealthCheckFactory()
         
         service_manager = ServiceManager()
-        
-        health_monitor = HealthMonitor(
-            service_repository=service_repo,
-            service_manager=service_manager,
-            health_check_factory=health_check_factory
-        )
+        restart_manager = RestartManager(service_manager)
+        health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
         
         daemon_manager = DaemonManager(
             service_repository=service_repo,
@@ -137,12 +134,8 @@ async def stop_daemon_command(force: bool = False) -> None:
         health_check_factory = HealthCheckFactory()
         
         service_manager = ServiceManager()
-        
-        health_monitor = HealthMonitor(
-            service_repository=service_repo,
-            service_manager=service_manager,
-            health_check_factory=health_check_factory
-        )
+        restart_manager = RestartManager(service_manager)
+        health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
         
         daemon_manager = DaemonManager(
             service_repository=service_repo,
@@ -215,12 +208,8 @@ async def restart_daemon_command(
         health_check_factory = HealthCheckFactory()
         
         service_manager = ServiceManager()
-        
-        health_monitor = HealthMonitor(
-            service_repository=service_repo,
-            service_manager=service_manager,
-            health_check_factory=health_check_factory
-        )
+        restart_manager = RestartManager(service_manager)
+        health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
         
         daemon_manager = DaemonManager(
             service_repository=service_repo,
@@ -291,12 +280,8 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
         health_check_factory = HealthCheckFactory()
         
         service_manager = ServiceManager()
-        
-        health_monitor = HealthMonitor(
-            service_repository=service_repo,
-            service_manager=service_manager,
-            health_check_factory=health_check_factory
-        )
+        restart_manager = RestartManager(service_manager)
+        health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
         
         daemon_manager = DaemonManager(
             service_repository=service_repo,
@@ -392,12 +377,8 @@ async def reload_daemon_command() -> None:
         health_check_factory = HealthCheckFactory()
         
         service_manager = ServiceManager()
-        
-        health_monitor = HealthMonitor(
-            service_repository=service_repo,
-            service_manager=service_manager,
-            health_check_factory=health_check_factory
-        )
+        restart_manager = RestartManager(service_manager)
+        health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
         
         daemon_manager = DaemonManager(
             service_repository=service_repo,

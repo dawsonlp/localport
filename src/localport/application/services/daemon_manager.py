@@ -13,7 +13,7 @@ from ...domain.entities.service import Service, ServiceStatus
 from ...domain.repositories.service_repository import ServiceRepository
 from ...domain.repositories.config_repository import ConfigRepository
 from .service_manager import ServiceManager
-from .health_monitor import HealthMonitor
+from .health_monitor_scheduler import HealthMonitorScheduler
 
 logger = structlog.get_logger()
 
@@ -26,7 +26,7 @@ class DaemonManager:
         service_repository: ServiceRepository,
         config_repository: ConfigRepository,
         service_manager: ServiceManager,
-        health_monitor: HealthMonitor
+        health_monitor: HealthMonitorScheduler
     ):
         """Initialize the daemon manager.
         
@@ -34,7 +34,7 @@ class DaemonManager:
             service_repository: Repository for service persistence
             config_repository: Repository for configuration management
             service_manager: Service manager for lifecycle operations
-            health_monitor: Health monitor for service monitoring
+            health_monitor: Health monitor scheduler for service monitoring
         """
         self._service_repository = service_repository
         self._config_repository = config_repository
@@ -180,13 +180,13 @@ class DaemonManager:
         active_forwards = len([s for s in services if s.status == ServiceStatus.RUNNING])
         
         # Get health monitoring status
-        health_checks_enabled = self._health_monitor.is_monitoring
+        health_checks_enabled = len(self._health_monitor._tasks) > 0
         last_health_check = None
         if health_checks_enabled:
             # Get the most recent health check time from any service
-            health_statuses = await self._health_monitor.get_all_health_status()
+            health_statuses = self._health_monitor.get_all_health_status()
             if health_statuses:
-                recent_checks = [info.last_check for info in health_statuses.values() if info.last_check]
+                recent_checks = [info.checked_at for info in health_statuses.values() if info.checked_at]
                 if recent_checks:
                     last_health_check = max(recent_checks)
         
@@ -386,8 +386,13 @@ class DaemonManager:
                     pass
             
             # Log statistics
-            stats = await self._health_monitor.get_monitoring_statistics()
-            logger.debug("Maintenance completed", **stats)
+            health_statuses = self._health_monitor.get_all_health_status()
+            monitored_services = len(health_statuses)
+            healthy_services = len([s for s in health_statuses.values() if s.is_healthy])
+            
+            logger.debug("Maintenance completed", 
+                        monitored_services=monitored_services,
+                        healthy_services=healthy_services)
             
         except Exception as e:
             logger.error("Maintenance error", error=str(e))
@@ -512,9 +517,9 @@ class DaemonManager:
         self._enable_health_monitoring = enabled
         
         if self._is_running:
-            if enabled and not self._health_monitor.is_monitoring:
+            if enabled and len(self._health_monitor._tasks) == 0:
                 await self._start_health_monitoring()
-            elif not enabled and self._health_monitor.is_monitoring:
+            elif not enabled and len(self._health_monitor._tasks) > 0:
                 await self._health_monitor.stop_monitoring()
         
         logger.info("Health monitoring configuration updated", enabled=enabled)
