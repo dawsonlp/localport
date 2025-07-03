@@ -68,7 +68,7 @@ async def start_services_command(
             raise typer.Exit(1)
 
         # Initialize repositories and services with config path
-        MemoryServiceRepository()
+        service_repo = MemoryServiceRepository()
         config_repo = YamlConfigRepository(str(config_path))
         AdapterFactory()
         HealthCheckFactory()
@@ -76,21 +76,28 @@ async def start_services_command(
 
         # Load services from config
         await config_repo.load_configuration()
+        
+        # Load services into the service repository
+        loaded_services = await config_repo.load_services()
+        for service in loaded_services:
+            await service_repo.save(service)
 
         # Initialize use case
         start_use_case = StartServicesUseCase(
-            service_manager=service_manager,
-            config_repository=config_repo
+            service_repository=service_repo,
+            service_manager=service_manager
         )
 
         # Determine which services to start
         if all_services:
             service_names = None  # Start all services
+            all_services_flag = True
         elif services:
-            service_names = services
+            service_names = services  # These are service name strings from CLI
+            all_services_flag = False
         elif tags:
-            # Filter services by tags (would need to implement tag filtering)
-            service_names = None  # For now, start all
+            service_names = None
+            all_services_flag = False
         else:
             console.print("[yellow]No services specified. Use --all to start all services or specify service names.[/yellow]")
             raise typer.Exit(1)
@@ -103,22 +110,28 @@ async def start_services_command(
         ) as progress:
             task = progress.add_task("Starting services...", total=None)
 
-            result = await start_use_case.execute(
+            # Create command object
+            from ...application.use_cases.start_services import StartServicesCommand
+            command = StartServicesCommand(
                 service_names=service_names,
+                tags=tags,
+                all_services=all_services_flag,
                 force_restart=force
             )
+
+            result = await start_use_case.execute(command)
 
             progress.update(task, completed=True)
 
         # Display results
-        if result.success:
+        if result.success_count > 0:
             console.print(create_success_panel(
                 "Services Started",
-                f"Successfully started {len(result.started_services)} service(s)"
+                f"Successfully started {result.success_count} service(s)"
             ))
 
             # Show started services table
-            if result.started_services:
+            if result.successful_services:
                 table = Table(title="Started Services")
                 table.add_column("Service", style="bold blue")
                 table.add_column("Technology", style="cyan")
@@ -126,24 +139,53 @@ async def start_services_command(
                 table.add_column("Target", style="yellow")
                 table.add_column("Status", style="bold")
 
-                for service_name in result.started_services:
-                    # Get service details (would need to implement service lookup)
-                    table.add_row(
-                        format_service_name(service_name),
-                        format_technology("kubectl"),  # Placeholder
-                        format_port(8080),  # Placeholder
-                        "pod/service:8080",  # Placeholder
-                        "[green]Running[/green]"
-                    )
+                for service_name in result.successful_services:
+                    # Get service details from the loaded services
+                    service_details = None
+                    for service in loaded_services:
+                        if service.name == service_name:
+                            service_details = service
+                            break
+                    
+                    if service_details:
+                        # Build target string based on technology
+                        if service_details.technology.value == "kubectl":
+                            target = f"{service_details.connection_info.get_kubectl_resource_type()}/{service_details.connection_info.get_kubectl_resource_name()}:{service_details.remote_port}"
+                        else:
+                            target = f"remote:{service_details.remote_port}"
+                        
+                        table.add_row(
+                            format_service_name(service_name),
+                            format_technology(service_details.technology.value),
+                            format_port(service_details.local_port),
+                            target,
+                            "[green]Running[/green]"
+                        )
+                    else:
+                        # Fallback if service details not found
+                        table.add_row(
+                            format_service_name(service_name),
+                            format_technology("unknown"),
+                            format_port(0),
+                            "unknown",
+                            "[green]Running[/green]"
+                        )
 
                 console.print(table)
-        else:
+
+        if result.failure_count > 0:
+            error_messages = []
+            for service_name, error in result.errors.items():
+                error_messages.append(f"• {service_name}: {error}")
+            
             console.print(create_error_panel(
-                "Failed to Start Services",
-                result.error or "Unknown error occurred",
+                "Failed to Start Some Services",
+                f"Failed to start {result.failure_count} service(s):\n" + "\n".join(error_messages),
                 "Check the logs for more details or try with --verbose flag."
             ))
-            raise typer.Exit(1)
+            
+            if result.success_count == 0:
+                raise typer.Exit(1)
 
     except typer.Exit:
         # Re-raise typer.Exit to allow clean exit
@@ -233,11 +275,27 @@ async def status_services_command(
 ) -> None:
     """Show service status."""
     try:
+        # Load configuration (same logic as start command)
+        config_path = None
+        for path in ["./localport.yaml", "~/.config/localport/config.yaml"]:
+            test_path = Path(path).expanduser()
+            if test_path.exists():
+                config_path = test_path
+                break
+
         # Initialize repositories and services
         service_repo = MemoryServiceRepository()
+        config_repo = YamlConfigRepository(str(config_path)) if config_path else None
         AdapterFactory()
         HealthCheckFactory()
         service_manager = ServiceManager()
+
+        # Load services from config if available
+        if config_repo:
+            await config_repo.load_configuration()
+            loaded_services = await config_repo.load_services()
+            for service in loaded_services:
+                await service_repo.save(service)
 
         # Initialize use case
         monitor_use_case = MonitorServicesUseCase(

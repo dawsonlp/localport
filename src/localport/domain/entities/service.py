@@ -1,26 +1,11 @@
 """Service entity representing a port forwarding service."""
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-
-class ServiceStatus(Enum):
-    """Status of a port forwarding service."""
-
-    STOPPED = "stopped"
-    STARTING = "starting"
-    RUNNING = "running"
-    FAILED = "failed"
-    RESTARTING = "restarting"
-
-
-class ForwardingTechnology(Enum):
-    """Technology used for port forwarding."""
-
-    KUBECTL = "kubectl"
-    SSH = "ssh"
+from ..enums import ForwardingTechnology, ServiceStatus
+from ..value_objects.connection_info import ConnectionInfo
 
 
 @dataclass
@@ -32,7 +17,7 @@ class Service:
     technology: ForwardingTechnology
     local_port: int
     remote_port: int
-    connection_info: dict[str, Any]
+    connection_info: ConnectionInfo
     status: ServiceStatus = ServiceStatus.STOPPED
     health_check_config: dict[str, Any] | None = None
     restart_policy: dict[str, Any] | None = None
@@ -51,7 +36,7 @@ class Service:
         technology: ForwardingTechnology,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any],
+        connection_info: ConnectionInfo,
         **kwargs: Any,
     ) -> "Service":
         """Factory method to create a new service."""

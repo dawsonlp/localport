@@ -143,22 +143,30 @@ def format_service_name(name: str) -> str:
     return f"[bold blue]{name}[/bold blue]"
 
 
-def format_technology(technology: str) -> str:
+def format_technology(technology) -> str:
     """Format technology name with appropriate styling.
 
     Args:
-        technology: Technology name (kubectl, ssh, etc.)
+        technology: Technology name (kubectl, ssh, etc.) or ForwardingTechnology enum
 
     Returns:
         Formatted technology string
     """
+    # Handle both string and enum types
+    if hasattr(technology, 'value'):
+        # It's an enum, get the string value
+        tech_str = technology.value
+    else:
+        # It's already a string
+        tech_str = str(technology)
+    
     tech_colors = {
         "kubectl": "blue",
         "ssh": "green",
         "docker": "cyan"
     }
-    color = tech_colors.get(technology.lower(), "white")
-    return f"[{color}]{technology}[/{color}]"
+    color = tech_colors.get(tech_str.lower(), "white")
+    return f"[{color}]{tech_str}[/{color}]"
 
 
 def format_health_status(is_healthy: bool, failure_count: int = 0) -> str:

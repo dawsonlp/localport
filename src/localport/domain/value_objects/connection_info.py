@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..entities.service import ForwardingTechnology
+from ..enums import ForwardingTechnology
 
 
 @dataclass(frozen=True)

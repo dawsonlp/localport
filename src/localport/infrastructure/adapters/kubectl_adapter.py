@@ -6,6 +6,8 @@ from typing import Any
 import psutil
 import structlog
 
+from ...domain.value_objects.connection_info import ConnectionInfo
+
 logger = structlog.get_logger()
 
 
@@ -20,7 +22,7 @@ class KubectlAdapter:
         self,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any]
+        connection_info: ConnectionInfo
     ) -> int:
         """Start a kubectl port-forward process.
 
@@ -36,11 +38,11 @@ class KubectlAdapter:
             RuntimeError: If kubectl port-forward fails to start
             ValueError: If connection_info is invalid
         """
-        # Extract connection details
-        namespace = connection_info.get('namespace', 'default')
-        resource_type = connection_info.get('resource_type', 'service')
-        resource_name = connection_info['resource_name']
-        context = connection_info.get('context')
+        # Extract connection details using ConnectionInfo methods
+        namespace = connection_info.get_kubectl_namespace()
+        resource_type = connection_info.get_kubectl_resource_type()
+        resource_name = connection_info.get_kubectl_resource_name()
+        context = connection_info.get_kubectl_context()
 
         # Build kubectl command
         cmd = [
@@ -61,26 +63,46 @@ class KubectlAdapter:
                    namespace=namespace)
 
         try:
-            # Start the process
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                stdin=asyncio.subprocess.DEVNULL
+            # Start the process completely detached using subprocess.Popen
+            import subprocess
+            import os
+            
+            logger.info("Starting kubectl subprocess", command=cmd)
+            
+            # Use subprocess.Popen for better control over detachment
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,  # Don't capture output to avoid keeping references
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True  # Create new session
             )
+
+            logger.info("kubectl subprocess created", pid=process.pid)
 
             # Wait a moment to ensure it starts successfully
             await asyncio.sleep(2)
 
-            if process.returncode is not None:
-                # Process has already terminated
-                stdout, stderr = await process.communicate()
-                error_msg = stderr.decode().strip() if stderr else "Unknown error"
-                raise RuntimeError(f"kubectl port-forward failed: {error_msg}")
+            # Check if process is still running using psutil
+            try:
+                import psutil
+                psutil_process = psutil.Process(process.pid)
+                if not psutil_process.is_running():
+                    logger.error("kubectl process terminated early", pid=process.pid)
+                    raise RuntimeError("kubectl port-forward failed to start")
+                
+                logger.info("kubectl process confirmed running", 
+                           pid=process.pid,
+                           status=psutil_process.status())
+                
+            except psutil.NoSuchProcess:
+                logger.error("kubectl process not found after creation", pid=process.pid)
+                raise RuntimeError("kubectl port-forward failed to start")
 
-            # Store the process for later management
+            # Don't store the subprocess.Popen object as it keeps references
+            # Just store the PID for tracking
             if process.pid:
-                self._active_processes[process.pid] = process
+                self._active_processes[process.pid] = None  # Store PID but not process object
 
             logger.info("kubectl port-forward started successfully",
                        pid=process.pid,

@@ -126,10 +126,13 @@ class FormatRouter:
         # Check if we have services to display
         if data.services:
             for service_info in data.services:
-                status_color = get_status_color(
-                    service_info.status.value if hasattr(service_info.status, 'value')
-                    else str(service_info.status)
-                )
+                # Get status string properly
+                if hasattr(service_info.status, 'value'):
+                    status_str = service_info.status.value
+                else:
+                    status_str = str(service_info.status)
+                
+                status_color = get_status_color(status_str)
                 health_status = format_health_status(
                     service_info.is_healthy,
                     getattr(service_info, 'failure_count', 0)
@@ -137,7 +140,7 @@ class FormatRouter:
 
                 table.add_row(
                     format_service_name(service_info.name),
-                    f"[{status_color}]{str(service_info.status).title()}[/{status_color}]",
+                    f"[{status_color}]{status_str.title()}[/{status_color}]",
                     format_technology(getattr(service_info, 'technology', 'kubectl')),
                     format_port(service_info.local_port),
                     f"remote:{service_info.remote_port}",

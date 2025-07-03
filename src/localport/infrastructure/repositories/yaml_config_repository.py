@@ -13,6 +13,7 @@ except ImportError:
     yaml = None
 
 from ...domain.entities.service import Service
+from ...domain.enums import ForwardingTechnology
 from ...domain.repositories.config_repository import (
     ConfigRepository,
     ConfigurationError,
@@ -524,14 +525,36 @@ class YamlConfigRepository(ConfigRepository):
 
         for service_config in config.get('services', []):
             try:
+                # Parse technology and connection info
+                technology = ForwardingTechnology(service_config['technology'])
+                conn_config = service_config['connection']
+                
+                # Create ConnectionInfo based on technology
+                if technology == ForwardingTechnology.KUBECTL:
+                    connection_info = ConnectionInfo.kubectl(
+                        resource_name=conn_config['resource_name'],
+                        namespace=conn_config.get('namespace', 'default'),
+                        resource_type=conn_config.get('resource_type', 'service'),
+                        context=conn_config.get('context')
+                    )
+                elif technology == ForwardingTechnology.SSH:
+                    connection_info = ConnectionInfo.ssh(
+                        host=conn_config['host'],
+                        user=conn_config.get('user'),
+                        port=conn_config.get('port', 22),
+                        key_file=conn_config.get('key_file'),
+                        password=conn_config.get('password')
+                    )
+                else:
+                    raise ValueError(f"Unsupported technology: {technology}")
+
                 # Create Service entity from configuration
-                service = Service(
+                service = Service.create(
                     name=service_config['name'],
-                    technology=service_config['technology'],
-                    local_port=Port(service_config['local_port']),
-                    remote_port=Port(service_config['remote_port']),
-                    connection_info=ConnectionInfo(service_config['connection']),
-                    enabled=service_config.get('enabled', True),
+                    technology=technology,
+                    local_port=service_config['local_port'],
+                    remote_port=service_config['remote_port'],
+                    connection_info=connection_info,
                     tags=service_config.get('tags', []),
                     description=service_config.get('description'),
                     health_check_config=service_config.get('health_check'),

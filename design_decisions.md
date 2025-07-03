@@ -191,3 +191,38 @@
 ### Container Support
 - **Decision**: Design to work well in containerized environments
 - **Rationale**: Modern deployment patterns often use containers
+
+## Domain Model Design
+
+### ConnectionInfo Value Object vs Dictionary
+- **Decision**: Use ConnectionInfo value object instead of simple dictionary for connection information
+- **Rationale**: 
+  - **Type Safety**: Provides compile-time validation of connection parameters
+  - **Domain-Driven Design**: Encapsulates connection logic and validation within the domain
+  - **Immutability**: Value objects prevent accidental modification of connection data
+  - **Rich Behavior**: Methods like `get_kubectl_namespace()` provide clean, type-safe APIs
+  - **Validation**: Built-in validation for different connection types (kubectl vs SSH)
+  - **Architectural Consistency**: Aligns with hexagonal architecture and DDD principles
+- **Implementation**: 
+  - Service entity uses `ConnectionInfo` instead of `dict[str, Any]`
+  - YAML config repository creates ConnectionInfo objects using factory methods
+  - Adapters consume ConnectionInfo objects with type-safe accessors
+- **Trade-offs**: 
+  - **Pro**: Better maintainability, fewer runtime errors, cleaner APIs
+  - **Con**: Slightly more complex serialization, requires migration of existing code
+- **Alternative Considered**: Simple dictionary approach (rejected due to lack of type safety and validation)
+
+## Process Management Breakthrough
+
+### Kubectl Process Persistence Issue
+- **Problem**: kubectl processes started by LocalPort were terminating unexpectedly after the parent LocalPort process exited
+- **Root Cause**: Using `asyncio.create_subprocess_exec` with stdout/stderr pipes kept references that prevented proper process detachment
+- **Solution**: Switch to `subprocess.Popen` with `stdout=DEVNULL`, `stderr=DEVNULL`, and `start_new_session=True`
+- **Result**: kubectl processes now survive after LocalPort exits and remain fully functional
+- **Implementation**: 
+  - Use `subprocess.Popen` instead of `asyncio.create_subprocess_exec`
+  - Redirect all streams to `DEVNULL` to avoid keeping references
+  - Set `start_new_session=True` for proper process group isolation
+  - Store only PIDs in process tracking, not process objects
+- **Testing**: Verified with PostgreSQL connection through kubectl port-forward
+- **Impact**: Enables reliable, persistent port forwarding that survives CLI command completion
