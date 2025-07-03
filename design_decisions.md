@@ -1,116 +1,193 @@
-# LocalPort Design Decisions
+# Design Decisions
 
-## Recent Design Decisions (January 2025)
+## Architecture
 
-### 1. Constructor Argument Resolution ✅ COMPLETED
-**Problem**: Multiple constructor mismatches causing CLI failures
-**Decision**: Fixed all constructor calls to match actual class definitions
-**Rationale**: Hexagonal architecture requires proper dependency injection
-**Implementation**:
-- ServiceManager: Takes no parameters (was incorrectly called with parameters)
-- HealthMonitor: Requires `service_repository`, `service_manager`, `health_check_factory`
-- DaemonManager: Requires `service_repository`, `config_repository`, `service_manager`, `health_monitor`
-- ManageDaemonUseCase: Requires `service_repository`, `service_manager` (not daemon_manager)
-- MonitorServicesUseCase: Requires `service_repository`, `service_manager`
-- YamlConfigRepository: Takes config_path in constructor (not via set_config_file method)
+### Hexagonal Architecture
+- **Decision**: Use hexagonal (ports and adapters) architecture
+- **Rationale**: Provides clear separation of concerns, makes the application testable, and allows for easy swapping of external dependencies
+- **Implementation**: 
+  - Domain layer contains business logic and entities
+  - Application layer contains use cases and services
+  - Infrastructure layer contains adapters for external systems
+  - CLI layer provides the user interface
 
-**Impact**: All CLI commands now instantiate correctly without TypeErrors
+### Dependency Injection
+- **Decision**: Use dependency injection pattern
+- **Rationale**: Improves testability and flexibility
+- **Implementation**: Manual dependency injection in main application setup
 
-### 2. "Fail Fast and Clean" Error Handling Philosophy ✅ COMPLETED
-**Problem**: CLI showing confusing tracebacks for expected error conditions
-**Decision**: Implement clean exit behavior - "if you can't do something useful with an exception, just die"
-**Rationale**: Better user experience with clear, actionable error messages
-**Implementation**:
-- Added `typer.Exit` exception handling to prevent unnecessary tracebacks
-- Configuration errors show helpful messages and exit cleanly
-- Only genuine unexpected errors show "Unexpected Error" panels
-- All error messages include specific log locations
+## Technology Choices
 
-**Impact**: Professional CLI experience with no confusing error noise
+### Python Version
+- **Decision**: Require Python 3.13+
+- **Rationale**: Access to latest language features, performance improvements, and modern typing capabilities
+- **Impact**: May limit compatibility with older systems but ensures access to cutting-edge features
 
-### 3. Command Pattern for Use Case Interfaces ✅ COMPLETED
-**Problem**: Direct method calls on use cases were inconsistent
-**Decision**: Updated all use case calls to use command pattern with `execute()` method
-**Rationale**: Consistent interface and better separation of concerns
-**Implementation**:
-- ManageDaemonUseCase now uses `execute(ManageDaemonCommand)`
-- MonitorServicesUseCase now uses `execute(MonitorServicesCommand)`
-- All commands properly instantiated with required parameters
+### CLI Framework
+- **Decision**: Use Typer for CLI interface
+- **Rationale**: 
+  - Type-safe CLI development
+  - Automatic help generation
+  - Rich integration for beautiful output
+  - Modern Python patterns
+- **Alternative considered**: Click (Typer is built on Click but provides better type safety)
 
-**Impact**: Cleaner, more maintainable code structure with consistent patterns
+### Rich Output
+- **Decision**: Use Rich for terminal formatting
+- **Rationale**: 
+  - Beautiful, professional terminal output
+  - Tables, progress bars, and syntax highlighting
+  - Excellent integration with Typer
+  - Improves user experience significantly
 
-### 4. Enhanced Configuration Error Messages ✅ COMPLETED
-**Problem**: Generic "config not found" errors weren't helpful
-**Decision**: Provide specific guidance on where to place configuration files
-**Rationale**: Follow Unix conventions and guide users toward success
-**Implementation**:
-```
-No configuration file found. Please create a localport.yaml file in one of these locations:
-• ./localport.yaml (current directory)
-• ~/.config/localport/config.yaml (user config)
-• ~/.localport.yaml (user home)
-Or specify a custom path with --config.
-```
+### Configuration Management
+- **Decision**: Use YAML for configuration files with Pydantic for validation
+- **Rationale**: 
+  - YAML is human-readable and widely adopted
+  - Pydantic provides excellent validation and type safety
+  - Easy to extend and maintain
+- **Alternative considered**: TOML (chose YAML for better readability of complex nested structures)
 
-**Impact**: Users know exactly where to place config files
+### Async/Await
+- **Decision**: Use asyncio for concurrent operations
+- **Rationale**: 
+  - Better performance for I/O-bound operations (health checks, network calls)
+  - Modern Python concurrency patterns
+  - Scales well with multiple port forwards
 
-### 5. Specific Log Location Guidance ✅ COMPLETED
-**Problem**: Error messages said "check the logs" without saying where
-**Decision**: Include specific log paths in all error messages
-**Rationale**: Reduce user friction when troubleshooting
-**Implementation**: All error messages now include "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details."
+### Health Checking
+- **Decision**: Implement pluggable health check system
+- **Rationale**: 
+  - Different services need different health check strategies
+  - Extensible design allows for custom health checks
+  - Improves reliability of port forwarding
 
-**Impact**: Users can easily find logs for troubleshooting
+### Process Management
+- **Decision**: Use subprocess for external tool integration (kubectl, ssh)
+- **Rationale**: 
+  - Leverages existing, well-tested tools
+  - Avoids reimplementing complex networking logic
+  - Easier to maintain and debug
 
-## Architecture Decisions
+### Logging
+- **Decision**: Use structlog for structured logging
+- **Rationale**: 
+  - Better for debugging and monitoring
+  - JSON output for production environments
+  - Rich integration for development
 
-### Hexagonal Architecture Compliance
-**Decision**: Maintain strict hexagonal architecture boundaries
-**Rationale**: Clean separation of concerns and testability
-**Status**: ✅ Maintained throughout constructor fixes
+### Testing Strategy
+- **Decision**: Comprehensive testing with pytest
+- **Rationale**: 
+  - Unit tests for business logic
+  - Integration tests for external tool interaction
+  - Separate test configurations for different environments
 
-### Rich-based UI Framework
-**Decision**: Use Rich library for all CLI output formatting
-**Rationale**: Professional user experience with beautiful formatting
-**Status**: ✅ Implemented with error panels, tables, and progress indicators
+### Package Management
+- **Decision**: Use UV for dependency management and building
+- **Rationale**: 
+  - Faster than pip/poetry
+  - Modern Python packaging
+  - Better dependency resolution
+  - Excellent CI/CD integration
 
-### Async/Await Throughout
-**Decision**: Use async/await for all I/O operations
-**Rationale**: Better performance and modern Python practices
-**Status**: ✅ Maintained in all use cases and adapters
+### Version Management
+- **Decision**: Use Hatch VCS for dynamic versioning
+- **Rationale**: 
+  - Automatic version derivation from Git tags
+  - Eliminates version mismatch issues
+  - PEP 440 compliant version normalization
+  - No manual version management required
+- **Implementation**: 
+  - Git tag `v0.1.0-alpha.6` → Package version `0.1.0a6`
+  - Git tag `v1.0.0` → Package version `1.0.0`
+  - Git tag `v1.2.3-beta.1` → Package version `1.2.3b1`
+- **Problem Solved**: Previously Git tags and package versions didn't match, causing confusion
 
-## Development Process Decisions
+## Development Workflow
 
-### Error Handling Strategy
-**Decision**: Distinguish between expected and unexpected errors
-**Rationale**: Expected errors (like missing config) should show helpful messages, unexpected errors should show technical details
-**Implementation**: 
-- Expected errors: Clean exit with helpful guidance
-- Unexpected errors: Technical details with log locations
+### Code Quality
+- **Decision**: Use ruff, black, and mypy for code quality
+- **Rationale**: 
+  - Ruff provides fast linting
+  - Black ensures consistent formatting
+  - MyPy catches type errors early
 
-### Testing Approach
-**Decision**: Focus on constructor and integration issues first, comprehensive testing later
-**Rationale**: Get basic functionality working before extensive test coverage
-**Status**: Constructor issues resolved, ready for comprehensive testing phase
+### Pre-commit Hooks
+- **Decision**: Use pre-commit for automated quality checks
+- **Rationale**: Prevents low-quality code from being committed
 
-### Documentation Strategy
-**Decision**: Maintain both design_decisions.md and implementation_design_python.md
-**Rationale**: 
-- design_decisions.md: Records specific decisions made during development
-- implementation_design_python.md: Comprehensive implementation guide and checklist
-**Status**: ✅ Separated concerns to avoid duplication
+### CI/CD
+- **Decision**: Use GitHub Actions for CI/CD
+- **Rationale**: 
+  - Integrated with GitHub
+  - Good ecosystem of actions
+  - Free for open source projects
 
-## Next Phase Priorities
+### Release Strategy
+- **Decision**: Automated releases with Test PyPI for pre-releases
+- **Rationale**: 
+  - Safe testing before production releases
+  - Automated publishing reduces manual errors
+  - Clear separation between test and production environments
 
-1. **Configuration Management**: Implement `localport init` command for easy setup
-2. **Service Implementation**: Complete actual service start/stop functionality  
-3. **Health Monitoring**: Implement health check system
-4. **Daemon Process Management**: Complete background daemon functionality
+## Security Considerations
 
-## Lessons Learned
+### Input Validation
+- **Decision**: Validate all configuration inputs with Pydantic
+- **Rationale**: Prevents configuration errors and potential security issues
 
-1. **Constructor Validation**: Always verify constructor signatures match usage
-2. **Error UX**: Clean, helpful error messages are as important as functionality
-3. **Command Patterns**: Consistent interfaces reduce cognitive load
-4. **User Guidance**: Specific, actionable error messages save user time
-5. **Clean Exits**: Avoid technical noise in user-facing error scenarios
+### Process Isolation
+- **Decision**: Run external processes with limited privileges where possible
+- **Rationale**: Reduces attack surface
+
+### Credential Management
+- **Decision**: Never store credentials in configuration files
+- **Rationale**: Security best practice - rely on external credential management
+
+## Performance Considerations
+
+### Concurrent Health Checks
+- **Decision**: Run health checks concurrently
+- **Rationale**: Improves responsiveness when managing multiple services
+
+### Efficient Process Management
+- **Decision**: Reuse processes where possible, clean shutdown
+- **Rationale**: Reduces resource usage and improves reliability
+
+## Extensibility
+
+### Plugin Architecture
+- **Decision**: Design for extensibility in health checks and adapters
+- **Rationale**: Allows users to add custom functionality without modifying core code
+
+### Configuration Schema
+- **Decision**: Use flexible but validated configuration schema
+- **Rationale**: Balances ease of use with type safety and validation
+
+## Documentation Strategy
+
+### Comprehensive Documentation
+- **Decision**: Provide extensive documentation and examples
+- **Rationale**: Improves adoption and reduces support burden
+
+### CLI Help
+- **Decision**: Rich, contextual help throughout the CLI
+- **Rationale**: Improves user experience and reduces learning curve
+
+## Deployment Strategy
+
+### Multiple Installation Methods
+- **Decision**: Support both pipx and UV for installation
+- **Rationale**: 
+  - pipx for traditional Python package management
+  - UV for modern, fast package management
+  - Provides flexibility for different user preferences
+
+### Cross-Platform Support
+- **Decision**: Support Linux, macOS, and Windows
+- **Rationale**: Maximizes potential user base
+
+### Container Support
+- **Decision**: Design to work well in containerized environments
+- **Rationale**: Modern deployment patterns often use containers
