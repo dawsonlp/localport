@@ -5,7 +5,6 @@ import asyncio
 import structlog
 import typer
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ...application.services.daemon_manager import DaemonManager
@@ -19,6 +18,7 @@ from ...infrastructure.repositories.memory_service_repository import (
     MemoryServiceRepository,
 )
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from ..utils.progress_utils import EnhancedProgress, get_operation_messages
 from ..utils.rich_utils import (
     create_error_panel,
     create_info_panel,
@@ -60,14 +60,11 @@ async def start_daemon_command(
             service_manager=service_manager
         )
 
-        # Start daemon with progress indication
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Starting daemon...", total=None)
-
+        # Start daemon with enhanced progress indication
+        enhanced_progress = EnhancedProgress(console)
+        messages = get_operation_messages("start")
+        
+        async def start_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
                 ManageDaemonCommand,
@@ -77,9 +74,13 @@ async def start_daemon_command(
                 command=DaemonCommand.START,
                 config_file=config_file
             )
-            result = await daemon_use_case.execute(command)
+            return await daemon_use_case.execute(command)
 
-            progress.update(task, completed=True)
+        result = await enhanced_progress.run_with_spinner(
+            start_operation,
+            messages["daemon"],
+            messages["success"]
+        )
 
         # Display results
         if result.success:
@@ -174,14 +175,11 @@ async def stop_daemon_command(force: bool = False) -> None:
             service_manager=service_manager
         )
 
-        # Stop daemon with progress indication
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Stopping daemon...", total=None)
-
+        # Stop daemon with enhanced progress indication
+        enhanced_progress = EnhancedProgress(console)
+        messages = get_operation_messages("stop")
+        
+        async def stop_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
                 ManageDaemonCommand,
@@ -191,9 +189,13 @@ async def stop_daemon_command(force: bool = False) -> None:
                 command=DaemonCommand.STOP,
                 force=force
             )
-            result = await daemon_use_case.execute(command)
+            return await daemon_use_case.execute(command)
 
-            progress.update(task, completed=True)
+        result = await enhanced_progress.run_with_spinner(
+            stop_operation,
+            messages["daemon"],
+            messages["success"]
+        )
 
         # Display results
         if result.success:
