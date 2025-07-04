@@ -56,15 +56,23 @@ async def start_services_command(
                     break
 
         if not config_path or not config_path.exists():
-            console.print(create_error_panel(
-                "Configuration Not Found",
-                "No configuration file found. Please create a localport.yaml file in one of these locations:\n" +
-                "• ./localport.yaml (current directory)\n" +
-                "• ~/.config/localport/config.yaml (user config)\n" +
-                "• ~/.localport.yaml (user home)\n" +
-                "Or specify a custom path with --config.",
-                "Run 'localport init' to create a sample configuration file."
-            ))
+            # Determine which specific path was attempted if config_file was provided
+            if config_file:
+                attempted_path = Path(config_file).expanduser().resolve()
+                console.print(create_error_panel(
+                    "Configuration File Not Found",
+                    f"Configuration file not found: {attempted_path}",
+                    f"Create the file or check the path. Run 'localport config init --help' for setup guidance."
+                ))
+            else:
+                console.print(create_error_panel(
+                    "No Configuration Found",
+                    "No configuration file found in default locations:\n" +
+                    "• ./localport.yaml (current directory)\n" +
+                    "• ~/.config/localport/config.yaml (user config directory)\n" +
+                    "• ~/.localport.yaml (user home directory)",
+                    "Create a config file: 'localport config init' or specify custom path with --config /path/to/config.yaml"
+                ))
             raise typer.Exit(1)
 
         # Initialize repositories and services with config path

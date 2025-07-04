@@ -30,46 +30,46 @@ class ConnectionInfo:
         required_fields = ["resource_name"]
         for field in required_fields:
             if field not in self.config:
-                raise ValueError(f"kubectl connection requires '{field}' field")
+                raise ValueError(f"kubectl connection missing required field '{field}'. Example: resource_name: 'my-service'")
 
         # Validate resource_name is not empty
         if not self.config["resource_name"].strip():
-            raise ValueError("resource_name cannot be empty")
+            raise ValueError("kubectl resource_name cannot be empty. Provide a valid Kubernetes resource name like 'my-service' or 'my-pod'")
 
         # Validate optional fields
         if "namespace" in self.config and not self.config["namespace"].strip():
-            raise ValueError("namespace cannot be empty if provided")
+            raise ValueError("kubectl namespace cannot be empty if provided. Use a valid namespace like 'default' or 'production', or remove the field")
 
         if "resource_type" in self.config:
             valid_types = ["service", "pod", "deployment"]
             if self.config["resource_type"] not in valid_types:
-                raise ValueError(f"resource_type must be one of {valid_types}")
+                raise ValueError(f"kubectl resource_type '{self.config['resource_type']}' is invalid. Valid options: {', '.join(valid_types)}")
 
     def _validate_ssh_config(self) -> None:
         """Validate SSH-specific configuration."""
         required_fields = ["host"]
         for field in required_fields:
             if field not in self.config:
-                raise ValueError(f"SSH connection requires '{field}' field")
+                raise ValueError(f"SSH connection missing required field '{field}'. Example: host: 'example.com' or host: '192.168.1.100'")
 
         # Validate host is not empty
         if not self.config["host"].strip():
-            raise ValueError("host cannot be empty")
+            raise ValueError("SSH host cannot be empty. Provide a hostname like 'example.com' or IP address like '192.168.1.100'")
 
         # Validate port if provided
         if "port" in self.config:
             try:
                 port = int(self.config["port"])
                 if not 1 <= port <= 65535:
-                    raise ValueError("SSH port must be between 1 and 65535")
+                    raise ValueError(f"SSH port {port} is invalid. Use a port between 1 and 65535 (default SSH port is 22)")
             except (ValueError, TypeError):
-                raise ValueError("SSH port must be a valid integer")
+                raise ValueError(f"SSH port '{self.config['port']}' must be a valid integer. Example: port: 22 or port: 2222")
 
         # Validate key_file path if provided
         if "key_file" in self.config and self.config["key_file"]:
             key_path = Path(self.config["key_file"]).expanduser()
             if not key_path.exists():
-                raise ValueError(f"SSH key file not found: {key_path}")
+                raise ValueError(f"SSH key file not found: {key_path}. Check the path or generate a key with 'ssh-keygen -t rsa'")
 
     @classmethod
     def kubectl(
