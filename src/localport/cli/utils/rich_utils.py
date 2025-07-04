@@ -9,34 +9,76 @@ from rich.traceback import install
 
 
 def setup_rich_logging(
-    level: str = "INFO",
-    verbose: bool = False,
-    console: Console | None = None
+    verbosity_level: int = 0,
+    console: Console | None = None,
+    level: str | None = None,  # Backward compatibility
+    verbose: bool | None = None  # Backward compatibility
 ) -> None:
-    """Setup Rich-based logging for the CLI.
+    """Setup Rich-based logging with verbosity levels.
 
     Args:
-        level: Logging level (DEBUG, INFO, WARN, ERROR)
-        verbose: Enable verbose logging
+        verbosity_level: Verbosity level (-1=quiet, 0=clean, 1=info, 2=debug)
         console: Rich console instance to use
+        level: Legacy log level (for backward compatibility)
+        verbose: Legacy verbose flag (for backward compatibility)
     """
     if console is None:
         console = Console()
 
+    # Handle backward compatibility
+    if level is not None or verbose is not None:
+        # Legacy mode: convert old parameters to verbosity level
+        if verbose:
+            verbosity_level = 2 if level == "DEBUG" else 1
+        else:
+            verbosity_level = 0
+
+    # Map verbosity to log levels
+    log_level_map = {
+        -1: logging.ERROR,    # Quiet: Only errors
+        0: logging.WARNING,   # Clean: Only warnings/errors
+        1: logging.INFO,      # Informational: Include info logs
+        2: logging.DEBUG      # Debug: Everything
+    }
+    
+    log_level = log_level_map.get(verbosity_level, logging.WARNING)
+    
     # Install rich traceback handler
-    install(console=console, show_locals=verbose)
+    install(console=console, show_locals=(verbosity_level >= 2))
 
-    # Configure log level
-    log_level = getattr(logging, level.upper(), logging.INFO)
+    # Configure different output styles per verbosity level
+    if verbosity_level <= 0:
+        # Clean/Quiet mode: Minimal, structured output
+        rich_handler = RichHandler(
+            console=console,
+            show_time=False,      # No timestamps
+            show_path=False,      # No file paths
+            show_level=False,     # No log levels
+            rich_tracebacks=True,
+            markup=True
+        )
+    elif verbosity_level == 1:
+        # Info mode: Helpful context
+        rich_handler = RichHandler(
+            console=console,
+            show_time=True,       # Show timestamps
+            show_path=False,      # No file paths
+            show_level=False,     # No log levels (cleaner)
+            rich_tracebacks=True,
+            markup=True
+        )
+    else:  # verbosity_level >= 2
+        # Debug mode: Full details
+        rich_handler = RichHandler(
+            console=console,
+            show_time=True,       # Show timestamps
+            show_path=True,       # Show file paths
+            show_level=True,      # Show log levels
+            rich_tracebacks=True,
+            tracebacks_show_locals=True,
+            markup=True
+        )
 
-    # Setup Rich handler for standard logging
-    rich_handler = RichHandler(
-        console=console,
-        show_time=True,
-        show_path=verbose,
-        rich_tracebacks=True,
-        tracebacks_show_locals=verbose
-    )
     rich_handler.setLevel(log_level)
 
     # Configure root logger
@@ -44,17 +86,24 @@ def setup_rich_logging(
         level=log_level,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[rich_handler]
+        handlers=[rich_handler],
+        force=True  # Override any existing configuration
     )
 
-    # Configure structlog to work properly with Rich
-    if verbose:
-        # For verbose mode, use JSON renderer for structured output
+    # Configure structlog based on verbosity level
+    if verbosity_level >= 2:
+        # Debug mode: Use JSON renderer for structured output
         final_processor = structlog.processors.JSONRenderer()
-    else:
-        # For normal mode, use a simple key-value renderer that works with Rich
+    elif verbosity_level == 1:
+        # Info mode: Use clean key-value renderer
         final_processor = structlog.processors.KeyValueRenderer(
             key_order=['timestamp', 'level', 'event'],
+            drop_missing=True
+        )
+    else:
+        # Clean/Quiet mode: Minimal output
+        final_processor = structlog.processors.KeyValueRenderer(
+            key_order=['event'],
             drop_missing=True
         )
 
