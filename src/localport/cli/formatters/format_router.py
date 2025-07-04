@@ -113,15 +113,24 @@ class FormatRouter:
         Returns:
             Rich table markup string
         """
-        # Create status table
-        table = Table(title="Service Status")
-        table.add_column("Service", style="bold blue")
-        table.add_column("Status", style="bold")
-        table.add_column("Technology", style="cyan")
-        table.add_column("Local Port", style="green")
-        table.add_column("Target", style="yellow")
-        table.add_column("Health", style="bold")
-        table.add_column("Uptime", style="dim")
+        # Create enhanced status table with better styling
+        table = Table(
+            title="🚀 LocalPort Service Status",
+            title_style="bold blue",
+            show_header=True,
+            header_style="bold white on blue",
+            border_style="blue",
+            expand=False
+        )
+        
+        # Add columns with improved styling and spacing
+        table.add_column("Service", style="bold cyan", min_width=12)
+        table.add_column("Status", style="bold", justify="center", min_width=10)
+        table.add_column("Tech", style="dim cyan", justify="center", min_width=8)
+        table.add_column("Local", style="bold green", justify="center", min_width=8)
+        table.add_column("→ Target", style="yellow", min_width=15)
+        table.add_column("Health", style="bold", justify="center", min_width=10)
+        table.add_column("Uptime", style="dim white", justify="right", min_width=10)
 
         # Check if we have services to display
         if data.services:
@@ -138,25 +147,66 @@ class FormatRouter:
                     getattr(service_info, 'failure_count', 0)
                 )
 
+                # Enhanced target formatting
+                target_port = service_info.remote_port
+                technology = getattr(service_info, 'technology', 'kubectl')
+                if technology == 'kubectl':
+                    target = f"pod:{target_port}"
+                elif technology == 'ssh':
+                    target = f"ssh:{target_port}"
+                else:
+                    target = f"remote:{target_port}"
+
+                # Add status icons for better visual clarity
+                status_icon = "🟢" if status_str.lower() == "running" else "🔴" if status_str.lower() == "failed" else "🟡"
+                
                 table.add_row(
                     format_service_name(service_info.name),
-                    f"[{status_color}]{status_str.title()}[/{status_color}]",
-                    format_technology(getattr(service_info, 'technology', 'kubectl')),
-                    format_port(service_info.local_port),
-                    f"remote:{service_info.remote_port}",
+                    f"{status_icon} [{status_color}]{status_str.title()}[/{status_color}]",
+                    format_technology(technology),
+                    f":{service_info.local_port}",
+                    target,
                     health_status,
                     format_uptime(service_info.uptime_seconds or 0)
                 )
         else:
-            table.add_row("No services found", "-", "-", "-", "-", "-", "-")
+            # Enhanced empty state message
+            table.add_row(
+                "[dim]No services configured[/dim]", 
+                "[dim]—[/dim]", 
+                "[dim]—[/dim]", 
+                "[dim]—[/dim]", 
+                "[dim]—[/dim]", 
+                "[dim]—[/dim]", 
+                "[dim]—[/dim]"
+            )
 
-        # For table format, we should directly print to console, not capture
-        # The FormatRouter should return a signal to print directly
+        # Print the enhanced table
         self.console.print(table)
 
-        # Add summary
-        summary = f"Total: {data.total_services} | Running: {data.running_services} | Healthy: {data.healthy_services}"
-        self.console.print(f"\n[dim]{summary}[/dim]")
+        # Enhanced summary with better formatting and helpful info
+        if data.services:
+            # Create summary with status indicators
+            running_indicator = "🟢" if data.running_services > 0 else "🔴"
+            healthy_indicator = "💚" if data.healthy_services == data.total_services else "💛" if data.healthy_services > 0 else "❤️"
+            
+            summary_parts = [
+                f"📊 Total: [bold]{data.total_services}[/bold]",
+                f"{running_indicator} Running: [bold green]{data.running_services}[/bold green]",
+                f"{healthy_indicator} Healthy: [bold]{data.healthy_services}[/bold]"
+            ]
+            
+            summary = " | ".join(summary_parts)
+            self.console.print(f"\n{summary}")
+            
+            # Add helpful tips if there are issues
+            if data.running_services == 0 and data.total_services > 0:
+                self.console.print("\n[dim]💡 Tip: Start services with 'localport start --all' or 'localport daemon start'[/dim]")
+            elif data.healthy_services < data.running_services:
+                unhealthy_count = data.running_services - data.healthy_services
+                self.console.print(f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs'[/dim]")
+        else:
+            self.console.print("\n[dim]💡 Get started: Create a config with 'localport config init' or see 'localport --help'[/dim]")
 
         return ""  # Return empty string since we printed directly
 
@@ -189,36 +239,69 @@ class FormatRouter:
         Returns:
             Rich table markup string
         """
-        # Create status table
-        table = Table(title="Daemon Status")
-        table.add_column("Property", style="bold blue")
-        table.add_column("Value", style="white")
+        # Create enhanced daemon status table
+        table = Table(
+            title="⚙️  LocalPort Daemon Status",
+            title_style="bold blue",
+            show_header=True,
+            header_style="bold white on blue",
+            border_style="blue",
+            expand=False
+        )
+        
+        table.add_column("Property", style="bold cyan", min_width=15)
+        table.add_column("Value", style="white", min_width=20)
 
         # Check if we have status information
         if hasattr(data, 'status') and data.status:
             status_info = data.status
             is_running = getattr(status_info, 'running', False)
 
-            # Add daemon information
-            table.add_row("Status", "[green]Running[/green]" if is_running else "[red]Stopped[/red]")
+            # Add daemon information with enhanced formatting
+            status_icon = "🟢" if is_running else "🔴"
+            status_text = f"{status_icon} [green]Running[/green]" if is_running else f"{status_icon} [red]Stopped[/red]"
+            table.add_row("Status", status_text)
 
             if is_running:
                 if hasattr(status_info, 'pid') and status_info.pid:
-                    table.add_row("PID", str(status_info.pid))
+                    table.add_row("Process ID", f"[bold]{status_info.pid}[/bold]")
                 if hasattr(status_info, 'uptime_seconds') and status_info.uptime_seconds:
-                    table.add_row("Uptime", format_uptime(status_info.uptime_seconds))
+                    table.add_row("Uptime", f"[green]{format_uptime(status_info.uptime_seconds)}[/green]")
                 if hasattr(status_info, 'active_services'):
-                    table.add_row("Active Services", str(status_info.active_services or 0))
+                    service_count = status_info.active_services or 0
+                    service_icon = "🚀" if service_count > 0 else "💤"
+                    table.add_row("Active Services", f"{service_icon} [bold]{service_count}[/bold]")
+                
+                # Add helpful management commands
+                table.add_row("", "")  # Spacer
+                table.add_row("[dim]Management[/dim]", "[dim]Commands[/dim]")
+                table.add_row("Stop daemon", "[dim]localport daemon stop[/dim]")
+                table.add_row("View logs", "[dim]localport logs[/dim]")
+                table.add_row("Service status", "[dim]localport status[/dim]")
+            else:
+                # Daemon is stopped - show helpful start commands
+                table.add_row("", "")  # Spacer
+                table.add_row("[dim]Quick Start[/dim]", "[dim]Commands[/dim]")
+                table.add_row("Start daemon", "[dim]localport daemon start[/dim]")
+                table.add_row("Start services", "[dim]localport start --all[/dim]")
+                table.add_row("Get help", "[dim]localport --help[/dim]")
         else:
             # Fallback - show basic status based on success
-            table.add_row("Status", "[red]Stopped[/red]")
-            table.add_row("Message", getattr(data, 'message', 'Daemon is not running'))
+            status_icon = "🔴"
+            table.add_row("Status", f"{status_icon} [red]Stopped[/red]")
+            message = getattr(data, 'message', 'Daemon is not running')
+            table.add_row("Message", f"[dim]{message}[/dim]")
+            
+            # Add helpful start commands
+            table.add_row("", "")  # Spacer
+            table.add_row("[dim]Quick Start[/dim]", "[dim]Commands[/dim]")
+            table.add_row("Start daemon", "[dim]localport daemon start[/dim]")
+            table.add_row("Get help", "[dim]localport --help[/dim]")
 
-        # Capture table output
-        with self.console.capture() as capture:
-            self.console.print(table)
+        # Print the enhanced table directly
+        self.console.print(table)
 
-        return capture.get()
+        return ""  # Return empty string since we printed directly
 
     def _format_daemon_operation_table(self, data: Any, command_name: str) -> str:
         """Format daemon operation as Rich table.

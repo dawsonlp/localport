@@ -13,10 +13,10 @@ class Port:
     def __post_init__(self) -> None:
         """Validate port value after creation."""
         if not isinstance(self.value, int):
-            raise ValueError(f"Port must be an integer, got {type(self.value).__name__}")
+            raise ValueError(f"Port must be an integer, got {type(self.value).__name__}. Example: port: 8080 or port: 5432")
 
         if not self.is_valid_port(self.value):
-            raise ValueError(f"Port must be between 1 and 65535, got {self.value}")
+            raise ValueError(f"Port {self.value} is invalid. Use a port between 1 and 65535 (common ports: 80, 443, 8080, 5432)")
 
     @staticmethod
     def is_valid_port(port: int | str) -> bool:
