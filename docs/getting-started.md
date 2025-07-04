@@ -53,12 +53,93 @@ python3.11 --version  # Should show Python 3.11.x or newer
 
 ## Installation
 
-If you haven't installed LocalPort yet, see the [main README](../README.md#installation) for detailed installation instructions using pipx, UV, or development setup.
+LocalPort supports multiple installation methods. Choose the one that works best for your environment:
 
-Quick verification:
+### Method 1: pipx (Recommended)
+
+**Best for**: Most users, isolated installation, easy management
+
 ```bash
+# Install pipx if you don't have it
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+
+# Install LocalPort
+pipx install localport
+
+# Verify installation
 localport --version
 ```
+
+### Method 2: uv (Fastest)
+
+**Best for**: Modern Python workflows, fastest installation
+
+```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install LocalPort globally
+uv tool install localport
+
+# Verify installation
+localport --version
+```
+
+### Method 3: pip (Traditional)
+
+**Best for**: Virtual environments, CI/CD, traditional Python workflows
+
+```bash
+# In a virtual environment (recommended)
+python3 -m venv localport-env
+source localport-env/bin/activate  # On Windows: localport-env\Scripts\activate
+pip install localport
+
+# Or globally (not recommended)
+pip install --user localport
+
+# Verify installation
+localport --version
+```
+
+### Installation Verification
+
+All methods should result in the same functionality:
+
+```bash
+# Check version
+localport --version
+
+# Test basic commands
+localport --help
+localport config --help
+```
+
+### Troubleshooting Installation
+
+**Command not found after installation:**
+```bash
+# For pipx users
+pipx ensurepath
+source ~/.bashrc  # or restart terminal
+
+# For pip --user installs
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+**Python version issues:**
+```bash
+# Check your Python version
+python3 --version  # Should be 3.11+
+
+# If you have multiple Python versions
+python3.11 -m pipx install localport
+# or
+python3.12 -m pip install localport
+```
+
+For more installation options and development setup, see the [main README](../README.md#installation).
 
 ## Your First Configuration
 

@@ -10,7 +10,7 @@ LocalPort is a modern Python CLI tool that simplifies port forwarding across dif
 
 - **🔄 Universal**: Works with kubectl, SSH, and more - one tool for all your port forwarding needs
 - **🏥 Self-Healing**: Automatic health monitoring with intelligent restart policies and exponential backoff
-- **⚡ Hot Reload**: Configuration changes applied instantly in daemon mode
+- **⚡ Hot Reload**: Configuration changes applied instantly in daemon mode (powered by [watchdog](https://github.com/gorakhargosh/watchdog))
 - **🎯 Production Ready**: Daemon mode for background operation with comprehensive monitoring
 - **🎨 Beautiful CLI**: Rich terminal interface with clean output and progressive verbosity
 - **🔧 Flexible**: YAML configuration with environment variable support and validation

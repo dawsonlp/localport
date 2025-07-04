@@ -76,9 +76,6 @@ class ConfigurationWatcher:
         self._handlers: dict[Path, ConfigurationFileHandler] = {}
         self._is_watching = False
 
-        if not WATCHDOG_AVAILABLE:
-            logger.warning("Watchdog not available - configuration hot reloading disabled. "
-                         "Install with: pip install watchdog")
 
     async def start_watching(self, config_path: Path, callback: Callable[[Path], None]) -> bool:
         """Start watching a configuration file for changes.
