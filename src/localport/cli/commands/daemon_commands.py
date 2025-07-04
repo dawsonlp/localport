@@ -83,18 +83,37 @@ async def start_daemon_command(
 
         # Display results
         if result.success:
-            console.print(create_success_panel(
-                "Daemon Started",
-                f"LocalPort daemon started successfully (PID: {result.pid})"
-            ))
-
-            if auto_start:
-                console.print(create_info_panel(
-                    "Auto-start Enabled",
-                    "Configured services will be started automatically"
+            if detach:
+                # Background mode - show brief success message with next steps
+                console.print(create_success_panel(
+                    "Daemon Started",
+                    f"LocalPort daemon started in background (PID: {result.pid})"
+                ))
+                
+                if auto_start:
+                    console.print(create_info_panel(
+                        "Auto-start Enabled",
+                        "Configured services will be started automatically"
+                    ))
+                
+                # Show helpful next steps
+                console.print("\n[dim]Next steps:[/dim]")
+                console.print("  • Check status: [bold]localport daemon status[/bold]")
+                console.print("  • View logs: [bold]localport logs[/bold]")
+                console.print("  • Stop daemon: [bold]localport daemon stop[/bold]")
+            else:
+                # Foreground mode - show different message
+                console.print(create_success_panel(
+                    "Daemon Started",
+                    f"LocalPort daemon started in foreground (PID: {result.pid})"
                 ))
 
-            if not detach:
+                if auto_start:
+                    console.print(create_info_panel(
+                        "Auto-start Enabled",
+                        "Configured services will be started automatically"
+                    ))
+
                 console.print("[dim]Press Ctrl+C to stop the daemon[/dim]")
                 try:
                     # Keep running until interrupted
@@ -456,9 +475,11 @@ async def reload_daemon_command() -> None:
 def start_daemon_sync(
     config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     auto_start: bool = typer.Option(True, "--auto-start/--no-auto-start", help="Auto-start configured services"),
-    detach: bool = typer.Option(False, "--detach", "-d", help="Run daemon in background")
+    foreground: bool = typer.Option(False, "--foreground", "-f", help="Run daemon in foreground (don't detach)")
 ) -> None:
     """Start the LocalPort daemon."""
+    # Invert the logic: default is detached (background), --foreground runs in foreground
+    detach = not foreground
     asyncio.run(start_daemon_command(config_file, auto_start, detach))
 
 
