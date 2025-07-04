@@ -136,16 +136,16 @@ Following the successful v0.3.1 release with Python 3.11+ compatibility, v0.3.2 
 - [ ] Update documentation with all installation methods
 
 ### **Phase 2: Daemon UX (Week 2)**
-- [ ] Fix daemon detach functionality
-- [ ] Change default daemon behavior to background
-- [ ] Add --foreground flag for old behavior
-- [ ] Test daemon lifecycle management across all installation methods
+- [x] Fix daemon detach functionality
+- [x] Change default daemon behavior to background
+- [x] Add --foreground flag for old behavior
+- [x] Test daemon lifecycle management across all installation methods
 
 ### **Phase 3: CLI Polish (Week 3)**
-- [ ] Improve error messages and help text
-- [ ] Enhance status display formatting
-- [ ] Add better progress indicators
-- [ ] Audit and improve validation messages
+- [x] Improve error messages and help text
+- [x] Enhance status display formatting
+- [x] Add better progress indicators
+- [x] Audit and improve validation messages
 
 ### **Phase 4: Documentation & Testing (Week 4)**
 - [ ] Update installation documentation with pip/uv options
