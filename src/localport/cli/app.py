@@ -70,11 +70,17 @@ def main(
         help="Path to configuration file",
         metavar="PATH"
     ),
-    verbose: bool = typer.Option(
-        False,
+    verbose: int = typer.Option(
+        0,
         "--verbose",
         "-v",
-        help="Enable verbose logging"
+        count=True,
+        help="Increase verbosity (-v for info, -vv for debug)"
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Enable debug logging (equivalent to -vv)"
     ),
     quiet: bool = typer.Option(
         False,
@@ -141,32 +147,41 @@ def main(
         console._color_system = None
         os.environ["NO_COLOR"] = "1"
 
-    # Handle quiet mode
-    if quiet:
+    # Resolve verbosity level from flags
+    def resolve_verbosity_level(verbosity_count: int, debug_flag: bool, quiet_flag: bool) -> int:
+        """Resolve final verbosity level from flags."""
+        if quiet_flag:
+            return -1  # Quiet mode: errors only
+        if debug_flag:
+            return 2   # Debug level
+        return min(verbosity_count, 2)  # Cap at debug level
+
+    verbosity_level = resolve_verbosity_level(verbose, debug, quiet)
+
+    # Map verbosity level to log level for backward compatibility
+    if verbosity_level == -1:  # Quiet
         log_level = "ERROR"
-        verbose = False
-
-    # Handle verbose mode
-    if verbose:
+        verbose_bool = False
+    elif verbosity_level == 0:  # Clean (default)
+        log_level = "WARNING"
+        verbose_bool = False
+    elif verbosity_level == 1:  # Informational
+        log_level = "INFO"
+        verbose_bool = True
+    else:  # verbosity_level >= 2, Debug
         log_level = "DEBUG"
-
-    # Validate log level
-    valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
-    if log_level.upper() not in valid_levels:
-        console.print(f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: {', '.join(valid_levels)}")
-        raise typer.Exit(1)
+        verbose_bool = True
 
     # Validate output format
     try:
         output_format = OutputFormat.from_string(output)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        console.print(f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: table, json, text")
         raise typer.Exit(1)
 
-    # Setup logging
+    # Setup logging with verbosity level
     setup_rich_logging(
-        level=log_level.upper(),
-        verbose=verbose,
+        verbosity_level=verbosity_level,
         console=console
     )
 
@@ -175,7 +190,7 @@ def main(
         settings = Settings(
             config_file=config_file,
             log_level=log_level.upper(),
-            verbose=verbose,
+            verbose=verbose_bool,
             quiet=quiet
         )
 
@@ -184,7 +199,8 @@ def main(
             'settings': settings,
             'console': console,
             'config_file': config_file,
-            'verbose': verbose,
+            'verbose': verbose_bool,  # Backward compatibility
+            'verbosity_level': verbosity_level,  # New verbosity system
             'quiet': quiet,
             'log_level': log_level.upper(),
             'no_color': no_color,
@@ -194,7 +210,8 @@ def main(
         logger.debug("CLI initialized",
                     config_file=config_file,
                     log_level=log_level,
-                    verbose=verbose,
+                    verbosity_level=verbosity_level,
+                    verbose=verbose_bool,
                     quiet=quiet)
 
     except Exception as e:

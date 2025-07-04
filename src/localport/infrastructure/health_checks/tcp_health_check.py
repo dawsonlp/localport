@@ -3,21 +3,40 @@
 import asyncio
 import socket
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict
 
 import structlog
 
 from ...domain.entities.health_check import HealthCheckResult
+from .base_health_checker import HealthChecker
 
 logger = structlog.get_logger()
 
 
-class TCPHealthCheck:
+class TCPHealthCheck(HealthChecker):
     """TCP connectivity health check implementation."""
 
     def __init__(self) -> None:
         """Initialize the TCP health check."""
         pass
+
+    async def check_health(self, config: Dict[str, Any]) -> HealthCheckResult:
+        """Perform TCP health check with given configuration.
+        
+        Args:
+            config: Configuration containing host, port, timeout
+            
+        Returns:
+            HealthCheckResult with the check outcome
+        """
+        # Merge with defaults and validate
+        merged_config = self.merge_with_defaults(config)
+        
+        host = merged_config.get('host', 'localhost')
+        port = merged_config.get('port', 80)
+        timeout = merged_config.get('timeout', 5.0)
+        
+        return await self.check(host=host, port=port, timeout=timeout)
 
     async def check(
         self,
