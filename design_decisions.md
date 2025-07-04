@@ -109,3 +109,42 @@ def generate_deterministic_id(name, technology, local_port, remote_port, connect
 - Added UUID5-based generation with stable namespace
 - Implemented state migration logic for backward compatibility
 - Added comprehensive tests for ID determinism and collision prevention
+
+## GitHub Actions Deprecation Fix (2025-07-03)
+
+### Problem
+GitHub Actions workflow was using deprecated actions that were generating warnings:
+- `actions/create-release@v1` - deprecated and no longer maintained
+- `actions/upload-release-asset@v1` - deprecated and no longer maintained
+
+### Root Cause
+These actions were deprecated because GitHub recommends using the GitHub CLI (`gh`) or REST API directly for better reliability and maintenance.
+
+### Solution
+Replaced deprecated actions with modern GitHub CLI commands:
+
+#### Changes Made
+1. **Replaced `actions/create-release@v1`** with `gh release create` command
+   - Maintains all functionality (title, notes, prerelease detection)
+   - Uses `--prerelease` flag for alpha/beta/rc versions
+   - Uses `--notes-file` for changelog content
+
+2. **Replaced `actions/upload-release-asset@v1`** with `gh release upload` command
+   - Uploads assets directly to existing release
+   - Maintains platform-specific asset naming
+   - Preserves conditional logic for different file types
+
+3. **Updated job outputs** to use tag_name instead of deprecated upload_url
+
+### Benefits
+- **No deprecation warnings** in GitHub Actions
+- **Better error handling** and debugging with GitHub CLI
+- **More maintainable** - follows current GitHub best practices
+- **Same functionality** - all existing features preserved
+- **Future-proof** - GitHub CLI is actively maintained
+
+### Implementation Details
+- Modified `.github/workflows/release.yml`
+- Preserved all existing conditional logic and matrix strategies
+- Maintained backward compatibility with existing release process
+- No changes required to secrets or repository configuration
