@@ -8,12 +8,48 @@ This guide will walk you through setting up LocalPort from scratch and getting y
 
 Before you begin, ensure you have:
 
-- **Python 3.13+** installed on your system
+- **Python 3.11+** installed on your system
+  - **⚠️ Important**: LocalPort requires Python 3.11 or newer
+  - If you don't have Python 3.11+, see [Python Installation](#python-installation) below
 - **pipx** or **UV** for package management (recommended)
 - Access to either:
   - A Kubernetes cluster with `kubectl` configured
   - SSH access to remote servers
 - Basic familiarity with YAML configuration files
+
+### Python Installation
+
+If you don't have Python 3.11+, install it first:
+
+**macOS (using Homebrew):**
+```bash
+brew install python@3.11
+# or for latest version
+brew install python@3.12
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3.11-pip
+# or for newer version
+sudo apt install python3.12 python3.12-venv python3.12-pip
+```
+
+**Windows:**
+- Download from [python.org](https://www.python.org/downloads/) (3.11+ versions)
+- Or use [pyenv-win](https://github.com/pyenv-win/pyenv-win)
+
+**Using pyenv (cross-platform):**
+```bash
+pyenv install 3.11.0  # or 3.12.0, 3.13.0
+pyenv global 3.11.0
+```
+
+**Verify installation:**
+```bash
+python3.11 --version  # Should show Python 3.11.x or newer
+```
 
 ## Installation
 

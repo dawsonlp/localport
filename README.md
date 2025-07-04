@@ -19,25 +19,60 @@ LocalPort is a modern Python CLI tool that simplifies port forwarding across dif
 
 ### Installation
 
-#### Current Release (Test PyPI)
-> **Note**: LocalPort is currently in testing phase and not yet published to production PyPI. Install from Test PyPI for now.
+#### Production Release (PyPI)
+> **Note**: LocalPort is now available on production PyPI! This is alpha software under active development - expect breaking changes and missing features.
+
+> **⚠️ Python 3.11+ Required**: LocalPort requires Python 3.11 or newer. If you don't have Python 3.11+, see [Python Installation](#python-installation) below.
 
 ```bash
-# Install latest test version with pipx (recommended)
-pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport
+# Install with pipx (recommended)
+pipx install localport
 
 # Install with optional dependencies for advanced health checks
-pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" "localport[kafka,postgres]"
+pipx install "localport[kafka,postgres]"
 
 # Alternative: Install with UV
-uv tool install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ localport
+uv tool install localport
 ```
 
-#### Future Stable Release (PyPI)
+#### Python Installation
+
+If you don't have Python 3.11+, install it first:
+
+**macOS (using Homebrew):**
 ```bash
-# Will be available once testing is complete:
-pipx install localport                    # Coming soon
-uv tool install localport                 # Coming soon
+brew install python@3.11
+# or for latest version
+brew install python@3.12
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3.11-pip
+# or for newer version
+sudo apt install python3.12 python3.12-venv python3.12-pip
+```
+
+**Windows:**
+- Download from [python.org](https://www.python.org/downloads/) (3.11+ versions)
+- Or use [pyenv-win](https://github.com/pyenv-win/pyenv-win)
+
+**Using pyenv (cross-platform):**
+```bash
+pyenv install 3.11.0  # or 3.12.0, 3.13.0
+pyenv global 3.11.0
+```
+
+**Verify installation:**
+```bash
+python3.11 --version  # Should show Python 3.11.x or newer
+```
+
+#### Test PyPI (Development Versions)
+```bash
+# Install development versions from Test PyPI
+pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport
 ```
 
 #### Development Installation (GitHub)
@@ -46,7 +81,7 @@ uv tool install localport                 # Coming soon
 pipx install git+https://github.com/dawsonlp/localport.git
 
 # Install specific version/tag
-pipx install git+https://github.com/dawsonlp/localport.git@v0.1.0
+pipx install git+https://github.com/dawsonlp/localport.git@v0.3.0
 
 # Development: Install from source
 git clone https://github.com/dawsonlp/localport.git
@@ -71,14 +106,14 @@ services:
       namespace: default
     tags: [database]
 
-  # Forward Redis via SSH tunnel
+  # Forward Redis from Kubernetes (SSH tunnels planned for v0.4.0)
   - name: redis
-    technology: ssh
+    technology: kubectl
     local_port: 6379
     remote_port: 6379
     connection:
-      host: redis.example.com
-      user: deploy
+      resource_name: redis
+      namespace: default
     tags: [cache]
 ```
 
@@ -121,9 +156,9 @@ That's it! Your services are now accessible locally with automatic health monito
 - **[CLI Reference](docs/cli-reference.md)** - All commands and options
 
 ### User Guides
-- **[User Guide](docs/user-guide.md)** - Common workflows and best practices
-- **[Troubleshooting](docs/troubleshooting.md)** - Solutions for common issues
-- **[Examples](docs/examples/)** - Real-world configuration examples
+- **[CLI Reference](docs/cli-reference.md)** - All commands and options
+- **[Development Guide](docs/development.md)** - Development setup and contribution guidelines
+- **[Architecture Guide](docs/architecture.md)** - Technical architecture overview
 
 ## 🎯 Core Features
 
@@ -249,6 +284,8 @@ services:
 ```
 
 ### SSH Tunnels
+> **⚠️ Note**: SSH tunnel support is planned for v0.4.0 and not yet implemented. The configuration below shows the planned syntax.
+
 ```yaml
 - name: service-name
   technology: ssh
@@ -310,7 +347,7 @@ connection:
 
 ### Requirements
 
-- Python 3.13+
+- Python 3.11+
 - UV (for dependency management)
 - Virtual environment support
 
@@ -318,7 +355,7 @@ connection:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/localport.git
+git clone https://github.com/dawsonlp/localport.git
 cd localport
 
 # Setup development environment
@@ -349,7 +386,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📊 Status
 
-🎯 **Alpha Release 0.3.0** - Core functionality working with daemon mode and health monitoring!
+🎯 **Alpha Release 0.3.x** - Core functionality working with daemon mode and health monitoring!
 
 **Current Progress:**
 - ✅ Core Infrastructure (100% complete)
