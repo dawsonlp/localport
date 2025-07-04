@@ -357,6 +357,9 @@ class ManageDaemonUseCase:
         if config_file:
             cmd.extend(["--config", config_file])
 
+        # Add PID file argument
+        cmd.extend(["--pid-file", self._daemon_pid_file])
+
         # Start daemon process in background
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -366,13 +369,28 @@ class ManageDaemonUseCase:
             start_new_session=True  # Detach from parent
         )
 
-        # Wait a moment to ensure it starts
-        await asyncio.sleep(1)
+        # Wait for daemon to write PID file and become ready
+        max_wait_time = 10.0  # Maximum time to wait for daemon startup
+        check_interval = 0.5  # Check every 500ms
+        elapsed_time = 0.0
 
-        if process.returncode is not None:
-            raise RuntimeError("Daemon process failed to start")
+        while elapsed_time < max_wait_time:
+            await asyncio.sleep(check_interval)
+            elapsed_time += check_interval
 
-        return process.pid
+            # Check if PID file exists and daemon is running
+            if await self._is_daemon_running():
+                daemon_pid = await self._get_daemon_pid()
+                if daemon_pid:
+                    logger.info("Daemon startup verified", pid=daemon_pid, startup_time=elapsed_time)
+                    return daemon_pid
+
+            # Check if the initial process failed early
+            if process.returncode is not None:
+                raise RuntimeError(f"Daemon process failed to start (exit code: {process.returncode})")
+
+        # If we get here, daemon didn't start within timeout
+        raise RuntimeError(f"Daemon failed to start within {max_wait_time} seconds")
 
     async def _stop_daemon_process(self, timeout: float = 30.0) -> None:
         """Stop the daemon process.
@@ -457,8 +475,9 @@ class ManageDaemonUseCase:
             Number of active services
         """
         try:
-            services = await self._service_repository.find_all()
-            return len([s for s in services if s.is_healthy()])
+            # Use service manager's active forwards count instead of repository
+            # The service manager tracks actually running processes
+            return self._service_manager.get_active_forwards_count()
         except Exception:
             return 0
 
