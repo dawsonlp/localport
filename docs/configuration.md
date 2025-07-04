@@ -162,10 +162,16 @@ health_check:
   config:
     database: postgres           # Database name
     user: postgres              # Database user
-    password: ${DB_PASSWORD}    # Database password
+    password: ${DB_PASSWORD}    # Database password (REQUIRED)
     host: localhost             # Database host (default: localhost)
     port: 5432                  # Database port (default: 5432)
 ```
+
+> **⚠️ Important**: PostgreSQL health checks require a password to be configured. Use environment variables to keep passwords secure:
+> ```bash
+> export DB_PASSWORD=your-secure-password
+> ```
+> Without a password, the health check will fail with authentication errors.
 
 ### Kafka Health Check
 
@@ -174,12 +180,17 @@ Message broker connectivity (requires `kafka-python`):
 ```yaml
 health_check:
   type: kafka
-  interval: 45
+  interval: 45                    # Longer interval recommended
   timeout: 15.0
-  failure_threshold: 2
+  failure_threshold: 3            # Higher threshold recommended
   config:
     bootstrap_servers: "localhost:9092"  # Kafka bootstrap servers
 ```
+
+> **⚠️ Known Issue**: The Kafka health check may be too aggressive in detecting failures. Consider using:
+> - Longer intervals (45-60 seconds)
+> - Higher failure thresholds (3-5 failures)
+> - TCP health checks as an alternative for basic connectivity testing
 
 ## Restart Policy Configuration
 
