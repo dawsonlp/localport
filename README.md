@@ -1,16 +1,18 @@
 # LocalPort
 
-> **Universal port forwarding manager with intelligent health monitoring and hot configuration reloading**
+> **🚧 ALPHA RELEASE - Universal port forwarding manager with intelligent health monitoring**
 
-LocalPort is a modern Python CLI tool that simplifies port forwarding across different technologies (kubectl, SSH) while providing enterprise-grade features like automatic health monitoring, intelligent restart policies, and zero-downtime configuration updates.
+**⚠️ This is alpha software under active development. While core functionality is working and tested, expect breaking changes and incomplete features. Please report issues and provide feedback!**
+
+LocalPort is a modern Python CLI tool that simplifies port forwarding across different technologies (kubectl, SSH) while providing enterprise-grade features like automatic health monitoring, intelligent restart policies, and daemon-mode operation.
 
 ## ✨ Why LocalPort?
 
 - **🔄 Universal**: Works with kubectl, SSH, and more - one tool for all your port forwarding needs
 - **🏥 Self-Healing**: Automatic health monitoring with intelligent restart policies and exponential backoff
-- **⚡ Hot Reload**: Configuration changes applied instantly without restarting services
+- **⚡ Hot Reload**: Configuration changes applied instantly in daemon mode
 - **🎯 Production Ready**: Daemon mode for background operation with comprehensive monitoring
-- **🎨 Beautiful CLI**: Rich terminal interface with progress indicators and formatted output
+- **🎨 Beautiful CLI**: Rich terminal interface with clean output and progressive verbosity
 - **🔧 Flexible**: YAML configuration with environment variable support and validation
 
 ## 🚀 Quick Start
@@ -260,18 +262,24 @@ services:
 
 ## 🌟 Advanced Features
 
-### Hot Configuration Reloading
+### Hot Configuration Reloading (Daemon Mode)
 
-LocalPort automatically detects configuration changes and applies them without restarting:
+When running in daemon mode, LocalPort automatically detects configuration changes and applies them without restarting services:
 
 ```bash
+# Start daemon mode first
+localport daemon start --auto-start
+
 # Edit your localport.yaml file
 vim localport.yaml
 
-# Changes are automatically applied!
+# Changes are automatically applied in daemon mode!
 # Check what changed:
+localport daemon status
 localport status
 ```
+
+> **Note**: Hot reloading only works in daemon mode. For standalone commands, you'll need to restart services manually after configuration changes.
 
 ### Multiple Output Formats
 
@@ -341,7 +349,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📊 Status
 
-🎯 **Alpha Testing** - Core functionality implemented and working! Initial testing with Kubernetes PostgreSQL port forwarding successful.
+🎯 **Alpha Release 0.3.0** - Core functionality working with daemon mode and health monitoring!
 
 **Current Progress:**
 - ✅ Core Infrastructure (100% complete)
@@ -350,11 +358,23 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - ✅ ConnectionInfo Value Objects (100% complete)
 - ✅ Health Monitoring Framework (100% complete)
 - ✅ Configuration Management (100% complete)
-- 🚧 SSH Tunnels (planned)
-- 🚧 Daemon Mode (planned)
+- ✅ Daemon Mode (100% complete)
+- ✅ Basic Testing Suite (100% complete)
+- ✅ Hybrid Verbosity System (100% complete)
+- 🚧 SSH Tunnels (planned for 0.4.0)
+- 🚧 Advanced Health Checks (in progress)
 - 🚧 Documentation (in progress)
 
-**Latest Breakthrough:** Resolved kubectl process persistence issue - port forwards now survive after LocalPort CLI exits!
+**Known Issues:**
+- **PostgreSQL Health Check**: Requires password configuration (see [Configuration Guide](docs/configuration.md))
+- **Kafka Health Check**: May be too aggressive in failure detection
+- **SSH Tunnels**: Not yet implemented
+
+**Recent Improvements:**
+- ✅ Daemon startup detection and verification
+- ✅ Health check interface standardization
+- ✅ Progressive verbosity system (-v, -vv, --debug)
+- ✅ Clean CLI output by default
 
 ## 🔗 Links
 
