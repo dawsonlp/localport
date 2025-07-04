@@ -19,25 +19,24 @@ LocalPort is a modern Python CLI tool that simplifies port forwarding across dif
 
 ### Installation
 
-#### Current Release (Test PyPI)
-> **Note**: LocalPort is currently in testing phase and not yet published to production PyPI. Install from Test PyPI for now.
+#### Production Release (PyPI)
+> **Note**: LocalPort is now available on production PyPI! This is alpha software under active development - expect breaking changes and missing features.
 
 ```bash
-# Install latest test version with pipx (recommended)
-pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport
+# Install with pipx (recommended)
+pipx install localport
 
 # Install with optional dependencies for advanced health checks
-pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" "localport[kafka,postgres]"
+pipx install "localport[kafka,postgres]"
 
 # Alternative: Install with UV
-uv tool install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ localport
+uv tool install localport
 ```
 
-#### Future Stable Release (PyPI)
+#### Test PyPI (Development Versions)
 ```bash
-# Will be available once testing is complete:
-pipx install localport                    # Coming soon
-uv tool install localport                 # Coming soon
+# Install development versions from Test PyPI
+pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/" localport
 ```
 
 #### Development Installation (GitHub)
