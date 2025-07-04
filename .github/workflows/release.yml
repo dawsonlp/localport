@@ -26,7 +26,7 @@ jobs:
       run: |
         TAG_NAME=${GITHUB_REF#refs/tags/}
         echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-        if echo "$TAG_NAME" | grep -E '(alpha|beta|rc)' > /dev/null; then
+        if echo "$TAG_NAME" | grep -E '(alpha|beta|rc|a[0-9]+|b[0-9]+)' > /dev/null; then
           echo "is_prerelease=true" >> $GITHUB_OUTPUT
         else
           echo "is_prerelease=false" >> $GITHUB_OUTPUT
@@ -168,7 +168,7 @@ jobs:
   publish-test-pypi:
     needs: create-release
     runs-on: ubuntu-latest
-    if: "contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')"
+    if: contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(github.ref, 'a1') || contains(github.ref, 'a2') || contains(github.ref, 'a3') || contains(github.ref, 'a4') || contains(github.ref, 'a5') || contains(github.ref, 'a6') || contains(github.ref, 'a7') || contains(github.ref, 'a8') || contains(github.ref, 'a9') || contains(github.ref, 'a0')
     
     steps:
     - uses: actions/checkout@v4
@@ -212,7 +212,7 @@ jobs:
   publish-pypi:
     needs: create-release
     runs-on: ubuntu-latest
-    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
+    if: "!(contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(github.ref, 'a1') || contains(github.ref, 'a2') || contains(github.ref, 'a3') || contains(github.ref, 'a4') || contains(github.ref, 'a5') || contains(github.ref, 'a6') || contains(github.ref, 'a7') || contains(github.ref, 'a8') || contains(github.ref, 'a9') || contains(github.ref, 'a0'))"
     
     steps:
     - uses: actions/checkout@v4
