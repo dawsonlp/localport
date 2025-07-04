@@ -22,6 +22,8 @@ LocalPort is a modern Python CLI tool that simplifies port forwarding across dif
 #### Production Release (PyPI)
 > **Note**: LocalPort is now available on production PyPI! This is alpha software under active development - expect breaking changes and missing features.
 
+> **⚠️ Python 3.11+ Required**: LocalPort requires Python 3.11 or newer. If you don't have Python 3.11+, see [Python Installation](#python-installation) below.
+
 ```bash
 # Install with pipx (recommended)
 pipx install localport
@@ -31,6 +33,40 @@ pipx install "localport[kafka,postgres]"
 
 # Alternative: Install with UV
 uv tool install localport
+```
+
+#### Python Installation
+
+If you don't have Python 3.11+, install it first:
+
+**macOS (using Homebrew):**
+```bash
+brew install python@3.11
+# or for latest version
+brew install python@3.12
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3.11-pip
+# or for newer version
+sudo apt install python3.12 python3.12-venv python3.12-pip
+```
+
+**Windows:**
+- Download from [python.org](https://www.python.org/downloads/) (3.11+ versions)
+- Or use [pyenv-win](https://github.com/pyenv-win/pyenv-win)
+
+**Using pyenv (cross-platform):**
+```bash
+pyenv install 3.11.0  # or 3.12.0, 3.13.0
+pyenv global 3.11.0
+```
+
+**Verify installation:**
+```bash
+python3.11 --version  # Should show Python 3.11.x or newer
 ```
 
 #### Test PyPI (Development Versions)
@@ -311,7 +347,7 @@ connection:
 
 ### Requirements
 
-- Python 3.13+
+- Python 3.11+
 - UV (for dependency management)
 - Virtual environment support
 
