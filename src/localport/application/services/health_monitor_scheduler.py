@@ -185,41 +185,43 @@ class HealthMonitorScheduler:
             # Perform the check
             start_time = datetime.now()
 
+            # Prepare configuration for the health checker
+            check_config = health_config.get('config', {}).copy()
+            check_config.setdefault('timeout', timeout)
+            
+            # Add service-specific defaults based on check type
             if check_type == 'tcp':
-                is_healthy = await health_checker.check(
-                    host='localhost',
-                    port=service.local_port,
-                    timeout=timeout
-                )
+                check_config.setdefault('host', 'localhost')
+                check_config.setdefault('port', service.local_port)
             elif check_type == 'http':
-                url = health_config.get('config', {}).get('url', f'http://localhost:{service.local_port}/health')
-                is_healthy = await health_checker.check(url=url, timeout=timeout)
+                if 'url' not in check_config:
+                    check_config['url'] = f'http://localhost:{service.local_port}/health'
             elif check_type == 'kafka':
-                bootstrap_servers = health_config.get('config', {}).get('bootstrap_servers', f'localhost:{service.local_port}')
-                is_healthy = await health_checker.check(bootstrap_servers=bootstrap_servers, timeout=timeout)
+                if 'bootstrap_servers' not in check_config:
+                    check_config['bootstrap_servers'] = f'localhost:{service.local_port}'
             elif check_type == 'postgres':
-                connection_config = health_config.get('config', {})
-                connection_config.setdefault('host', 'localhost')
-                connection_config.setdefault('port', service.local_port)
-                is_healthy = await health_checker.check(**connection_config, timeout=timeout)
+                check_config.setdefault('host', 'localhost')
+                check_config.setdefault('port', service.local_port)
             else:
-                # Default to TCP check
-                is_healthy = await health_checker.check(
-                    host='localhost',
-                    port=service.local_port,
-                    timeout=timeout
-                )
+                # Default to TCP-like configuration
+                check_config.setdefault('host', 'localhost')
+                check_config.setdefault('port', service.local_port)
 
+            # Use polymorphic interface - all health checkers implement check_health()
+            health_result = await health_checker.check_health(check_config)
+            
+            # Update timing information
             check_duration = (datetime.now() - start_time).total_seconds()
-
+            
+            # Create standardized result with service information
             return HealthCheckResult(
                 service_id=service.id,
                 service_name=service.name,
                 check_type=check_type,
-                is_healthy=is_healthy,
+                is_healthy=health_result.status.value == 'healthy',
                 checked_at=start_time,
                 response_time=check_duration,
-                error=None if is_healthy else f"{check_type.upper()} health check failed"
+                error=health_result.error
             )
 
         except Exception as e:

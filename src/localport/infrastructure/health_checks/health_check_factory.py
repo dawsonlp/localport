@@ -1,28 +1,21 @@
 """Factory for creating health check instances based on configuration."""
 
-from typing import Any, Protocol
+from typing import Any
 
 import structlog
 
+from .base_health_checker import HealthChecker
 from .http_health_check import HTTPHealthCheck
 from .tcp_health_check import TCPHealthCheck
 
 logger = structlog.get_logger()
 
 
-class HealthChecker(Protocol):
-    """Protocol for health check implementations."""
-
-    async def check(self, **kwargs) -> bool:
-        """Perform a health check and return True if healthy."""
-        ...
-
-
 class HealthCheckFactory:
     """Factory for creating health check instances."""
 
     def __init__(self):
-        self._health_checkers: dict[str, type] = {
+        self._health_checkers: dict[str, type[HealthChecker]] = {
             'tcp': TCPHealthCheck,
             'http': HTTPHealthCheck,
         }
@@ -35,13 +28,13 @@ class HealthCheckFactory:
 
         Args:
             check_type: Type of health check (tcp, http, kafka, postgres)
-            config: Configuration for the health checker
+            config: Configuration for the health checker (used for validation)
 
         Returns:
             Health checker instance
 
         Raises:
-            ValueError: If check_type is not supported
+            ValueError: If check_type is not supported or config is invalid
         """
         if check_type not in self._health_checkers:
             available_types = list(self._health_checkers.keys())
@@ -50,7 +43,15 @@ class HealthCheckFactory:
         health_checker_class = self._health_checkers[check_type]
 
         try:
-            return health_checker_class(config)
+            # Create health checker instance (no config in constructor)
+            health_checker = health_checker_class()
+            
+            # Validate configuration if provided
+            if config and not health_checker.validate_config(config):
+                raise ValueError(f"Invalid configuration for {check_type} health checker")
+            
+            return health_checker
+            
         except Exception as e:
             logger.error("Failed to create health checker",
                         check_type=check_type,
