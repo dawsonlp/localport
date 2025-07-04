@@ -70,14 +70,14 @@ services:
       namespace: default
     tags: [database]
 
-  # Forward Redis via SSH tunnel
+  # Forward Redis from Kubernetes (SSH tunnels planned for v0.4.0)
   - name: redis
-    technology: ssh
+    technology: kubectl
     local_port: 6379
     remote_port: 6379
     connection:
-      host: redis.example.com
-      user: deploy
+      resource_name: redis
+      namespace: default
     tags: [cache]
 ```
 
@@ -120,9 +120,9 @@ That's it! Your services are now accessible locally with automatic health monito
 - **[CLI Reference](docs/cli-reference.md)** - All commands and options
 
 ### User Guides
-- **[User Guide](docs/user-guide.md)** - Common workflows and best practices
-- **[Troubleshooting](docs/troubleshooting.md)** - Solutions for common issues
-- **[Examples](docs/examples/)** - Real-world configuration examples
+- **[CLI Reference](docs/cli-reference.md)** - All commands and options
+- **[Development Guide](docs/development.md)** - Development setup and contribution guidelines
+- **[Architecture Guide](docs/architecture.md)** - Technical architecture overview
 
 ## 🎯 Core Features
 
@@ -248,6 +248,8 @@ services:
 ```
 
 ### SSH Tunnels
+> **⚠️ Note**: SSH tunnel support is planned for v0.4.0 and not yet implemented. The configuration below shows the planned syntax.
+
 ```yaml
 - name: service-name
   technology: ssh
@@ -317,7 +319,7 @@ connection:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/localport.git
+git clone https://github.com/dawsonlp/localport.git
 cd localport
 
 # Setup development environment
