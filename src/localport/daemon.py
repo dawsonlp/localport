@@ -47,7 +47,7 @@ class LocalPortDaemon:
         try:
             # Initialize repositories and services
             service_repo = MemoryServiceRepository()
-            config_repo = YamlConfigRepository(config_file=self.config_file)
+            config_repo = YamlConfigRepository(config_path=self.config_file)
             AdapterFactory()
             health_check_factory = HealthCheckFactory()
 

@@ -109,3 +109,147 @@ def generate_deterministic_id(name, technology, local_port, remote_port, connect
 - Added UUID5-based generation with stable namespace
 - Implemented state migration logic for backward compatibility
 - Added comprehensive tests for ID determinism and collision prevention
+
+
+## Health Check Interface Standardization (2025-07-04)
+
+### Problem
+The health check system had inconsistent object-oriented design causing daemon restart loops and maintenance issues:
+
+1. **Inconsistent Interface Contract**:
+   - `TCPHealthCheck`: Has both `check()` and `check_with_config()` methods, returns `HealthCheckResult`
+   - `HTTPHealthCheck`: Only has `check()` method, returns `bool`
+   - Factory Protocol: Defines `check(**kwargs) -> bool` but implementations don't match
+
+2. **Mixed Return Types**:
+   - Some health checkers return `bool`
+   - Others return `HealthCheckResult`
+   - Scheduler needs conditional logic to handle both
+
+3. **Inconsistent Constructor Patterns**:
+   - `TCPHealthCheck`: `__init__()` takes no parameters
+   - `HTTPHealthCheck`: `__init__(config: dict)` requires config
+   - Factory fails when trying to create all with uniform pattern
+
+4. **Violation of Liskov Substitution Principle**:
+   - Health checkers can't be used interchangeably
+   - Scheduler needs type-specific conditional logic
+
+### Root Cause
+The health check implementations evolved independently without a common abstract interface, leading to:
+- Health check failures due to method signature mismatches
+- Continuous service restarts (32+ failures observed)
+- Complex, error-prone scheduler logic with type-specific branches
+- Difficult maintenance and extension
+
+### Solution
+Implemented a standardized abstract interface that all health checkers must implement:
+
+#### Abstract Health Checker Interface
+```python
+from abc import ABC, abstractmethod
+from typing import Any, Dict
+
+class HealthChecker(ABC):
+    """Abstract base class for all health checkers."""
+    
+    @abstractmethod
+    async def check_health(self, config: Dict[str, Any]) -> HealthCheckResult:
+        """Perform health check with given configuration."""
+        pass
+    
+    @abstractmethod
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validate configuration for this health checker."""
+        pass
+    
+    @abstractmethod
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for this health checker."""
+        pass
+```
+
+#### Design Principles
+1. **Uniform Interface**: Single `check_health(config)` method for all implementations
+2. **Consistent Return Type**: All health checkers return `HealthCheckResult`
+3. **Configuration-Driven**: All configuration passed at check time, not constructor
+4. **Polymorphic Usage**: All health checkers interchangeable via common interface
+5. **Validation Separation**: Configuration validation separate from execution
+
+### Benefits
+- **Eliminates Restart Loops**: Consistent interface prevents method signature errors
+- **Simplified Scheduler**: No more type-specific conditional logic
+- **Better Maintainability**: Clear contract for all health checker implementations
+- **Easy Extension**: New health checkers follow standard pattern
+- **Polymorphic Design**: True object-oriented substitutability
+
+### Implementation Strategy
+1. **Create Abstract Base Class** with standardized interface
+2. **Refactor Existing Health Checkers** to implement the interface uniformly
+3. **Update Factory** to use consistent creation pattern
+4. **Simplify Scheduler** to use polymorphic calls only
+5. **Add Configuration Validation** at factory level
+
+### Scheduler Simplification
+Before (type-specific logic):
+```python
+if check_type == 'tcp':
+    health_result = await health_checker.check_with_config(check_config)
+    is_healthy = health_result.is_healthy
+elif check_type == 'http':
+    is_healthy = await health_checker.check(url=url, timeout=timeout)
+# ... more type-specific branches
+```
+
+After (polymorphic):
+```python
+result = await health_checker.check_health(merged_config)
+is_healthy = result.status == HealthCheckStatus.HEALTHY
+```
+
+### Implementation Details
+- Created `HealthChecker` abstract base class with uniform interface
+- Refactored all health checker implementations to inherit from base class
+- Updated factory to create instances uniformly without constructor dependencies
+- Simplified health monitor scheduler to use polymorphic method calls
+- Added comprehensive configuration validation at factory level
+
+## GitHub Actions Deprecation Fix (2025-07-03)
+
+### Problem
+GitHub Actions workflow was using deprecated actions that were generating warnings:
+- `actions/create-release@v1` - deprecated and no longer maintained
+- `actions/upload-release-asset@v1` - deprecated and no longer maintained
+
+### Root Cause
+These actions were deprecated because GitHub recommends using the GitHub CLI (`gh`) or REST API directly for better reliability and maintenance.
+
+### Solution
+Replaced deprecated actions with modern GitHub CLI commands:
+
+#### Changes Made
+1. **Replaced `actions/create-release@v1`** with `gh release create` command
+   - Maintains all functionality (title, notes, prerelease detection)
+   - Uses `--prerelease` flag for alpha/beta/rc versions
+   - Uses `--notes-file` for changelog content
+
+2. **Replaced `actions/upload-release-asset@v1`** with `gh release upload` command
+   - Uploads assets directly to existing release
+   - Maintains platform-specific asset naming
+   - Preserves conditional logic for different file types
+
+3. **Updated job outputs** to use tag_name instead of deprecated upload_url
+
+### Benefits
+- **No deprecation warnings** in GitHub Actions
+- **Better error handling** and debugging with GitHub CLI
+- **More maintainable** - follows current GitHub best practices
+- **Same functionality** - all existing features preserved
+- **Future-proof** - GitHub CLI is actively maintained
+
+### Implementation Details
+- Modified `.github/workflows/release.yml`
+- Preserved all existing conditional logic and matrix strategies
+- Maintained backward compatibility with existing release process
+- No changes required to secrets or repository configuration
+

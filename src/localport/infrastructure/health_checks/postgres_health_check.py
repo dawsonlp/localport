@@ -1,23 +1,95 @@
 """PostgreSQL-specific health check implementation."""
 
 import asyncio
-from typing import Any
+from datetime import datetime
+from typing import Any, Dict
 
 import structlog
+
+from ...domain.entities.health_check import HealthCheckResult
+from .base_health_checker import HealthChecker
 
 logger = structlog.get_logger()
 
 
-class PostgreSQLHealthCheck:
+class PostgreSQLHealthCheck(HealthChecker):
     """PostgreSQL-specific health check using database connectivity."""
 
-    def __init__(self, timeout: float = 10.0):
-        """Initialize PostgreSQL health check.
+    def __init__(self):
+        """Initialize PostgreSQL health check."""
+        pass
 
+    async def check_health(self, config: Dict[str, Any]) -> HealthCheckResult:
+        """Perform PostgreSQL health check with given configuration.
+        
         Args:
-            timeout: Connection timeout in seconds
+            config: Configuration containing database connection parameters
+            
+        Returns:
+            HealthCheckResult with the check outcome
         """
-        self.timeout = timeout
+        # Merge with defaults and validate
+        merged_config = self.merge_with_defaults(config)
+        
+        start_time = datetime.now()
+        
+        try:
+            # Import psycopg here to make it optional
+            try:
+                import psycopg
+                from psycopg import DatabaseError, OperationalError
+            except ImportError:
+                return HealthCheckResult.error("psycopg not installed. Install with: pip install psycopg[binary]")
+
+            # Build connection string
+            connection_string = self._build_connection_string(merged_config)
+            timeout = merged_config.get('timeout', 10.0)
+
+            # Test connection
+            try:
+                async with psycopg.AsyncConnection.connect(
+                    connection_string,
+                    connect_timeout=timeout
+                ) as conn:
+                    # Execute a simple query to verify the connection works
+                    async with conn.cursor() as cur:
+                        await cur.execute("SELECT 1")
+                        result = await cur.fetchone()
+
+                        # Calculate response time
+                        end_time = datetime.now()
+                        response_time_ms = (end_time - start_time).total_seconds() * 1000
+
+                        if result and result[0] == 1:
+                            logger.debug("PostgreSQL health check passed",
+                                        host=merged_config.get('host', 'localhost'),
+                                        database=merged_config.get('database', 'postgres'))
+                            return HealthCheckResult.healthy(
+                                message=f"PostgreSQL connection to {merged_config.get('host', 'localhost')}:{merged_config.get('port', 5432)} successful",
+                                response_time_ms=response_time_ms
+                            )
+                        else:
+                            return HealthCheckResult.unhealthy(
+                                message="PostgreSQL query returned unexpected result",
+                                error="Unexpected query result"
+                            )
+
+            except (OperationalError, DatabaseError) as e:
+                logger.debug("PostgreSQL health check failed - database error",
+                            host=merged_config.get('host', 'localhost'),
+                            database=merged_config.get('database', 'postgres'),
+                            error=str(e))
+                return HealthCheckResult.unhealthy(
+                    message=f"PostgreSQL database error: {str(e)}",
+                    error=str(e)
+                )
+
+        except Exception as e:
+            logger.debug("PostgreSQL health check failed - unexpected error",
+                        host=merged_config.get('host', 'localhost'),
+                        database=merged_config.get('database', 'postgres'),
+                        error=str(e))
+            return HealthCheckResult.error(f"PostgreSQL health check exception: {str(e)}")
 
     async def check(self, config: dict[str, Any]) -> bool:
         """Check PostgreSQL connectivity via database connection.
@@ -89,6 +161,7 @@ class PostgreSQLHealthCheck:
         database = config.get('database', 'postgres')
         user = config.get('user', 'postgres')
         password = config.get('password', '')
+        timeout = config.get('timeout', 10.0)
 
         # Build connection string
         conn_parts = [
@@ -107,7 +180,7 @@ class PostgreSQLHealthCheck:
             conn_parts.append(f"sslmode={sslmode}")
 
         # Add connection timeout
-        conn_parts.append(f"connect_timeout={int(self.timeout)}")
+        conn_parts.append(f"connect_timeout={int(timeout)}")
 
         return " ".join(conn_parts)
 
@@ -351,6 +424,120 @@ class PostgreSQLHealthCheck:
             return False
 
 
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validate PostgreSQL health check configuration.
+        
+        Args:
+            config: Configuration to validate
+            
+        Returns:
+            True if configuration is valid, False otherwise
+        """
+        try:
+            # Validate optional host
+            host = config.get('host', 'localhost')
+            if not isinstance(host, str) or not host.strip():
+                logger.error("PostgreSQL health check invalid host", host=host)
+                return False
+
+            # Validate optional port
+            port = config.get('port', 5432)
+            if not isinstance(port, int) or not 1 <= port <= 65535:
+                logger.error("PostgreSQL health check invalid port", port=port)
+                return False
+
+            # Validate optional database
+            database = config.get('database', 'postgres')
+            if not isinstance(database, str) or not database.strip():
+                logger.error("PostgreSQL health check invalid database", database=database)
+                return False
+
+            # Validate optional user
+            user = config.get('user', 'postgres')
+            if not isinstance(user, str) or not user.strip():
+                logger.error("PostgreSQL health check invalid user", user=user)
+                return False
+
+            # Validate optional timeout
+            timeout = config.get('timeout', 10.0)
+            if not isinstance(timeout, (int, float)) or timeout <= 0:
+                logger.error("PostgreSQL health check invalid timeout", timeout=timeout)
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error("Error validating PostgreSQL health check config", error=str(e))
+            return False
+
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for PostgreSQL health checks.
+        
+        Returns:
+            Default configuration dictionary
+        """
+        return {
+            "host": "localhost",
+            "port": 5432,
+            "database": "postgres",
+            "user": "postgres",
+            "password": "",
+            "timeout": 10.0
+        }
+
+    def get_config_schema(self) -> Dict[str, Any]:
+        """Get configuration schema for PostgreSQL health checks.
+        
+        Returns:
+            JSON schema for configuration validation
+        """
+        return {
+            "type": "object",
+            "properties": {
+                "host": {
+                    "type": "string",
+                    "default": "localhost",
+                    "description": "Database host"
+                },
+                "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "default": 5432,
+                    "description": "Database port"
+                },
+                "database": {
+                    "type": "string",
+                    "default": "postgres",
+                    "description": "Database name"
+                },
+                "user": {
+                    "type": "string",
+                    "default": "postgres",
+                    "description": "Database user"
+                },
+                "password": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Database password"
+                },
+                "timeout": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 300,
+                    "default": 10.0,
+                    "description": "Connection timeout in seconds"
+                },
+                "sslmode": {
+                    "type": "string",
+                    "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"],
+                    "description": "SSL mode for connection"
+                }
+            },
+            "additionalProperties": False
+        }
+
+
 # Convenience function for simple health checks
 async def check_postgres_health(
     host: str = 'localhost',
@@ -373,12 +560,14 @@ async def check_postgres_health(
     Returns:
         True if PostgreSQL is healthy, False otherwise
     """
-    health_check = PostgreSQLHealthCheck(timeout=timeout)
+    health_check = PostgreSQLHealthCheck()
     config = {
         'host': host,
         'port': port,
         'database': database,
         'user': user,
-        'password': password
+        'password': password,
+        'timeout': timeout
     }
-    return await health_check.check(config)
+    result = await health_check.check_health(config)
+    return result.status.value == 'healthy'
