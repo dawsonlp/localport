@@ -131,7 +131,7 @@ async def start_daemon_command(
             console.print(create_error_panel(
                 "Failed to Start Daemon",
                 result.error or "Unknown error occurred",
-                "Check if another daemon is already running or check the logs."
+                "Check if another daemon is running: 'localport daemon status' or view logs: 'localport logs --daemon'"
             ))
             raise typer.Exit(1)
 
