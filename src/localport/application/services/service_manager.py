@@ -65,53 +65,24 @@ class ServiceManager:
                                process_id=existing_forward.process_id)
                     del self._active_forwards[service.id]
 
-            # Check if there's already a running process with the same port mapping
-            # This handles cases where the service config changed but the process is still running
-            if await self.is_service_running(service):
-                logger.info("Service already running with correct port mapping",
-                           service_name=service.name,
-                           local_port=service.local_port,
-                           remote_port=service.remote_port)
-                
-                # Find and track the existing process
-                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                    try:
-                        if (proc.info['cmdline'] and 
-                            len(proc.info['cmdline']) > 0 and
-                            'kubectl' in proc.info['cmdline'][0] and 
-                            'port-forward' in proc.info['cmdline']):
-                            
-                            cmdline = ' '.join(proc.info['cmdline'])
-                            if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
-                                # Found the existing process, track it under this service
-                                port_forward = PortForward(
-                                    service_id=service.id,
-                                    process_id=proc.info['pid'],
-                                    local_port=service.local_port,
-                                    remote_port=service.remote_port,
-                                    started_at=datetime.now()  # We don't know the real start time
-                                )
-                                self._active_forwards[service.id] = port_forward
-                                self._persist_state()
-                                
-                                logger.info("Tracked existing process for service",
-                                          service_name=service.name,
-                                          process_id=proc.info['pid'])
-                                
-                                return ServiceStartResult.success_result(
-                                    service_name=service.name,
-                                    process_id=proc.info['pid'],
-                                    started_at=port_forward.started_at
-                                )
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                        continue
-
             # Check if local port is available
-            if not await self._is_port_available(service.local_port):
-                error_msg = f"Port {service.local_port} is already in use"
+            conflict_info = await self._get_port_conflict_info(service.local_port)
+            if conflict_info:
+                if conflict_info['is_managed']:
+                    error_msg = f"Port {service.local_port} is already in use by another LocalPort service (PID: {conflict_info['pid']})"
+                else:
+                    error_msg = (f"Port {service.local_port} is already in use by external process\n"
+                               f"Process: {conflict_info['name']} (PID: {conflict_info['pid']})\n"
+                               f"Command: {conflict_info['cmdline']}\n\n"
+                               f"Resolution:\n"
+                               f"- Use a different local port in your configuration, or\n"
+                               f"- Stop the conflicting process manually if you own it")
+                
                 logger.error("Port unavailable",
                            service_name=service.name,
-                           port=service.local_port)
+                           port=service.local_port,
+                           conflict_pid=conflict_info['pid'],
+                           is_managed=conflict_info['is_managed'])
                 service.update_status(ServiceStatus.FAILED)
                 return ServiceStartResult.failure_result(service.name, error_msg)
 
@@ -375,52 +346,11 @@ class ServiceManager:
                 service.update_status(ServiceStatus.FAILED)
                 status_info.status = ServiceStatus.FAILED
         else:
-            # No active forward in memory, check if service is actually running
-            is_running = await self.is_service_running(service)
-            if is_running:
-                # Service is running but not tracked - this shouldn't happen normally
-                # but can occur if state was lost or process started externally
-                logger.warning("Found running service not tracked in memory",
-                             service_name=service.name,
-                             local_port=service.local_port)
-                status_info.is_healthy = True
-                service.update_status(ServiceStatus.RUNNING)
-                status_info.status = ServiceStatus.RUNNING
-                
-                # Try to find the process and add it to active forwards
-                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                    try:
-                        if (proc.info['cmdline'] and 
-                            len(proc.info['cmdline']) > 0 and
-                            'kubectl' in proc.info['cmdline'][0] and 
-                            'port-forward' in proc.info['cmdline']):
-                            
-                            cmdline = ' '.join(proc.info['cmdline'])
-                            if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
-                                # Found the process, add it to active forwards
-                                port_forward = PortForward(
-                                    service_id=service.id,
-                                    process_id=proc.info['pid'],
-                                    local_port=service.local_port,
-                                    remote_port=service.remote_port,
-                                    started_at=datetime.now()  # We don't know the real start time
-                                )
-                                self._active_forwards[service.id] = port_forward
-                                self._persist_state()
-                                
-                                status_info.process_id = proc.info['pid']
-                                status_info.started_at = port_forward.started_at
-                                logger.info("Re-tracked running service",
-                                          service_name=service.name,
-                                          process_id=proc.info['pid'])
-                                break
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                        continue
-            else:
-                # Service is not running
-                status_info.is_healthy = False
-                service.update_status(ServiceStatus.STOPPED)
-                status_info.status = ServiceStatus.STOPPED
+            # No active forward in memory - service is not managed by LocalPort
+            # Only report what we know from our state, don't auto-adopt external processes
+            status_info.is_healthy = False
+            service.update_status(ServiceStatus.STOPPED)
+            status_info.status = ServiceStatus.STOPPED
 
         return status_info
 
@@ -525,6 +455,104 @@ class ServiceManager:
         self._active_forwards.clear()
         logger.info("All processes cleaned up")
 
+    async def detect_orphaned_processes(self, declared_services: list[Service]) -> list[dict]:
+        """Detect LocalPort processes that are no longer in the configuration.
+
+        Args:
+            declared_services: List of services currently declared in configuration
+
+        Returns:
+            List of orphaned process information dictionaries
+        """
+        logger.info("Detecting orphaned LocalPort processes")
+        
+        # Get service IDs from declared services
+        declared_service_ids = {service.id for service in declared_services}
+        
+        orphaned_processes = []
+        
+        # Check state file for processes not in current config
+        for service_id, port_forward in self._active_forwards.items():
+            if service_id not in declared_service_ids:
+                # This process is in our state but not in current config
+                if port_forward.is_process_alive():
+                    try:
+                        proc = psutil.Process(port_forward.process_id)
+                        cmdline = ' '.join(proc.cmdline()) if proc.cmdline() else proc.name()
+                        
+                        orphaned_processes.append({
+                            'service_id': str(service_id),
+                            'process_id': port_forward.process_id,
+                            'local_port': port_forward.local_port,
+                            'remote_port': port_forward.remote_port,
+                            'started_at': port_forward.started_at,
+                            'cmdline': cmdline,
+                            'status': 'orphaned'
+                        })
+                        
+                        logger.info("Found orphaned LocalPort process",
+                                   service_id=service_id,
+                                   process_id=port_forward.process_id,
+                                   local_port=port_forward.local_port)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                        # Process is dead, will be cleaned up by cleanup_dead_processes
+                        pass
+                else:
+                    # Process is dead, will be cleaned up by cleanup_dead_processes
+                    logger.debug("Found dead orphaned process",
+                               service_id=service_id,
+                               process_id=port_forward.process_id)
+        
+        logger.info("Orphaned process detection completed", count=len(orphaned_processes))
+        return orphaned_processes
+
+    async def cleanup_orphaned_processes(self, declared_services: list[Service]) -> list[dict]:
+        """Clean up LocalPort processes that are no longer in the configuration.
+
+        Args:
+            declared_services: List of services currently declared in configuration
+
+        Returns:
+            List of cleaned up process information dictionaries
+        """
+        logger.info("Cleaning up orphaned LocalPort processes")
+        
+        orphaned_processes = await self.detect_orphaned_processes(declared_services)
+        cleaned_up = []
+        
+        for orphan_info in orphaned_processes:
+            try:
+                service_id = UUID(orphan_info['service_id'])
+                process_id = orphan_info['process_id']
+                
+                # Stop the process using the appropriate adapter
+                # For now, assume kubectl (could be enhanced to detect technology)
+                adapter = self._adapters[ForwardingTechnology.KUBECTL]
+                await adapter.stop_port_forward(process_id)
+                
+                # Remove from active forwards
+                if service_id in self._active_forwards:
+                    del self._active_forwards[service_id]
+                
+                cleaned_up.append(orphan_info)
+                logger.info("Cleaned up orphaned process",
+                           service_id=service_id,
+                           process_id=process_id,
+                           local_port=orphan_info['local_port'])
+                
+            except Exception as e:
+                logger.error("Error cleaning up orphaned process",
+                           service_id=orphan_info['service_id'],
+                           process_id=orphan_info['process_id'],
+                           error=str(e))
+        
+        # Persist the updated state
+        if cleaned_up:
+            self._persist_state()
+        
+        logger.info("Orphaned process cleanup completed", count=len(cleaned_up))
+        return cleaned_up
+
     async def _is_port_available(self, port: int) -> bool:
         """Check if a local port is available.
 
@@ -535,6 +563,56 @@ class ServiceManager:
             True if port is available, False if in use
         """
         return await self._tcp_health_check.check_port_available(port)
+
+    async def _get_port_conflict_info(self, port: int) -> dict | None:
+        """Get detailed information about what's using a port.
+
+        Args:
+            port: Port number to check
+
+        Returns:
+            Dictionary with conflict details or None if port is available
+        """
+        if await self._tcp_health_check.check_port_available(port):
+            return None
+
+        # Port is in use, find what's using it
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                # Check if this process has connections on the port
+                connections = proc.connections()
+                for conn in connections:
+                    if (conn.laddr and conn.laddr.port == port and 
+                        conn.status == psutil.CONN_LISTEN):
+                        
+                        cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else proc.info['name']
+                        
+                        # Check if this is a LocalPort-managed process
+                        is_managed = False
+                        for service_id, port_forward in self._active_forwards.items():
+                            if (port_forward.process_id == proc.info['pid'] and 
+                                port_forward.local_port == port):
+                                is_managed = True
+                                break
+                        
+                        return {
+                            'pid': proc.info['pid'],
+                            'name': proc.info['name'],
+                            'cmdline': cmdline,
+                            'is_managed': is_managed,
+                            'port': port
+                        }
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+
+        # Port is in use but we couldn't identify the process
+        return {
+            'pid': None,
+            'name': 'Unknown',
+            'cmdline': 'Unable to identify process',
+            'is_managed': False,
+            'port': port
+        }
 
     def get_active_forwards_count(self) -> int:
         """Get the number of active port forwards.
@@ -624,6 +702,85 @@ class ServiceManager:
         except Exception as e:
             logger.error("Error loading persisted state", error=str(e))
             self._active_forwards = {}
+
+    def migrate_state_to_deterministic_ids(self, services: list[Service]) -> int:
+        """Migrate state from random UUIDs to deterministic UUIDs.
+        
+        This method matches running processes to current service configuration
+        based on port mappings and updates the state file with deterministic IDs.
+        
+        Args:
+            services: List of current services with deterministic IDs
+            
+        Returns:
+            Number of processes migrated
+        """
+        logger.info("Starting state migration to deterministic IDs")
+        
+        # Create mapping of (local_port, remote_port) -> service
+        port_to_service = {}
+        for service in services:
+            key = (service.local_port, service.remote_port)
+            port_to_service[key] = service
+        
+        migrated_forwards = {}
+        migration_count = 0
+        
+        # Check each active forward for migration
+        for old_service_id, port_forward in self._active_forwards.items():
+            key = (port_forward.local_port, port_forward.remote_port)
+            
+            if key in port_to_service:
+                # Found a matching service in current config
+                new_service = port_to_service[key]
+                
+                # Check if this is actually a migration (different IDs)
+                if old_service_id != new_service.id:
+                    logger.info("Migrating process to deterministic ID",
+                               old_service_id=old_service_id,
+                               new_service_id=new_service.id,
+                               service_name=new_service.name,
+                               process_id=port_forward.process_id,
+                               local_port=port_forward.local_port,
+                               remote_port=port_forward.remote_port)
+                    
+                    # Create new PortForward with updated service ID
+                    migrated_forward = PortForward(
+                        service_id=new_service.id,
+                        process_id=port_forward.process_id,
+                        local_port=port_forward.local_port,
+                        remote_port=port_forward.remote_port,
+                        started_at=port_forward.started_at
+                    )
+                    migrated_forward.restart_count = port_forward.restart_count
+                    migrated_forward.last_health_check = port_forward.last_health_check
+                    
+                    migrated_forwards[new_service.id] = migrated_forward
+                    migration_count += 1
+                else:
+                    # ID is already deterministic, keep as-is
+                    migrated_forwards[old_service_id] = port_forward
+            else:
+                # No matching service in current config - this is an orphaned process
+                logger.info("Found orphaned process during migration",
+                           old_service_id=old_service_id,
+                           process_id=port_forward.process_id,
+                           local_port=port_forward.local_port,
+                           remote_port=port_forward.remote_port)
+                # Keep the orphaned process for now - it will be handled by orphaned process cleanup
+                migrated_forwards[old_service_id] = port_forward
+        
+        # Update active forwards with migrated state
+        self._active_forwards = migrated_forwards
+        
+        # Persist the migrated state
+        if migration_count > 0:
+            self._persist_state()
+            logger.info("State migration completed", migrated_count=migration_count)
+        else:
+            logger.info("No migration needed - all IDs are already deterministic")
+        
+        return migration_count
 
     def _validate_port_mapping(self, cmdline: str, local_port: int, remote_port: int) -> bool:
         """Validate that a command line contains the expected port mapping.

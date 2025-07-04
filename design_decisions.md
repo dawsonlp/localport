@@ -1,271 +1,111 @@
 # Design Decisions
 
-## Architecture
+## Service Management Redesign (2025-01-03)
 
-### Hexagonal Architecture
-- **Decision**: Use hexagonal (ports and adapters) architecture
-- **Rationale**: Provides clear separation of concerns, makes the application testable, and allows for easy swapping of external dependencies
-- **Implementation**: 
-  - Domain layer contains business logic and entities
-  - Application layer contains use cases and services
-  - Infrastructure layer contains adapters for external systems
-  - CLI layer provides the user interface
+### Problem
+The service manager was auto-adopting external processes that weren't declared in the configuration, leading to confusion where services with names like "postgres-primary" and "postgres-readonly" would appear even when the configuration declared different service names like "uhes-postgres-dev" and "kafka-dev".
 
-### Dependency Injection
-- **Decision**: Use dependency injection pattern
-- **Rationale**: Improves testability and flexibility
-- **Implementation**: Manual dependency injection in main application setup
+### Root Cause
+The `get_service_status()` method was automatically "re-tracking" any kubectl processes it found running on the same ports, regardless of whether they were started by LocalPort or declared in the configuration.
 
-## Technology Choices
+### Solution
+Implemented a strict three-category process management system:
 
-### Python Version
-- **Decision**: Require Python 3.13+
-- **Rationale**: Access to latest language features, performance improvements, and modern typing capabilities
-- **Impact**: May limit compatibility with older systems but ensures access to cutting-edge features
+#### Category A: Managed Processes
+- In state file + in current config + process matches exactly
+- These are fully managed (start/stop/restart/monitor)
 
-### CLI Framework
-- **Decision**: Use Typer for CLI interface
-- **Rationale**: 
-  - Type-safe CLI development
-  - Automatic help generation
-  - Rich integration for beautiful output
-  - Modern Python patterns
-- **Alternative considered**: Click (Typer is built on Click but provides better type safety)
+#### Category B: Orphaned LocalPort Processes
+- In state file + NOT in current config + process matches exactly
+- These were started by LocalPort but removed from config
+- LocalPort offers to clean these up (since we started them)
 
-### Rich Output
-- **Decision**: Use Rich for terminal formatting
-- **Rationale**: 
-  - Beautiful, professional terminal output
-  - Tables, progress bars, and syntax highlighting
-  - Excellent integration with Typer
-  - Improves user experience significantly
+#### Category C: External Processes
+- NOT in state file (regardless of whether they look like port forwards)
+- LocalPort has no authority over these
+- Simply report port conflicts and refuse to start
 
-### Configuration Management
-- **Decision**: Use YAML for configuration files with Pydantic for validation
-- **Rationale**: 
-  - YAML is human-readable and widely adopted
-  - Pydantic provides excellent validation and type safety
-  - Easy to extend and maintain
-- **Alternative considered**: TOML (chose YAML for better readability of complex nested structures)
+### Key Changes
+1. **Removed auto-adoption logic** from `get_service_status()`
+2. **Enhanced port conflict detection** with detailed error messages
+3. **Added orphaned process detection** as separate functionality
+4. **Strict state file authority** - only manage what we explicitly started
+5. **Conservative approach** - never interfere with external processes
 
-### Async/Await
-- **Decision**: Use asyncio for concurrent operations
-- **Rationale**: 
-  - Better performance for I/O-bound operations (health checks, network calls)
-  - Modern Python concurrency patterns
-  - Scales well with multiple port forwards
+### Benefits
+- Predictable behavior - only manages declared services
+- Clear error messages for port conflicts
+- No risk of interfering with user's other processes
+- Proper separation of concerns between managed, orphaned, and external processes
 
-### Health Checking
-- **Decision**: Implement pluggable health check system
-- **Rationale**: 
-  - Different services need different health check strategies
-  - Extensible design allows for custom health checks
-  - Improves reliability of port forwarding
+### Implementation Details
+- Modified `ServiceManager._is_port_available()` to provide detailed conflict information
+- Removed auto-tracking logic from `get_service_status()`
+- Added `detect_orphaned_processes()` method for cleanup operations
+- Enhanced error messages to clearly distinguish between conflict types
 
-### Process Management
-- **Decision**: Use subprocess for external tool integration (kubectl, ssh)
-- **Rationale**: 
-  - Leverages existing, well-tested tools
-  - Avoids reimplementing complex networking logic
-  - Easier to maintain and debug
+## Deterministic Service Identity System (2025-07-03)
 
-### Logging
-- **Decision**: Use structlog for structured logging
-- **Rationale**: 
-  - Better for debugging and monitoring
-  - JSON output for production environments
-  - Rich integration for development
+### Problem
+Service IDs were generated using random UUIDs (`uuid4()`), causing state persistence to break across LocalPort restarts. When LocalPort reloaded configuration, it would generate new random IDs that didn't match the IDs in the state file, making running processes appear as "Stopped" even though they were actively running.
 
-### Testing Strategy
-- **Decision**: Comprehensive testing with pytest
-- **Rationale**: 
-  - Unit tests for business logic
-  - Integration tests for external tool interaction
-  - Separate test configurations for different environments
+### Root Cause
+The `Service.create()` method used `uuid4()` to generate a new random UUID each time, meaning:
+- Same service configuration → Different IDs each time loaded
+- State file contains processes with old random IDs
+- Current configuration generates new random IDs
+- No way to match running processes to current configuration
 
-### Package Management
-- **Decision**: Use UV for dependency management and building
-- **Rationale**: 
-  - Faster than pip/poetry
-  - Modern Python packaging
-  - Better dependency resolution
-  - Excellent CI/CD integration
+### Solution
+Implemented deterministic service ID generation based on service configuration properties:
 
-### Version Management
-- **Decision**: Use Hatch VCS for dynamic versioning
-- **Rationale**: 
-  - Automatic version derivation from Git tags
-  - Eliminates version mismatch issues
-  - PEP 440 compliant version normalization
-  - No manual version management required
-- **Implementation**: 
-  - Git tag `v0.1.0-alpha.6` → Package version `0.1.0a6`
-  - Git tag `v1.0.0` → Package version `1.0.0`
-  - Git tag `v1.2.3-beta.1` → Package version `1.2.3b1`
-- **Problem Solved**: Previously Git tags and package versions didn't match, causing confusion
+#### Service ID Generation Algorithm
+```python
+def generate_deterministic_id(name, technology, local_port, remote_port, connection_info) -> UUID:
+    # Build stable config key from essential service properties
+    config_key = f"{name}:{technology}:{local_port}:{remote_port}"
+    
+    # Add connection-specific details
+    if technology == 'kubectl':
+        config_key += f":{namespace}:{resource_name}:{resource_type}"
+        if context: config_key += f":{context}"
+    elif technology == 'ssh':
+        config_key += f":{host}:{port}"
+        if user: config_key += f":{user}"
+    
+    # Generate deterministic UUID using UUID5
+    return uuid5(NAMESPACE_DNS, config_key)
+```
 
-## Development Workflow
+#### What Service ID Identifies
+- **Service Configuration**: A unique service declaration (name, ports, connection)
+- **NOT Process Instance**: Runtime details like PID, start time, status
 
-### Code Quality
-- **Decision**: Use ruff, black, and mypy for code quality
-- **Rationale**: 
-  - Ruff provides fast linting
-  - Black ensures consistent formatting
-  - MyPy catches type errors early
+#### ID Stability Rules
+**ID stays same when**:
+- Configuration reloaded
+- LocalPort restarted  
+- Process restarted/failed
 
-### Pre-commit Hooks
-- **Decision**: Use pre-commit for automated quality checks
-- **Rationale**: Prevents low-quality code from being committed
+**ID changes when**:
+- Service name changes
+- Port configuration changes
+- Connection details change (namespace, resource, host, etc.)
 
-### CI/CD
-- **Decision**: Use GitHub Actions for CI/CD
-- **Rationale**: 
-  - Integrated with GitHub
-  - Good ecosystem of actions
-  - Free for open source projects
+### Benefits
+- **State Persistence**: Same service config always gets same ID
+- **Process Tracking**: Can match running processes to current configuration
+- **Restart Resilience**: Service identity survives LocalPort restarts
+- **Configuration Changes**: Different configs get different IDs appropriately
 
-### Release Strategy
-- **Decision**: Automated releases with Test PyPI for pre-releases
-- **Rationale**: 
-  - Safe testing before production releases
-  - Automated publishing reduces manual errors
-  - Clear separation between test and production environments
+### Migration Strategy
+- Detect old-format state files with random UUIDs
+- Match orphaned processes to current config by port/command validation
+- Clean up unmatched processes safely
+- Preserve user's running services during transition
 
-## Security Considerations
-
-### Input Validation
-- **Decision**: Validate all configuration inputs with Pydantic
-- **Rationale**: Prevents configuration errors and potential security issues
-
-### Process Isolation
-- **Decision**: Run external processes with limited privileges where possible
-- **Rationale**: Reduces attack surface
-
-### Credential Management
-- **Decision**: Never store credentials in configuration files
-- **Rationale**: Security best practice - rely on external credential management
-
-## Performance Considerations
-
-### Concurrent Health Checks
-- **Decision**: Run health checks concurrently
-- **Rationale**: Improves responsiveness when managing multiple services
-
-### Efficient Process Management
-- **Decision**: Reuse processes where possible, clean shutdown
-- **Rationale**: Reduces resource usage and improves reliability
-
-## Extensibility
-
-### Plugin Architecture
-- **Decision**: Design for extensibility in health checks and adapters
-- **Rationale**: Allows users to add custom functionality without modifying core code
-
-### Configuration Schema
-- **Decision**: Use flexible but validated configuration schema
-- **Rationale**: Balances ease of use with type safety and validation
-
-## Documentation Strategy
-
-### Comprehensive Documentation
-- **Decision**: Provide extensive documentation and examples
-- **Rationale**: Improves adoption and reduces support burden
-
-### CLI Help
-- **Decision**: Rich, contextual help throughout the CLI
-- **Rationale**: Improves user experience and reduces learning curve
-
-## Deployment Strategy
-
-### Multiple Installation Methods
-- **Decision**: Support both pipx and UV for installation
-- **Rationale**: 
-  - pipx for traditional Python package management
-  - UV for modern, fast package management
-  - Provides flexibility for different user preferences
-
-### Cross-Platform Support
-- **Decision**: Support Linux, macOS, and Windows
-- **Rationale**: Maximizes potential user base
-
-### Container Support
-- **Decision**: Design to work well in containerized environments
-- **Rationale**: Modern deployment patterns often use containers
-
-## Domain Model Design
-
-### ConnectionInfo Value Object vs Dictionary
-- **Decision**: Use ConnectionInfo value object instead of simple dictionary for connection information
-- **Rationale**: 
-  - **Type Safety**: Provides compile-time validation of connection parameters
-  - **Domain-Driven Design**: Encapsulates connection logic and validation within the domain
-  - **Immutability**: Value objects prevent accidental modification of connection data
-  - **Rich Behavior**: Methods like `get_kubectl_namespace()` provide clean, type-safe APIs
-  - **Validation**: Built-in validation for different connection types (kubectl vs SSH)
-  - **Architectural Consistency**: Aligns with hexagonal architecture and DDD principles
-- **Implementation**: 
-  - Service entity uses `ConnectionInfo` instead of `dict[str, Any]`
-  - YAML config repository creates ConnectionInfo objects using factory methods
-  - Adapters consume ConnectionInfo objects with type-safe accessors
-- **Trade-offs**: 
-  - **Pro**: Better maintainability, fewer runtime errors, cleaner APIs
-  - **Con**: Slightly more complex serialization, requires migration of existing code
-- **Alternative Considered**: Simple dictionary approach (rejected due to lack of type safety and validation)
-
-## Process Management Breakthrough
-
-### Kubectl Process Persistence Issue
-- **Problem**: kubectl processes started by LocalPort were terminating unexpectedly after the parent LocalPort process exited
-- **Root Cause**: Using `asyncio.create_subprocess_exec` with stdout/stderr pipes kept references that prevented proper process detachment
-- **Solution**: Switch to `subprocess.Popen` with `stdout=DEVNULL`, `stderr=DEVNULL`, and `start_new_session=True`
-- **Result**: kubectl processes now survive after LocalPort exits and remain fully functional
-- **Implementation**: 
-  - Use `subprocess.Popen` instead of `asyncio.create_subprocess_exec`
-  - Redirect all streams to `DEVNULL` to avoid keeping references
-  - Set `start_new_session=True` for proper process group isolation
-  - Store only PIDs in process tracking, not process objects
-- **Testing**: Verified with PostgreSQL connection through kubectl port-forward
-- **Impact**: Enables reliable, persistent port forwarding that survives CLI command completion
-
-### Hybrid State Management for Cross-Session Process Tracking
-- **Problem**: Stop command couldn't find processes started in previous LocalPort sessions, leading to "zombie" processes
-- **Root Cause**: ServiceManager used only in-memory state (`_active_forwards`) which was reset on each LocalPort startup
-- **Solution**: Implemented hybrid state management combining persistent storage with OS process discovery
-- **Architecture**:
-  - **Fast Path**: In-memory state for current session processes (high performance)
-  - **Slow Path**: OS process discovery using psutil for cross-session processes
-  - **Persistent State**: JSON file at `~/.local/share/localport/state.json` (cross-platform)
-  - **Self-Healing**: Automatic validation and cleanup of stale process entries
-- **Implementation Details**:
-  - State persisted on every start/stop operation using atomic writes
-  - Process validation on state load to ensure processes still exist
-  - Enhanced `is_service_running()` to use hybrid approach
-  - Cross-platform state directory handling (Linux/macOS vs Windows)
-  - Robust kubectl process detection handling different installation paths
-- **Benefits**:
-  - **Reliability**: Stop command now actually terminates processes across sessions
-  - **Performance**: Fast in-memory lookups with OS fallback only when needed
-  - **Persistence**: Process state survives LocalPort restarts
-  - **Cross-Platform**: Works on Linux, macOS, and Windows
-  - **Self-Healing**: Automatic cleanup of dead/orphaned processes
-- **Testing**: Verified complete start/stop cycle with cross-session process termination
-- **Impact**: Stop command is now semantically correct and functionally complete
-
-## Release Management
-
-### Proper Release Workflow
-- **Problem**: Hatch VCS auto-increments versions when commits exist after tags, causing version mismatches
-- **Solution**: Implement a clean release workflow that ensures tags match published versions
-- **Workflow**:
-  1. **Complete all development work** (code, tests, documentation)
-  2. **Commit and push all changes** to main branch
-  3. **Create and push the release tag** immediately (no additional commits)
-  4. **Let GitHub Actions handle the release** automatically
-  5. **Any post-release documentation updates** go in the next development cycle
-- **Benefits**:
-  - **Version Consistency**: Git tags match published package versions exactly
-  - **Clean Releases**: No `.dev0` suffixes in release versions
-  - **Predictable Versioning**: Users can rely on version numbers matching tags
-  - **Automated Process**: Minimal manual intervention reduces errors
-- **Example**: Tag `v0.1.0-alpha.11` → Package version `0.1.0a11` (exact match)
-- **Anti-pattern**: Tag `v0.1.0-alpha.11` + commits → Package version `0.1.0a12.dev0` (mismatch)
+### Implementation Details
+- Modified `Service.create()` to use deterministic ID generation
+- Added UUID5-based generation with stable namespace
+- Implemented state migration logic for backward compatibility
+- Added comprehensive tests for ID determinism and collision prevention

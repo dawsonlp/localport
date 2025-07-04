@@ -325,6 +325,12 @@ async def status_services_command(
         if config_repo:
             await config_repo.load_configuration()
             loaded_services = await config_repo.load_services()
+            
+            # Migrate state from random UUIDs to deterministic UUIDs
+            migration_count = service_manager.migrate_state_to_deterministic_ids(loaded_services)
+            if migration_count > 0:
+                logger.info("Migrated state to deterministic IDs", count=migration_count)
+            
             for service in loaded_services:
                 await service_repo.save(service)
 
