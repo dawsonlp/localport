@@ -45,7 +45,7 @@ pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index
 pipx install git+https://github.com/dawsonlp/localport.git
 
 # Install specific version/tag
-pipx install git+https://github.com/dawsonlp/localport.git@v0.1.0
+pipx install git+https://github.com/dawsonlp/localport.git@v0.3.0
 
 # Development: Install from source
 git clone https://github.com/dawsonlp/localport.git
@@ -348,7 +348,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📊 Status
 
-🎯 **Alpha Release 0.3.0** - Core functionality working with daemon mode and health monitoring!
+🎯 **Alpha Release 0.3.x** - Core functionality working with daemon mode and health monitoring!
 
 **Current Progress:**
 - ✅ Core Infrastructure (100% complete)
