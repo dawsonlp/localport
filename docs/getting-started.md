@@ -1,5 +1,7 @@
 # Getting Started with LocalPort
 
+> **🚧 ALPHA SOFTWARE**: LocalPort is currently in alpha testing. While core functionality works well, expect some rough edges and breaking changes. Please report issues and provide feedback!
+
 This guide will walk you through setting up LocalPort from scratch and getting your first port forwards running in under 10 minutes.
 
 ## Prerequisites
@@ -15,62 +17,10 @@ Before you begin, ensure you have:
 
 ## Installation
 
-### Option 1: pipx (Recommended)
+If you haven't installed LocalPort yet, see the [main README](../README.md#installation) for detailed installation instructions using pipx, UV, or development setup.
 
-pipx installs LocalPort in an isolated environment, preventing dependency conflicts:
-
+Quick verification:
 ```bash
-# Install pipx if you don't have it
-python -m pip install --user pipx
-python -m pipx ensurepath
-
-# Install LocalPort
-pipx install localport
-
-# Install with optional dependencies for advanced health checks
-pipx install "localport[kafka,postgres]"
-
-# Verify installation
-localport --version
-```
-
-### Option 2: UV (Modern Alternative)
-
-UV is a fast Python package installer and resolver:
-
-```bash
-# Install UV if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install LocalPort
-uv tool install localport
-
-# Install with optional dependencies
-uv tool install "localport[kafka,postgres]"
-
-# Verify installation
-localport --version
-```
-
-### Option 3: Development Installation
-
-For contributing or development:
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/localport.git
-cd localport
-
-# Run the setup script
-./scripts/setup-dev.sh
-
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Install in development mode
-uv pip install -e .
-
-# Verify installation
 localport --version
 ```
 
