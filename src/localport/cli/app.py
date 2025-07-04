@@ -20,9 +20,9 @@ logger = structlog.get_logger()
 # Create main Typer app
 app = typer.Typer(
     name="localport",
-    help="[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring",
+    help="[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring\n\n[bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues\n[blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]",
     rich_markup_mode="rich",
-    no_args_is_help=True,
+    no_args_is_help=False,
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]}
 )
@@ -111,6 +111,8 @@ def main(
     """
     [bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring.
 
+    [bold red]⚠️  ALPHA SOFTWARE[/bold red] - Core functionality works, but expect breaking changes.
+
     LocalPort provides a unified interface for managing port forwards across different
     technologies (kubectl, SSH) with automatic health monitoring and restart capabilities.
 
@@ -136,6 +138,13 @@ def main(
     • /etc/localport/config.yaml
 
     Use --config to specify a custom configuration file.
+
+    [bold]Documentation & Support:[/bold]
+
+    • [blue]Documentation:[/blue] https://github.com/dawsonlp/localport#readme
+    • [blue]Getting Started:[/blue] https://github.com/dawsonlp/localport/blob/main/docs/getting-started.md
+    • [blue]Configuration Guide:[/blue] https://github.com/dawsonlp/localport/blob/main/docs/configuration.md
+    • [blue]Report Issues:[/blue] https://github.com/dawsonlp/localport/issues
     """
     global settings
 
@@ -280,7 +289,46 @@ app.add_typer(config_app, name="config")
 def cli_main():
     """Entry point for the CLI application."""
     try:
-        app()
+        # Check if no arguments provided and show help
+        if len(sys.argv) == 1:
+            # Manually show help without the error box
+            console.print("""[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring
+
+[bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues
+[blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]
+
+[bold]Usage:[/bold] localport [OPTIONS] COMMAND [ARGS]...
+
+[bold]Commands:[/bold]
+  [cyan]start[/cyan]    Start port forwarding services
+  [cyan]stop[/cyan]     Stop port forwarding services  
+  [cyan]status[/cyan]   Show service status
+  [cyan]logs[/cyan]     View service logs
+  [cyan]daemon[/cyan]   Daemon management commands
+  [cyan]config[/cyan]   Configuration management commands
+
+[bold]Options:[/bold]
+  [cyan]-h, --help[/cyan]     Show this message and exit
+  [cyan]-V, --version[/cyan]  Show version information
+  [cyan]-v, --verbose[/cyan]  Increase verbosity (-v for info, -vv for debug)
+  [cyan]--debug[/cyan]        Enable debug logging
+  [cyan]-q, --quiet[/cyan]    Suppress non-essential output
+
+[bold]Examples:[/bold]
+  [dim]localport start --all[/dim]        # Start all services
+  [dim]localport status[/dim]             # Check service status
+  [dim]localport daemon start[/dim]       # Run in daemon mode
+  [dim]localport --help[/dim]             # Show detailed help
+
+[bold]Get Started:[/bold]
+  [blue]https://github.com/dawsonlp/localport/blob/main/docs/getting-started.md[/blue]
+""")
+            sys.exit(0)
+        else:
+            app()
+    except typer.Exit as e:
+        # Handle Typer exits gracefully
+        sys.exit(e.exit_code)
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
         sys.exit(130)  # Standard exit code for SIGINT
