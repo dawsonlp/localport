@@ -32,7 +32,7 @@ class EnhancedProgress:
             Configured Progress instance
         """
         columns = [
-            SpinnerColumn(spinner_style="cyan"),
+            SpinnerColumn(style="cyan"),
             TextColumn("[progress.description]{task.description}"),
         ]
         
@@ -56,7 +56,7 @@ class EnhancedProgress:
             Configured Progress instance
         """
         return Progress(
-            SpinnerColumn(spinner_style="cyan"),
+            SpinnerColumn(style="cyan"),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=30),
             MofNCompleteColumn(),
