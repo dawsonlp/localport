@@ -513,7 +513,7 @@ def status_services_sync(
 
 
 async def _get_cluster_health_for_status(config_repo: YamlConfigRepository | None) -> dict | None:
-    """Get cluster health data for status display."""
+    """Get cluster health data for status display (lightweight but proper domain entities)."""
     if not config_repo:
         return None
     
@@ -542,25 +542,59 @@ async def _get_cluster_health_for_status(config_repo: YamlConfigRepository | Non
         if not contexts:
             return None
 
-        # Initialize cluster health manager
-        cluster_health_manager = ClusterHealthManager()
+        # Use lightweight kubectl client directly for status display
+        from ...infrastructure.cluster_monitoring.kubectl_client import KubectlClient
+        from ...domain.entities.cluster_health import ClusterHealth
         
-        # Start monitoring for each context (lightweight check)
+        kubectl_client = KubectlClient(timeout=10, retry_attempts=1)  # Faster for status
+        
         cluster_data = {}
         for context in contexts:
             try:
-                # Get current health data (don't start full monitoring)
-                health_data = await cluster_health_manager.get_cluster_health(context)
-                cluster_info = await cluster_health_manager.get_cluster_info(context)
+                # Get basic cluster info and resource counts quickly
+                cluster_info = await kubectl_client.get_cluster_info(context)
                 
-                cluster_data[context] = {
-                    'health': health_data,
-                    'info': cluster_info
-                }
+                if cluster_info.is_reachable:
+                    # Get node and pod counts
+                    nodes = await kubectl_client.get_node_statuses(context)
+                    pods = await kubectl_client.get_pod_statuses(context)
+                    
+                    # Create proper ClusterHealth entity using the domain factory method
+                    cluster_health = ClusterHealth.create_healthy(
+                        context=context,
+                        cluster_info=cluster_info,
+                        nodes=nodes,
+                        pods=pods,
+                        events=[],  # Skip events for status display performance
+                        check_duration=None
+                    )
+                    
+                    cluster_data[context] = {
+                        'health': cluster_health,
+                        'info': cluster_info
+                    }
+                else:
+                    # Cluster not reachable - create unhealthy ClusterHealth
+                    cluster_health = ClusterHealth.create_unhealthy(
+                        context=context,
+                        error=cluster_info.error_message or "Cluster not reachable"
+                    )
+                    
+                    cluster_data[context] = {
+                        'health': cluster_health,
+                        'info': cluster_info,
+                        'error': cluster_info.error_message or "Cluster not reachable"
+                    }
+                    
             except Exception as e:
                 logger.debug("Error getting cluster health for context", context=context, error=str(e))
+                # Create unhealthy ClusterHealth for errors
+                cluster_health = ClusterHealth.create_unhealthy(
+                    context=context,
+                    error=str(e)
+                )
                 cluster_data[context] = {
-                    'health': None,
+                    'health': cluster_health,
                     'info': None,
                     'error': str(e)
                 }
@@ -581,7 +615,6 @@ def _display_cluster_health_section(cluster_data: dict) -> None:
     table = Table(title="🏗️  Cluster Health", show_header=True, header_style="bold blue")
     table.add_column("Context", style="bold blue", width=20)
     table.add_column("Status", style="bold", width=15)
-    table.add_column("API Server", style="cyan", width=25)
     table.add_column("Nodes", style="green", width=8)
     table.add_column("Pods", style="yellow", width=8)
     table.add_column("Last Check", style="dim", width=12)
@@ -594,34 +627,41 @@ def _display_cluster_health_section(cluster_data: dict) -> None:
                 "[red]🔴 Error[/red]",
                 "Error",
                 "Error",
-                "Error",
                 "Error"
             )
         else:
             health_data = data.get('health', {})
             cluster_info = data.get('info', {})
             
-            # Format status with color indicators
+            # Format status with color indicators (health_data is a ClusterHealth object)
             if health_data:
-                is_healthy = health_data.get('is_healthy', False)
-                last_check = health_data.get('last_check_time')
+                is_healthy = health_data.is_healthy
+                last_check = health_data.last_check_time
                 
                 if is_healthy:
                     status = "[green]🟢 Healthy[/green]"
                 else:
                     status = "[red]🔴 Unhealthy[/red]"
                 
-                # Format last check time
+                # Format last check time (last_check is already a datetime object)
                 if last_check:
                     try:
-                        last_check_dt = datetime.fromisoformat(last_check.replace('Z', '+00:00'))
-                        time_ago = datetime.now().replace(tzinfo=last_check_dt.tzinfo) - last_check_dt
-                        if time_ago.total_seconds() < 60:
-                            time_str = f"{int(time_ago.total_seconds())}s ago"
-                        elif time_ago.total_seconds() < 3600:
-                            time_str = f"{int(time_ago.total_seconds() // 60)}m ago"
+                        from datetime import timezone
+                        now = datetime.now(timezone.utc) if last_check.tzinfo else datetime.now()
+                        if last_check.tzinfo is None:
+                            # If last_check is naive, assume it's UTC and make it timezone-aware
+                            last_check = last_check.replace(tzinfo=timezone.utc)
+                            now = datetime.now(timezone.utc)
+                        
+                        time_ago = now - last_check
+                        total_seconds = abs(time_ago.total_seconds())  # Use abs to avoid negative values
+                        
+                        if total_seconds < 60:
+                            time_str = f"{int(total_seconds)}s ago"
+                        elif total_seconds < 3600:
+                            time_str = f"{int(total_seconds // 60)}m ago"
                         else:
-                            time_str = f"{int(time_ago.total_seconds() // 3600)}h ago"
+                            time_str = f"{int(total_seconds // 3600)}h ago"
                     except Exception:
                         time_str = "Unknown"
                 else:
@@ -630,11 +670,12 @@ def _display_cluster_health_section(cluster_data: dict) -> None:
                 status = "[dim]Unknown[/dim]"
                 time_str = "Unknown"
             
-            # Format cluster info
+            # Format cluster info (cluster_info is a ClusterInfo object)
             if cluster_info:
-                api_server = cluster_info.get('api_server', 'Unknown')
-                node_count = str(cluster_info.get('node_count', 0))
-                pod_count = str(cluster_info.get('pod_count', 0))
+                api_server = cluster_info.api_server_url or 'Unknown'
+                # Use health_data for node/pod counts since ClusterInfo doesn't have them
+                node_count = str(health_data.total_nodes if health_data else 0)
+                pod_count = str(health_data.total_pods if health_data else 0)
             else:
                 api_server = "Unknown"
                 node_count = "0"
@@ -643,7 +684,6 @@ def _display_cluster_health_section(cluster_data: dict) -> None:
             table.add_row(
                 context,
                 status,
-                api_server,
                 node_count,
                 pod_count,
                 time_str
