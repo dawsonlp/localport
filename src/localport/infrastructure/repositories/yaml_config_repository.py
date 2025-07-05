@@ -389,6 +389,71 @@ class YamlConfigRepository(ConfigRepository):
             restart_errors = self._validate_restart_policy(restart_policy, "defaults.restart_policy")
             errors.extend(restart_errors)
 
+        # Validate cluster_health defaults
+        cluster_health = defaults.get('cluster_health')
+        if cluster_health is not None:
+            cluster_errors = self._validate_cluster_health(cluster_health, "defaults.cluster_health")
+            errors.extend(cluster_errors)
+
+        return errors
+
+    def _validate_cluster_health(self, cluster_health: dict[str, Any], prefix: str) -> list[str]:
+        """Validate cluster health configuration.
+
+        Args:
+            cluster_health: Cluster health configuration
+            prefix: Error message prefix
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        if not isinstance(cluster_health, dict):
+            errors.append(f"{prefix}: must be a dictionary")
+            return errors
+
+        # Validate enabled
+        enabled = cluster_health.get('enabled')
+        if enabled is not None and not isinstance(enabled, bool):
+            errors.append(f"{prefix}.enabled: must be a boolean")
+
+        # Validate numeric fields
+        numeric_fields = {
+            'interval': (60, 3600),  # 1 minute to 1 hour
+            'timeout': (5, 300),     # 5 seconds to 5 minutes
+            'retry_attempts': (0, 10),
+            'failure_threshold': (1, 100)
+        }
+
+        for field, (min_val, max_val) in numeric_fields.items():
+            value = cluster_health.get(field)
+            if value is not None:
+                if not isinstance(value, int | float) or not (min_val <= value <= max_val):
+                    errors.append(f"{prefix}.{field}: must be a number between {min_val} and {max_val}")
+
+        # Validate commands section
+        commands = cluster_health.get('commands')
+        if commands is not None:
+            if not isinstance(commands, dict):
+                errors.append(f"{prefix}.commands: must be a dictionary")
+            else:
+                valid_commands = ['cluster_info', 'pod_status', 'node_status', 'events_on_failure']
+                for cmd_name, cmd_config in commands.items():
+                    if cmd_name not in valid_commands:
+                        errors.append(f"{prefix}.commands.{cmd_name}: unknown command (valid: {valid_commands})")
+                    elif cmd_config is not None:
+                        if isinstance(cmd_config, bool):
+                            # Simple boolean enable/disable
+                            continue
+                        elif isinstance(cmd_config, dict):
+                            # Detailed command configuration
+                            cmd_enabled = cmd_config.get('enabled')
+                            if cmd_enabled is not None and not isinstance(cmd_enabled, bool):
+                                errors.append(f"{prefix}.commands.{cmd_name}.enabled: must be a boolean")
+                        else:
+                            errors.append(f"{prefix}.commands.{cmd_name}: must be a boolean or dictionary")
+
         return errors
 
     async def get_default_configuration(self) -> dict[str, Any]:
@@ -406,7 +471,8 @@ class YamlConfigRepository(ConfigRepository):
                     'interval': 30,
                     'timeout': 5.0,
                     'failure_threshold': 3,
-                    'success_threshold': 1
+                    'success_threshold': 1,
+                    'cluster_aware': True  # NEW: Consider cluster health in service health decisions
                 },
                 'restart_policy': {
                     'enabled': True,
@@ -414,6 +480,21 @@ class YamlConfigRepository(ConfigRepository):
                     'backoff_multiplier': 2.0,
                     'initial_delay': 1,
                     'max_delay': 300
+                },
+                'cluster_health': {
+                    'enabled': True,
+                    'interval': 240,  # 4 minutes
+                    'timeout': 30,    # 30 seconds per kubectl command
+                    'retry_attempts': 2,
+                    'failure_threshold': 3,  # Consecutive failures before marking cluster unhealthy
+                    
+                    # Commands to execute
+                    'commands': {
+                        'cluster_info': True,
+                        'pod_status': True,
+                        'node_status': True,
+                        'events_on_failure': True
+                    }
                 }
             }
         }

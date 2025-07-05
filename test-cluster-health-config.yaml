@@ -1,0 +1,88 @@
+version: '1.0'
+
+# Test configuration for cluster health monitoring
+defaults:
+  health_check:
+    type: tcp
+    interval: 30
+    timeout: 5.0
+    failure_threshold: 3
+    cluster_aware: true          # NEW: Enable cluster-aware health checking
+  
+  restart_policy:
+    enabled: true
+    max_attempts: 5
+    backoff_multiplier: 2.0
+    initial_delay: 1
+    max_delay: 300
+  
+  cluster_health:                # NEW: Cluster health monitoring configuration
+    enabled: true
+    interval: 240                # 4-minute keepalive prevents Mac idle issues
+    timeout: 30                  # 30 seconds per kubectl command
+    retry_attempts: 2            # Retry failed commands
+    failure_threshold: 3         # Consecutive failures before marking unhealthy
+    
+    # Commands to execute for health checking
+    commands:
+      cluster_info: true         # kubectl cluster-info
+      pod_status: true          # kubectl get pods
+      node_status: false        # Skip nodes for faster checks (good for Mac)
+      events_on_failure: true   # kubectl get events (only on failures)
+
+# Per-cluster context overrides (optional)
+cluster_contexts:
+  minikube:
+    cluster_health:
+      interval: 180             # More frequent for local development
+      timeout: 20
+      commands:
+        node_status: false      # Skip node checking for minikube
+  
+  docker-desktop:
+    cluster_health:
+      interval: 300             # Less frequent for Docker Desktop
+      timeout: 45
+
+services:
+  # Test service with cluster-aware health checking
+  - name: test-service
+    technology: kubectl
+    local_port: 8080
+    remote_port: 80
+    connection:
+      resource_type: service
+      resource_name: kubernetes
+      namespace: default
+      context: minikube         # This cluster will be monitored
+    enabled: true
+    tags: [test, demo]
+    description: "Test service for cluster health monitoring demo"
+    health_check:
+      type: tcp
+      cluster_aware: true       # Enable cluster-aware health checking
+      interval: 30
+      timeout: 5.0
+      failure_threshold: 2      # Faster failure detection for demo
+    restart_policy:
+      max_attempts: 3
+      initial_delay: 2
+
+  # Another test service
+  - name: test-service-2
+    technology: kubectl
+    local_port: 8081
+    remote_port: 8080
+    connection:
+      resource_type: deployment
+      resource_name: test-deployment
+      namespace: default
+      context: minikube
+    enabled: true
+    tags: [test, demo]
+    description: "Second test service"
+    health_check:
+      type: tcp
+      cluster_aware: true
+      interval: 45
+      failure_threshold: 3
