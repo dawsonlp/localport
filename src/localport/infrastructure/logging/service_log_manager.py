@@ -43,25 +43,17 @@ class ServiceLogManager:
         self._active_logs: Dict[str, Dict] = {}
         self._lock = threading.Lock()
         
-        # Configuration
-        self.max_log_size = getattr(self.settings, 'service_log_max_size', 10 * 1024 * 1024)  # 10MB
-        self.retention_days = getattr(self.settings, 'service_log_retention_days', 3)
+        # Configuration from settings
+        self.max_log_size = self.settings.get_service_log_rotation_size_bytes()
+        self.retention_days = self.settings.service_log_retention_days
+        self.buffer_size = self.settings.service_log_buffer_size
         
         # Ensure directories exist
         self._ensure_directories()
     
     def _get_log_directory(self) -> Path:
         """Get the base log directory, creating if necessary."""
-        if hasattr(self.settings, 'log_directory') and self.settings.log_directory:
-            return Path(self.settings.log_directory)
-        
-        # Default to ~/.local/share/localport/logs
-        if platform.system() == "Windows":
-            base_dir = Path.home() / "AppData" / "Local" / "localport" / "logs"
-        else:
-            base_dir = Path.home() / ".local" / "share" / "localport" / "logs"
-        
-        return base_dir
+        return self.settings.get_daemon_log_directory()
     
     def _ensure_directories(self) -> None:
         """Ensure log directories exist with proper permissions."""

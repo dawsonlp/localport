@@ -16,6 +16,7 @@ from ...infrastructure.adapters.kubectl_adapter import KubectlAdapter
 from ...infrastructure.adapters.ssh_adapter import SSHAdapter
 from ...infrastructure.health_checks.tcp_health_check import TCPHealthCheck
 from ...infrastructure.logging.service_log_manager import get_service_log_manager
+from ...config.settings import get_settings
 from ..dto.service_dto import ServiceStartResult, ServiceStatusInfo, ServiceStopResult
 
 logger = structlog.get_logger()
@@ -94,9 +95,11 @@ class ServiceManager:
             adapter = self._adapters[service.technology]
 
             # Start the port forward with service logging
+            settings = get_settings()
             try:
-                # Try to start with service logging first
-                if hasattr(adapter, 'start_port_forward_with_logging'):
+                # Try to start with service logging first (if enabled)
+                if (settings.is_service_logging_enabled() and 
+                    hasattr(adapter, 'start_port_forward_with_logging')):
                     process_id, service_log_id = await adapter.start_port_forward_with_logging(
                         service.name,
                         service.local_port,
