@@ -16,10 +16,11 @@ import threading
 import fcntl
 import errno
 
-from localport.config.settings import get_settings
-from localport.infrastructure.logging import get_logger
+import structlog
 
-logger = get_logger(__name__)
+from localport.config.settings import get_settings
+
+logger = structlog.get_logger(__name__)
 
 
 class ServiceLogManager:
