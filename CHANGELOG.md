@@ -5,6 +5,20 @@ All notable changes to LocalPort will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7.1] - 2025-01-05
+
+### Fixed
+- **Cluster Health Node Count**: Fixed cluster health monitoring showing 0 nodes instead of actual node count
+- **Status Command Performance**: Improved performance by using lightweight kubectl client instead of full cluster health manager
+- **Time Calculation Errors**: Fixed negative time displays in cluster health "Last Check" column
+- **UI Layout Issues**: Removed API Server column from main status command to prevent truncation
+
+### Technical
+- **Domain Model Integrity**: Maintained proper `ClusterHealth` domain entities throughout the system
+- **Lightweight Pattern**: Both status and cluster commands now use consistent fast kubectl client approach
+- **Timezone Handling**: Proper UTC timezone calculations with negative value protection
+- **Object Property Access**: Fixed to use `ClusterHealth` attributes instead of dictionary methods
+
 ## [0.3.7] - 2025-01-05
 
 ### Added
@@ -117,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version Support
 
-- **Current**: 0.3.7 (Active development and support)
+- **Current**: 0.3.7.1 (Active development and support)
 - **Supported**: 0.3.6+ (Security updates and critical bug fixes)
 - **Legacy**: 0.3.5 and below (No longer supported)
 
