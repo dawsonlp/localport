@@ -489,6 +489,132 @@ localport config export --no-defaults
 localport config export --include-disabled
 ```
 
+## Cluster Health Commands
+
+### `localport cluster status`
+
+Show detailed cluster health information for Kubernetes contexts used by services.
+
+```bash
+localport cluster status [OPTIONS]
+```
+
+#### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--context NAME` | `-c` | Show status for specific cluster context |
+
+#### Examples
+
+```bash
+# Show health status for all monitored clusters
+localport cluster status
+
+# Show status for specific cluster
+localport cluster status --context minikube
+
+# Output in JSON format
+localport --output json cluster status
+```
+
+### `localport cluster events`
+
+Show recent cluster events that might affect services.
+
+```bash
+localport cluster events [OPTIONS]
+```
+
+#### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--context NAME` | `-c` | Show events for specific cluster context |
+| `--since TIME` | `-s` | Show events since time (e.g., 1h, 30m, 60s) |
+| `--limit NUMBER` | `-l` | Maximum number of events to show (default: 20) |
+
+#### Examples
+
+```bash
+# Show events from last hour
+localport cluster events --since 1h
+
+# Show events for specific cluster
+localport cluster events --context minikube
+
+# Show last 50 events
+localport cluster events --limit 50
+
+# Show events from last 30 minutes in JSON
+localport --output json cluster events --since 30m
+```
+
+### `localport cluster pods`
+
+Show pod status for resources used by active services.
+
+```bash
+localport cluster pods [OPTIONS]
+```
+
+#### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--context NAME` | `-c` | Show pods for specific cluster context |
+| `--namespace NAME` | `-n` | Show pods in specific namespace |
+
+#### Examples
+
+```bash
+# Show pod status for all monitored clusters
+localport cluster pods
+
+# Show pods for specific cluster
+localport cluster pods --context minikube
+
+# Show pods in specific namespace
+localport cluster pods --namespace default
+```
+
+#### Notes
+
+- Cluster commands require cluster health monitoring to be enabled in configuration
+- Only clusters with active kubectl services are monitored
+- Commands gracefully handle unavailable clusters with helpful error messages
+
+## SSH Commands
+
+### `localport ssh test`
+
+Test SSH connectivity for configured services.
+
+```bash
+localport ssh test [OPTIONS] [SERVICES]...
+```
+
+#### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--all` | `-a` | Test all SSH services |
+| `--timeout SECONDS` | | Connection timeout (default: 10) |
+
+### `localport ssh validate`
+
+Validate SSH configuration.
+
+```bash
+localport ssh validate [OPTIONS]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--config PATH` | Path to configuration file |
+
 ## Output Formats
 
 LocalPort supports multiple output formats for most commands:
