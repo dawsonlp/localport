@@ -16,6 +16,8 @@ from .configuration_differ import ConfigurationDiff
 from .configuration_manager import ConfigurationManager
 from .health_monitor_scheduler import HealthMonitorScheduler
 from .service_manager import ServiceManager
+from .cluster_health_manager import ClusterHealthManager
+from .cluster_config_manager import ClusterConfigManager
 
 logger = structlog.get_logger()
 
@@ -49,6 +51,10 @@ class DaemonManager:
             service_repository=service_repository
         )
 
+        # Initialize cluster health components
+        self._cluster_config_manager = ClusterConfigManager()
+        self._cluster_health_manager: ClusterHealthManager | None = None
+
         # Daemon state
         self._is_running = False
         self._started_at: datetime | None = None
@@ -58,6 +64,7 @@ class DaemonManager:
         # Configuration
         self._auto_start_services = True
         self._enable_health_monitoring = True
+        self._enable_cluster_health_monitoring = True
         self._config_reload_enabled = True
         self._hot_reload_enabled = True
         self._graceful_shutdown_timeout = 30  # seconds
@@ -95,6 +102,10 @@ class DaemonManager:
             # Start health monitoring
             if self._enable_health_monitoring:
                 await self._start_health_monitoring()
+
+            # Start cluster health monitoring
+            if self._enable_cluster_health_monitoring:
+                await self._start_cluster_health_monitoring()
 
             # Start configuration hot reloading
             if self._hot_reload_enabled:
@@ -279,11 +290,35 @@ class DaemonManager:
             for service in services:
                 await self._service_repository.save(service)
 
+            # Load cluster health configuration
+            await self._load_cluster_configuration()
+
             logger.info("Configuration loaded", service_count=len(services))
 
         except Exception as e:
             logger.error("Failed to load configuration", error=str(e))
             raise
+
+    async def _load_cluster_configuration(self) -> None:
+        """Load cluster health configuration from repository."""
+        try:
+            # Load raw YAML configuration
+            config_data = await self._config_repository.load_configuration()
+            
+            # Load cluster health configuration
+            self._cluster_config_manager.load_from_yaml_config(config_data)
+            
+            # Check if cluster health monitoring is enabled
+            self._enable_cluster_health_monitoring = self._cluster_config_manager.is_cluster_health_enabled()
+            
+            logger.info("Cluster health configuration loaded",
+                       enabled=self._enable_cluster_health_monitoring,
+                       summary=self._cluster_config_manager.get_configuration_summary())
+
+        except Exception as e:
+            logger.warning("Failed to load cluster health configuration, using defaults", error=str(e))
+            # Continue with defaults if cluster configuration fails
+            self._enable_cluster_health_monitoring = True
 
     async def _auto_start_configured_services(self) -> None:
         """Automatically start configured services."""
@@ -353,6 +388,41 @@ class DaemonManager:
         except Exception as e:
             logger.error("Failed to start health monitoring", error=str(e))
             raise
+
+    async def _start_cluster_health_monitoring(self) -> None:
+        """Start cluster health monitoring for active cluster contexts."""
+        try:
+            # Get all services to extract cluster contexts
+            services = await self._service_repository.find_all()
+            
+            # Extract cluster contexts from services
+            cluster_contexts = self._cluster_config_manager.extract_cluster_contexts_from_services(services)
+            
+            if not cluster_contexts:
+                logger.info("No cluster contexts found for monitoring")
+                return
+            
+            # Get default cluster monitor configuration
+            default_config = self._cluster_config_manager.get_default_config()
+            
+            # Initialize cluster health manager
+            self._cluster_health_manager = ClusterHealthManager(default_config)
+            
+            # Start the cluster health manager
+            await self._cluster_health_manager.start()
+            
+            # Register cluster contexts for monitoring
+            await self._cluster_health_manager.update_active_contexts(cluster_contexts)
+            
+            logger.info("Cluster health monitoring started",
+                       monitored_contexts=list(cluster_contexts),
+                       context_count=len(cluster_contexts),
+                       config_summary=self._cluster_config_manager.get_configuration_summary())
+
+        except Exception as e:
+            logger.error("Failed to start cluster health monitoring", error=str(e))
+            # Don't raise - cluster health monitoring is optional
+            self._cluster_health_manager = None
 
     async def _start_background_tasks(self) -> None:
         """Start background tasks."""
