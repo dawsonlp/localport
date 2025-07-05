@@ -107,22 +107,17 @@ class HealthMonitorScheduler:
                    check_interval=check_interval)
 
     async def add_service(self, service: Service) -> None:
-        """Add a new service to health monitoring."""
+        """Add a new service to health monitoring using cooperative tasks."""
         if (service.health_check_config and
             service.status == ServiceStatus.RUNNING and
             self._running):
 
             # Stop existing monitoring if any
-            if service.id in self._tasks:
+            if service.id in self._cooperative_tasks:
                 await self.stop_monitoring({service.id})
 
-            # Start new monitoring
-            task = asyncio.create_task(
-                self._monitor_service_health(service),
-                name=f"health_monitor_{service.name}"
-            )
-            self._tasks[service.id] = task
-            self._failure_counts[service.id] = 0
+            # Start new cooperative monitoring
+            await self._start_service_monitoring(service)
 
             logger.info("Added service to health monitoring",
                        service_name=service.name)
@@ -144,63 +139,6 @@ class HealthMonitorScheduler:
         """Get the current failure count for a service."""
         return self._failure_counts.get(service_id, 0)
 
-    async def _monitor_service_health(self, service: Service) -> None:
-        """Monitor health for a single service."""
-        logger.info("Starting health monitoring loop", service_name=service.name)
-
-        health_config = service.health_check_config
-        check_interval = health_config.get('interval', 30)
-        failure_threshold = health_config.get('failure_threshold', 3)
-
-        while self._running and service.id in self._tasks:
-            try:
-                # Perform health check
-                health_result = await self._perform_health_check(service)
-
-                # Update tracking data
-                self._service_health[service.id] = health_result
-                self._last_check_times[service.id] = datetime.now()
-
-                if health_result.is_healthy:
-                    # Reset failure count on successful check
-                    if self._failure_counts.get(service.id, 0) > 0:
-                        logger.info("Service health recovered",
-                                   service_name=service.name,
-                                   previous_failures=self._failure_counts[service.id])
-                    self._failure_counts[service.id] = 0
-                else:
-                    # Increment failure count
-                    self._failure_counts[service.id] += 1
-                    failure_count = self._failure_counts[service.id]
-
-                    logger.warning("Service health check failed",
-                                 service_name=service.name,
-                                 failure_count=failure_count,
-                                 failure_threshold=failure_threshold,
-                                 error=health_result.error)
-
-                    # Check if we've reached the failure threshold
-                    if failure_count >= failure_threshold:
-                        logger.error("Service health failure threshold reached",
-                                   service_name=service.name,
-                                   failure_count=failure_count,
-                                   threshold=failure_threshold)
-
-                        # Trigger restart logic (will be implemented in restart manager)
-                        await self._trigger_service_restart(service, health_result)
-
-                # Wait for next check interval
-                await asyncio.sleep(check_interval)
-
-            except asyncio.CancelledError:
-                logger.info("Health monitoring cancelled", service_name=service.name)
-                break
-            except Exception as e:
-                logger.exception("Error in health monitoring loop",
-                               service_name=service.name,
-                               error=str(e))
-                # Continue monitoring despite errors
-                await asyncio.sleep(check_interval)
 
     async def _perform_health_check(self, service: Service) -> HealthCheckResult:
         """Perform a health check for a service."""

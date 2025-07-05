@@ -73,7 +73,11 @@ class LocalPortDaemon:
             # Initialize core services
             service_manager = ServiceManager()
             restart_manager = RestartManager(service_manager)
-            health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
+            health_monitor = HealthMonitorScheduler(
+                health_check_factory, 
+                restart_manager,
+                task_manager=self._task_manager
+            )
 
             # Initialize daemon manager with new health monitoring system
             self.daemon_manager = DaemonManager(

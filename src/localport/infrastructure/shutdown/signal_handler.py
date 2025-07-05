@@ -44,7 +44,7 @@ class AsyncSignalHandler:
         """
         self._loop = loop or asyncio.get_event_loop()
         self._signal_handlers: Dict[int, Callable] = {}
-        self._original_handlers: Dict[int, signal.Handlers] = {}
+        self._original_handlers: Dict[int, Any] = {}
         self._shutdown_event = asyncio.Event()
         self._reload_event = asyncio.Event()
         self._status_event = asyncio.Event()
