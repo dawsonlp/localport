@@ -254,6 +254,11 @@ from .commands.ssh_commands import (
     test_ssh_connectivity_sync,
     validate_ssh_config_sync,
 )
+from .commands.cluster_commands import (
+    cluster_status_sync,
+    cluster_events_sync,
+    cluster_pods_sync,
+)
 
 # Service management commands
 app.command(name="start")(start_services_sync)
@@ -310,6 +315,22 @@ ssh_app.command(name="validate")(validate_ssh_config_sync)
 app.add_typer(ssh_app, name="ssh")
 
 
+# Cluster command group
+cluster_app = typer.Typer(
+    name="cluster",
+    help="Cluster health monitoring commands",
+    no_args_is_help=True
+)
+
+# Add cluster commands
+cluster_app.command(name="status")(cluster_status_sync)
+cluster_app.command(name="events")(cluster_events_sync)
+cluster_app.command(name="pods")(cluster_pods_sync)
+
+# Add cluster subcommand
+app.add_typer(cluster_app, name="cluster")
+
+
 def cli_main():
     """Entry point for the CLI application."""
     try:
@@ -330,6 +351,7 @@ def cli_main():
   [cyan]logs[/cyan]     View service logs
   [cyan]daemon[/cyan]   Daemon management commands
   [cyan]config[/cyan]   Configuration management commands
+  [cyan]cluster[/cyan]  Cluster health monitoring commands
 
 [bold]Options:[/bold]
   [cyan]-h, --help[/cyan]     Show this message and exit
