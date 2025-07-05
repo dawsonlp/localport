@@ -19,6 +19,11 @@ from .infrastructure.repositories.memory_service_repository import (
     MemoryServiceRepository,
 )
 from .infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from .infrastructure.shutdown import (
+    AsyncSignalHandler,
+    ShutdownCoordinator,
+    TaskManager,
+)
 
 logger = structlog.get_logger()
 
@@ -36,15 +41,29 @@ class LocalPortDaemon:
         self.config_file = config_file
         self.auto_start = auto_start
         self.daemon_manager: DaemonManager | None = None
-        self._shutdown_event = asyncio.Event()
+        
+        # New shutdown infrastructure
+        self._task_manager = TaskManager()
+        self._signal_handler: AsyncSignalHandler | None = None
+        self._shutdown_coordinator: ShutdownCoordinator | None = None
 
     async def start(self) -> None:
-        """Start the daemon process."""
-        logger.info("Starting LocalPort daemon",
+        """Start the daemon process with graceful shutdown infrastructure."""
+        logger.info("Starting LocalPort daemon with graceful shutdown",
                    config_file=self.config_file,
                    auto_start=self.auto_start)
 
         try:
+            # Initialize shutdown infrastructure first
+            self._signal_handler = AsyncSignalHandler()
+            self._shutdown_coordinator = ShutdownCoordinator(
+                self._task_manager,
+                self._signal_handler
+            )
+
+            # Setup signal handlers
+            self._signal_handler.setup_signal_handlers()
+
             # Initialize repositories and services
             service_repo = MemoryServiceRepository()
             config_repo = YamlConfigRepository(config_path=self.config_file)
@@ -54,7 +73,11 @@ class LocalPortDaemon:
             # Initialize core services
             service_manager = ServiceManager()
             restart_manager = RestartManager(service_manager)
-            health_monitor = HealthMonitorScheduler(health_check_factory, restart_manager)
+            health_monitor = HealthMonitorScheduler(
+                health_check_factory, 
+                restart_manager,
+                task_manager=self._task_manager
+            )
 
             # Initialize daemon manager with new health monitoring system
             self.daemon_manager = DaemonManager(
@@ -64,56 +87,102 @@ class LocalPortDaemon:
                 health_monitor=health_monitor
             )
 
-            # Setup signal handlers
-            self._setup_signal_handlers()
+            # Register daemon manager tasks with task manager
+            await self._register_daemon_tasks()
 
             # Start daemon manager
             await self.daemon_manager.start_daemon(auto_start_services=self.auto_start)
 
             logger.info("LocalPort daemon started successfully")
 
-            # Run until shutdown
-            await self.daemon_manager.run_until_shutdown()
+            # Run until shutdown signal
+            await self._shutdown_coordinator.wait_for_shutdown_signal()
+            
+            logger.info("Shutdown signal received, initiating graceful shutdown")
+            
+            # Perform graceful shutdown
+            success = await self._shutdown_coordinator.initiate_shutdown()
+            
+            if success:
+                logger.info("Graceful shutdown completed successfully")
+            else:
+                logger.warning("Graceful shutdown completed with issues")
 
         except Exception as e:
             logger.exception("Failed to start daemon", error=str(e))
+            # Attempt emergency shutdown
+            if self._shutdown_coordinator:
+                await self._shutdown_coordinator.emergency_shutdown()
             raise
+        finally:
+            # Cleanup signal handlers
+            if self._signal_handler:
+                self._signal_handler.cleanup_signal_handlers()
 
-    async def stop(self) -> None:
-        """Stop the daemon process."""
-        logger.info("Stopping LocalPort daemon")
+    async def _register_daemon_tasks(self) -> None:
+        """Register daemon manager tasks with the task manager."""
+        logger.debug("Registering daemon tasks with task manager")
+        
+        # Register daemon manager shutdown callback
+        if self._shutdown_coordinator and self.daemon_manager:
+            from .infrastructure.shutdown.shutdown_coordinator import ShutdownPhase
+            
+            # Register daemon manager stop in the CANCEL_TASKS phase
+            self._shutdown_coordinator.register_phase_callback(
+                ShutdownPhase.CANCEL_TASKS,
+                self._stop_daemon_manager
+            )
+            
+            # Register configuration reload handler
+            if self._signal_handler:
+                # Handle reload signals
+                async def handle_reload():
+                    if self.daemon_manager:
+                        await self.daemon_manager.reload_configuration()
+                
+                # Check for reload signals periodically
+                reload_task = self._task_manager.register_task(
+                    "reload_signal_monitor",
+                    self._monitor_reload_signals(),
+                    group="daemon_management",
+                    priority=10
+                )
 
+    async def _stop_daemon_manager(self) -> None:
+        """Stop the daemon manager during shutdown."""
         if self.daemon_manager:
+            logger.info("Stopping daemon manager")
             await self.daemon_manager.stop_daemon()
 
-        self._shutdown_event.set()
-        logger.info("LocalPort daemon stopped")
-
-    def _setup_signal_handlers(self) -> None:
-        """Setup signal handlers for daemon control."""
-        if sys.platform == "win32":
-            # Windows signal handling
-            signal.signal(signal.SIGINT, self._handle_shutdown_signal)
-            signal.signal(signal.SIGTERM, self._handle_shutdown_signal)
-        else:
-            # Unix signal handling
-            signal.signal(signal.SIGTERM, self._handle_shutdown_signal)
-            signal.signal(signal.SIGINT, self._handle_shutdown_signal)
-            signal.signal(signal.SIGUSR1, self._handle_reload_signal)
-            signal.signal(signal.SIGHUP, self._handle_reload_signal)
-
-        logger.debug("Signal handlers configured")
-
-    def _handle_shutdown_signal(self, signum: int, frame) -> None:
-        """Handle shutdown signals."""
-        logger.info("Received shutdown signal", signal=signum)
-        asyncio.create_task(self.stop())
-
-    def _handle_reload_signal(self, signum: int, frame) -> None:
-        """Handle reload signals."""
-        logger.info("Received reload signal", signal=signum)
-        if self.daemon_manager:
-            asyncio.create_task(self.daemon_manager.reload_configuration())
+    async def _monitor_reload_signals(self) -> None:
+        """Monitor for reload signals."""
+        if not self._signal_handler:
+            return
+            
+        while True:
+            try:
+                # Wait for reload signal with timeout
+                await asyncio.wait_for(
+                    self._signal_handler.wait_for_reload(),
+                    timeout=5.0
+                )
+                
+                logger.info("Reload signal received")
+                if self.daemon_manager:
+                    await self.daemon_manager.reload_configuration()
+                    
+                # Reset the reload event for next signal
+                self._signal_handler.reload_event.clear()
+                
+            except asyncio.TimeoutError:
+                # Normal timeout, continue monitoring
+                continue
+            except asyncio.CancelledError:
+                logger.debug("Reload signal monitoring cancelled")
+                break
+            except Exception as e:
+                logger.exception("Error monitoring reload signals", error=str(e))
+                await asyncio.sleep(1.0)  # Brief pause before retry
 
 
 def daemonize() -> None:

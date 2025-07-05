@@ -1,8 +1,8 @@
 # LocalPort
 
-> **🚧 ALPHA RELEASE - Universal port forwarding manager with intelligent health monitoring**
+> **🚀 BETA RELEASE - Universal port forwarding manager with intelligent health monitoring**
 
-**⚠️ This is alpha software under active development. While core functionality is working and tested, expect breaking changes and incomplete features. Please report issues and provide feedback!**
+**ℹ️ LocalPort is in active development with new features being added regularly. While core functionality is stable and well-tested, some advanced features are still being developed. We welcome feedback and issue reports!**
 
 LocalPort is a modern Python CLI tool that simplifies port forwarding across different technologies (kubectl, SSH) while providing enterprise-grade features like automatic health monitoring, intelligent restart policies, and daemon-mode operation.
 
@@ -20,7 +20,7 @@ LocalPort is a modern Python CLI tool that simplifies port forwarding across dif
 ### Installation
 
 #### Production Release (PyPI)
-> **Note**: LocalPort is now available on production PyPI! This is alpha software under active development - expect breaking changes and missing features.
+> **Note**: LocalPort is now available on production PyPI! This is beta software with stable core functionality and active feature development.
 
 > **⚠️ Python 3.11+ Required**: LocalPort requires Python 3.11 or newer. If you don't have Python 3.11+, see [Python Installation](#python-installation) below.
 
@@ -406,7 +406,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📊 Status
 
-🎯 **Alpha Release 0.3.x** - Core functionality working with daemon mode and health monitoring!
+🎯 **Beta Release 0.3.x** - Stable core functionality with cluster health monitoring and daemon mode!
 
 **Current Progress:**
 - ✅ Core Infrastructure (100% complete)
@@ -434,8 +434,12 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - ✅ Clean CLI output by default
 - ✅ **v0.3.5 Architectural Enhancements**: Complete kubectl adapter interface compliance with enhanced validation, type safety, and comprehensive testing (31 unit tests)
 
+## 📋 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes and version history.
+
 ## 🔗 Links
 
-- [Requirements](localport.md) - Detailed project requirements
-- [Implementation Design](implementation_design_python.md) - Technical architecture and implementation guide
-- [Development Guide](docs/development.md) - Development setup and contribution guidelines (coming soon)
+- [Changelog](CHANGELOG.md) - Detailed release notes and version history
+- [Development Guide](docs/development.md) - Development setup and contribution guidelines
+- [Architecture Guide](docs/architecture.md) - Technical architecture overview

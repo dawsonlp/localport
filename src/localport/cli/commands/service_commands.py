@@ -10,6 +10,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ...application.services.service_manager import ServiceManager
+from ...application.services.cluster_health_manager import ClusterHealthManager
 from ...application.use_cases.monitor_services import MonitorServicesUseCase
 from ...application.use_cases.start_services import StartServicesUseCase
 from ...application.use_cases.stop_services import StopServicesUseCase
@@ -412,16 +413,27 @@ async def status_services_command(
             )
             result = await monitor_use_case.execute(command)
 
+            # Get cluster health information if available
+            cluster_health_data = await _get_cluster_health_for_status(config_repo)
+
             # Format output based on requested format
             if output_format == OutputFormat.JSON:
-                # For JSON output, get the formatted string and print it
+                # For JSON output, include cluster health data
                 formatted_output = format_router.format_service_status(result, output_format)
+                # TODO: Enhance JSON formatter to include cluster health
                 console.print(formatted_output)
             else:
-                # For table output, clear screen if watching, then let formatter print directly
+                # For table output, clear screen if watching, then show services and cluster health
                 if watch:
                     console.clear()
+                
+                # Show service status
                 format_router.format_service_status(result, output_format)
+                
+                # Show cluster health section
+                if cluster_health_data:
+                    console.print()  # Add spacing
+                    _display_cluster_health_section(cluster_health_data)
 
         if watch:
             # Watch mode - refresh periodically
@@ -498,3 +510,147 @@ def status_services_sync(
     # Get output format from context
     output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
     asyncio.run(status_services_command(services, watch, refresh_interval, output_format))
+
+
+async def _get_cluster_health_for_status(config_repo: YamlConfigRepository | None) -> dict | None:
+    """Get cluster health data for status display."""
+    if not config_repo:
+        return None
+    
+    try:
+        # Load configuration to check if cluster health is enabled
+        config = await config_repo.load_configuration()
+        cluster_health_config = config.get('defaults', {}).get('cluster_health', {})
+        
+        if not cluster_health_config.get('enabled', True):
+            return None
+
+        # Load services to determine which clusters to monitor
+        services = await config_repo.load_services()
+        kubectl_services = [s for s in services if s.technology.value == 'kubectl']
+        
+        if not kubectl_services:
+            return None
+
+        # Extract unique cluster contexts
+        contexts = set()
+        for service in kubectl_services:
+            context = service.connection_info.get_kubectl_context()
+            if context:
+                contexts.add(context)
+
+        if not contexts:
+            return None
+
+        # Initialize cluster health manager
+        cluster_health_manager = ClusterHealthManager()
+        
+        # Start monitoring for each context (lightweight check)
+        cluster_data = {}
+        for context in contexts:
+            try:
+                # Get current health data (don't start full monitoring)
+                health_data = await cluster_health_manager.get_cluster_health(context)
+                cluster_info = await cluster_health_manager.get_cluster_info(context)
+                
+                cluster_data[context] = {
+                    'health': health_data,
+                    'info': cluster_info
+                }
+            except Exception as e:
+                logger.debug("Error getting cluster health for context", context=context, error=str(e))
+                cluster_data[context] = {
+                    'health': None,
+                    'info': None,
+                    'error': str(e)
+                }
+
+        return cluster_data if cluster_data else None
+
+    except Exception as e:
+        logger.debug("Error getting cluster health for status", error=str(e))
+        return None
+
+
+def _display_cluster_health_section(cluster_data: dict) -> None:
+    """Display cluster health section in status output."""
+    from datetime import datetime
+    from rich.panel import Panel
+    
+    # Create cluster health table
+    table = Table(title="🏗️  Cluster Health", show_header=True, header_style="bold blue")
+    table.add_column("Context", style="bold blue", width=20)
+    table.add_column("Status", style="bold", width=15)
+    table.add_column("API Server", style="cyan", width=25)
+    table.add_column("Nodes", style="green", width=8)
+    table.add_column("Pods", style="yellow", width=8)
+    table.add_column("Last Check", style="dim", width=12)
+
+    for context, data in cluster_data.items():
+        if data.get('error'):
+            # Error case
+            table.add_row(
+                context,
+                "[red]🔴 Error[/red]",
+                "Error",
+                "Error",
+                "Error",
+                "Error"
+            )
+        else:
+            health_data = data.get('health', {})
+            cluster_info = data.get('info', {})
+            
+            # Format status with color indicators
+            if health_data:
+                is_healthy = health_data.get('is_healthy', False)
+                last_check = health_data.get('last_check_time')
+                
+                if is_healthy:
+                    status = "[green]🟢 Healthy[/green]"
+                else:
+                    status = "[red]🔴 Unhealthy[/red]"
+                
+                # Format last check time
+                if last_check:
+                    try:
+                        last_check_dt = datetime.fromisoformat(last_check.replace('Z', '+00:00'))
+                        time_ago = datetime.now().replace(tzinfo=last_check_dt.tzinfo) - last_check_dt
+                        if time_ago.total_seconds() < 60:
+                            time_str = f"{int(time_ago.total_seconds())}s ago"
+                        elif time_ago.total_seconds() < 3600:
+                            time_str = f"{int(time_ago.total_seconds() // 60)}m ago"
+                        else:
+                            time_str = f"{int(time_ago.total_seconds() // 3600)}h ago"
+                    except Exception:
+                        time_str = "Unknown"
+                else:
+                    time_str = "Never"
+            else:
+                status = "[dim]Unknown[/dim]"
+                time_str = "Unknown"
+            
+            # Format cluster info
+            if cluster_info:
+                api_server = cluster_info.get('api_server', 'Unknown')
+                node_count = str(cluster_info.get('node_count', 0))
+                pod_count = str(cluster_info.get('pod_count', 0))
+            else:
+                api_server = "Unknown"
+                node_count = "0"
+                pod_count = "0"
+            
+            table.add_row(
+                context,
+                status,
+                api_server,
+                node_count,
+                pod_count,
+                time_str
+            )
+
+    console.print(table)
+    
+    # Add helpful note if cluster health is available
+    if cluster_data:
+        console.print("[dim]💡 Use 'localport cluster status' for detailed cluster information[/dim]")
