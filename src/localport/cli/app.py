@@ -250,6 +250,10 @@ from .commands.service_commands import (
     status_services_sync,
     stop_services_sync,
 )
+from .commands.ssh_commands import (
+    test_ssh_connectivity_sync,
+    validate_ssh_config_sync,
+)
 
 # Service management commands
 app.command(name="start")(start_services_sync)
@@ -289,6 +293,21 @@ config_app.command(name="validate")(validate_config_sync)
 
 # Add config subcommand
 app.add_typer(config_app, name="config")
+
+
+# SSH command group
+ssh_app = typer.Typer(
+    name="ssh",
+    help="SSH-specific commands",
+    no_args_is_help=True
+)
+
+# Add SSH commands
+ssh_app.command(name="test")(test_ssh_connectivity_sync)
+ssh_app.command(name="validate")(validate_ssh_config_sync)
+
+# Add SSH subcommand
+app.add_typer(ssh_app, name="ssh")
 
 
 def cli_main():

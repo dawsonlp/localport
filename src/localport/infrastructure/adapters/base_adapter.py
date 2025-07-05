@@ -5,6 +5,8 @@ from typing import Any
 
 import structlog
 
+from ...domain.value_objects.connection_info import ConnectionInfo
+
 logger = structlog.get_logger()
 
 
@@ -16,14 +18,14 @@ class PortForwardingAdapter(ABC):
         self,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any]
+        connection_info: ConnectionInfo
     ) -> int:
         """Start a port forwarding process.
 
         Args:
             local_port: Local port to bind to
             remote_port: Remote port to forward to
-            connection_info: Connection-specific configuration
+            connection_info: Connection information object
 
         Returns:
             Process ID of the started port forward
@@ -58,11 +60,11 @@ class PortForwardingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def validate_connection_info(self, connection_info: dict[str, Any]) -> list[str]:
+    async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
         """Validate connection information for this adapter.
 
         Args:
-            connection_info: Connection configuration to validate
+            connection_info: Connection information object to validate
 
         Returns:
             List of validation errors (empty if valid)

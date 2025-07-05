@@ -7,12 +7,14 @@ from typing import Any, Optional
 import psutil
 import structlog
 
+from .base_adapter import PortForwardingAdapter
 from ..logging.service_log_manager import get_service_log_manager
+from ...domain.value_objects.connection_info import ConnectionInfo
 
 logger = structlog.get_logger()
 
 
-class SSHAdapter:
+class SSHAdapter(PortForwardingAdapter):
     """Adapter for SSH tunnel port forwarding operations."""
 
     def __init__(self) -> None:
@@ -26,7 +28,7 @@ class SSHAdapter:
         service_name: str,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any]
+        connection_info: ConnectionInfo
     ) -> tuple[int, str]:
         """Start an SSH tunnel port-forward process with service logging.
 
@@ -34,7 +36,7 @@ class SSHAdapter:
             service_name: Name of the service for logging
             local_port: Local port to bind to
             remote_port: Remote port to forward to
-            connection_info: SSH-specific connection details
+            connection_info: SSH connection information object
 
         Returns:
             Tuple of (process_id, service_id)
@@ -43,12 +45,12 @@ class SSHAdapter:
             RuntimeError: If SSH tunnel fails to start
             ValueError: If connection_info is invalid
         """
-        # Extract connection details
-        host = connection_info['host']
-        user = connection_info.get('user')
-        ssh_port = connection_info.get('port', 22)
-        key_file = connection_info.get('key_file')
-        password = connection_info.get('password')
+        # Extract connection details using object methods
+        host = connection_info.get_ssh_host()
+        user = connection_info.get_ssh_user()
+        ssh_port = connection_info.get_ssh_port()
+        key_file = connection_info.get_ssh_key_file()
+        password = connection_info.config.get('password')  # Direct access for password since no method exists
 
         # Create service configuration for logging
         service_config = {
@@ -185,14 +187,14 @@ class SSHAdapter:
         self,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any]
+        connection_info: "ConnectionInfo"
     ) -> int:
         """Start an SSH tunnel port-forward process.
 
         Args:
             local_port: Local port to bind to
             remote_port: Remote port to forward to
-            connection_info: SSH-specific connection details
+            connection_info: SSH connection information object
 
         Returns:
             Process ID of the started SSH process
@@ -201,12 +203,12 @@ class SSHAdapter:
             RuntimeError: If SSH tunnel fails to start
             ValueError: If connection_info is invalid
         """
-        # Extract connection details
-        host = connection_info['host']
-        user = connection_info.get('user')
-        ssh_port = connection_info.get('port', 22)
-        key_file = connection_info.get('key_file')
-        password = connection_info.get('password')
+        # Extract connection details using object methods
+        host = connection_info.get_ssh_host()
+        user = connection_info.get_ssh_user()
+        ssh_port = connection_info.get_ssh_port()
+        key_file = connection_info.get_ssh_key_file()
+        password = connection_info.config.get('password')  # Direct access for password since no method exists
 
         # Build SSH command
         cmd = [
@@ -334,13 +336,17 @@ class SSHAdapter:
                         psutil_process.kill()
                         psutil_process.wait()
 
-                except psutil.NoSuchProcess:
-                    logger.warning("Process not found", pid=process_id)
-                    # Still need to clean up service log tracking
-                    if service_id:
-                        self._service_logs.pop(process_id, None)
-                        self._service_log_manager.remove_service_log(service_id)
-                    return
+                except (psutil.NoSuchProcess, Exception) as e:
+                    if "NoSuchProcess" in str(e) or isinstance(e, psutil.NoSuchProcess):
+                        logger.warning("Process not found", pid=process_id)
+                        # Still need to clean up service log tracking
+                        if service_id:
+                            self._service_logs.pop(process_id, None)
+                            self._service_log_manager.remove_service_log(service_id)
+                        return
+                    else:
+                        # Re-raise other exceptions
+                        raise
 
             # Clean up service log tracking
             if service_id:
@@ -548,3 +554,196 @@ class SSHAdapter:
             return False
         except Exception:
             return False
+
+    async def validate_ssh_connectivity(self, connection_info: dict[str, Any]) -> tuple[bool, str]:
+        """Pre-flight SSH connectivity check.
+
+        Args:
+            connection_info: SSH connection configuration
+
+        Returns:
+            Tuple of (success, message)
+        """
+        host = connection_info['host']
+        port = connection_info.get('port', 22)
+        user = connection_info.get('user')
+        key_file = connection_info.get('key_file')
+        
+        # Build test command
+        cmd = [
+            'ssh',
+            '-o', 'ConnectTimeout=5',
+            '-o', 'BatchMode=yes',  # Don't prompt for passwords
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-p', str(port)
+        ]
+        
+        # Add key file if specified
+        if key_file:
+            key_path = Path(key_file).expanduser()
+            if key_path.exists():
+                cmd.extend(['-i', str(key_path)])
+        
+        # Add user and host
+        if user:
+            cmd.extend([f'{user}@{host}', 'exit'])
+        else:
+            cmd.extend([host, 'exit'])
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            await asyncio.wait_for(process.wait(), timeout=10.0)
+            
+            if process.returncode == 0:
+                return True, "SSH connectivity verified"
+            else:
+                stderr = await process.stderr.read()
+                error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                return False, f"SSH connection failed: {error_msg}"
+                
+        except asyncio.TimeoutError:
+            return False, "SSH connectivity check timed out"
+        except Exception as e:
+            return False, f"SSH connectivity check failed: {str(e)}"
+
+    async def validate_dependencies(self) -> tuple[bool, list[str]]:
+        """Validate that required dependencies are available.
+
+        Returns:
+            Tuple of (all_available, missing_tools)
+        """
+        missing_tools = []
+        
+        # Check SSH availability
+        if not await self.validate_ssh_available():
+            missing_tools.append("ssh - Install OpenSSH client")
+        
+        return len(missing_tools) == 0, missing_tools
+
+    async def check_prerequisites(self) -> bool:
+        """Check if all prerequisites for SSH adapter are met.
+
+        Returns:
+            True if all prerequisites are available, False otherwise
+        """
+        try:
+            all_available, missing_tools = await self.validate_dependencies()
+            
+            if not all_available:
+                logger.warning("SSH adapter prerequisites not met",
+                             missing_tools=missing_tools)
+                return False
+            
+            logger.debug("SSH adapter prerequisites check passed")
+            return True
+            
+        except Exception as e:
+            logger.error("Error checking SSH adapter prerequisites",
+                        error=str(e))
+            return False
+
+    # Required abstract methods from PortForwardingAdapter
+
+    async def validate_connection_info(self, connection_info: "ConnectionInfo") -> list[str]:
+        """Validate SSH connection configuration.
+
+        Args:
+            connection_info: SSH connection information object to validate
+
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+
+        # Validate that this is an SSH connection
+        from ...domain.enums import ForwardingTechnology
+        if connection_info.technology != ForwardingTechnology.SSH:
+            errors.append("Connection info is not for SSH technology")
+            return errors
+
+        try:
+            # Required fields validation - use object methods
+            host = connection_info.get_ssh_host()
+            if not host or not host.strip():
+                errors.append("SSH host cannot be empty. Provide a hostname like 'example.com' or IP address like '192.168.1.100'")
+        except ValueError:
+            errors.append("SSH connection requires 'host' field. Example: host: 'example.com' or host: '192.168.1.100'")
+
+        # Port validation
+        try:
+            port = connection_info.get_ssh_port()
+            if not 1 <= port <= 65535:
+                errors.append(f"SSH port {port} must be between 1 and 65535 (default SSH port is 22)")
+        except (ValueError, TypeError):
+            errors.append("SSH port must be a valid integer. Example: port: 22 or port: 2222")
+
+        # Key file validation
+        key_file = connection_info.get_ssh_key_file()
+        if key_file:
+            key_path = Path(key_file).expanduser()
+            if not key_path.exists():
+                errors.append(f"SSH key file not found: {key_path}. Check the path or generate a key with 'ssh-keygen -t rsa'")
+            elif not key_path.is_file():
+                errors.append(f"SSH key path is not a file: {key_path}")
+            else:
+                # Check key file permissions (should be 600 or 400)
+                try:
+                    stat_info = key_path.stat()
+                    if stat_info.st_mode & 0o077:
+                        errors.append(f"SSH key file has overly permissive permissions: {key_path}. Run 'chmod 600 {key_path}' to fix")
+                except Exception as e:
+                    errors.append(f"Cannot check SSH key file permissions: {key_path} - {str(e)}")
+
+        # Authentication validation
+        has_key = key_file is not None
+        has_password = connection_info.has_ssh_password()
+        
+        if not has_key and not has_password:
+            errors.append("SSH connection requires either 'key_file' or 'password' for authentication")
+
+        # Password authentication warning
+        if has_password and not has_key:
+            # Check if sshpass is available
+            try:
+                import shutil
+                if not shutil.which('sshpass'):
+                    errors.append("Password authentication requires 'sshpass' to be installed. Install with: brew install sshpass (macOS) or apt-get install sshpass (Ubuntu)")
+            except Exception:
+                pass
+
+        return errors
+
+    def get_adapter_name(self) -> str:
+        """Get the name of this adapter.
+
+        Returns:
+            Human-readable adapter name
+        """
+        return "SSH Tunnel"
+
+    def get_required_tools(self) -> list[str]:
+        """Get list of required external tools for this adapter.
+
+        Returns:
+            List of required tool names
+        """
+        return ["ssh"]
+
+    async def is_port_forward_running(self, process_id: int) -> bool:
+        """Check if a port forward process is still running.
+
+        Args:
+            process_id: Process ID to check
+
+        Returns:
+            True if process is running, False otherwise
+        """
+        # Delegate to existing method (renamed for interface compliance)
+        return await self.is_process_running(process_id)
