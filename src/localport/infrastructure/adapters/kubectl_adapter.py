@@ -6,13 +6,14 @@ from typing import Any, Optional
 import psutil
 import structlog
 
+from .base_adapter import PortForwardingAdapter
 from ...domain.value_objects.connection_info import ConnectionInfo
 from ..logging.service_log_manager import get_service_log_manager
 
 logger = structlog.get_logger()
 
 
-class KubectlAdapter:
+class KubectlAdapter(PortForwardingAdapter):
     """Adapter for kubectl port-forward operations."""
 
     def __init__(self) -> None:
@@ -469,3 +470,79 @@ class KubectlAdapter:
         except Exception as e:
             logger.error("Error listing kubectl contexts", error=str(e))
             return []
+
+    # Required abstract methods from PortForwardingAdapter
+
+    async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
+        """Validate kubectl connection configuration.
+
+        Args:
+            connection_info: Kubectl connection information object to validate
+
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+
+        # Validate that this is a kubectl connection
+        from ...domain.enums import ForwardingTechnology
+        if connection_info.technology != ForwardingTechnology.KUBECTL:
+            errors.append("Connection info is not for kubectl technology")
+            return errors
+
+        try:
+            # Required fields validation - use object methods
+            resource_name = connection_info.get_kubectl_resource_name()
+            if not resource_name or not resource_name.strip():
+                errors.append("kubectl resource_name cannot be empty. Provide a valid Kubernetes resource name like 'my-service' or 'my-pod'")
+        except ValueError:
+            errors.append("kubectl connection requires 'resource_name' field. Example: resource_name: 'my-service'")
+
+        # Namespace validation
+        try:
+            namespace = connection_info.get_kubectl_namespace()
+            if not namespace or not namespace.strip():
+                errors.append("kubectl namespace cannot be empty if provided. Use a valid namespace like 'default' or 'production'")
+        except ValueError:
+            # Namespace is optional, so this is fine
+            pass
+
+        # Resource type validation
+        try:
+            resource_type = connection_info.get_kubectl_resource_type()
+            valid_types = ["service", "pod", "deployment"]
+            if resource_type not in valid_types:
+                errors.append(f"kubectl resource_type '{resource_type}' is invalid. Valid options: {', '.join(valid_types)}")
+        except ValueError:
+            # Resource type has a default, so this shouldn't happen
+            pass
+
+        return errors
+
+    def get_adapter_name(self) -> str:
+        """Get the name of this adapter.
+
+        Returns:
+            Human-readable adapter name
+        """
+        return "Kubectl Port Forward"
+
+    def get_required_tools(self) -> list[str]:
+        """Get list of required external tools for this adapter.
+
+        Returns:
+            List of required tool names
+        """
+        return ["kubectl"]
+
+    async def is_port_forward_running(self, process_id: int) -> bool:
+        """Check if a port forward process is still running.
+
+        Args:
+            process_id: Process ID to check
+
+        Returns:
+            True if process is running, False otherwise
+        """
+        # Delegate to existing method (renamed for interface compliance)
+        return await self.is_process_running(process_id)

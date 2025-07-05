@@ -96,6 +96,7 @@ class ServiceManager:
 
             # Start the port forward with service logging
             settings = get_settings()
+            
             try:
                 # Try to start with service logging first (if enabled)
                 if (settings.is_service_logging_enabled() and 

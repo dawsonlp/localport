@@ -9,6 +9,7 @@ import structlog
 
 from .base_adapter import PortForwardingAdapter
 from ..logging.service_log_manager import get_service_log_manager
+from ...domain.value_objects.connection_info import ConnectionInfo
 
 logger = structlog.get_logger()
 
@@ -27,7 +28,7 @@ class SSHAdapter(PortForwardingAdapter):
         service_name: str,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any]
+        connection_info: ConnectionInfo
     ) -> tuple[int, str]:
         """Start an SSH tunnel port-forward process with service logging.
 
@@ -35,7 +36,7 @@ class SSHAdapter(PortForwardingAdapter):
             service_name: Name of the service for logging
             local_port: Local port to bind to
             remote_port: Remote port to forward to
-            connection_info: SSH-specific connection details
+            connection_info: SSH connection information object
 
         Returns:
             Tuple of (process_id, service_id)
@@ -44,12 +45,12 @@ class SSHAdapter(PortForwardingAdapter):
             RuntimeError: If SSH tunnel fails to start
             ValueError: If connection_info is invalid
         """
-        # Extract connection details
-        host = connection_info['host']
-        user = connection_info.get('user')
-        ssh_port = connection_info.get('port', 22)
-        key_file = connection_info.get('key_file')
-        password = connection_info.get('password')
+        # Extract connection details using object methods
+        host = connection_info.get_ssh_host()
+        user = connection_info.get_ssh_user()
+        ssh_port = connection_info.get_ssh_port()
+        key_file = connection_info.get_ssh_key_file()
+        password = connection_info.config.get('password')  # Direct access for password since no method exists
 
         # Create service configuration for logging
         service_config = {
@@ -186,14 +187,14 @@ class SSHAdapter(PortForwardingAdapter):
         self,
         local_port: int,
         remote_port: int,
-        connection_info: dict[str, Any]
+        connection_info: "ConnectionInfo"
     ) -> int:
         """Start an SSH tunnel port-forward process.
 
         Args:
             local_port: Local port to bind to
             remote_port: Remote port to forward to
-            connection_info: SSH-specific connection details
+            connection_info: SSH connection information object
 
         Returns:
             Process ID of the started SSH process
@@ -202,12 +203,12 @@ class SSHAdapter(PortForwardingAdapter):
             RuntimeError: If SSH tunnel fails to start
             ValueError: If connection_info is invalid
         """
-        # Extract connection details
-        host = connection_info['host']
-        user = connection_info.get('user')
-        ssh_port = connection_info.get('port', 22)
-        key_file = connection_info.get('key_file')
-        password = connection_info.get('password')
+        # Extract connection details using object methods
+        host = connection_info.get_ssh_host()
+        user = connection_info.get_ssh_user()
+        ssh_port = connection_info.get_ssh_port()
+        key_file = connection_info.get_ssh_key_file()
+        password = connection_info.config.get('password')  # Direct access for password since no method exists
 
         # Build SSH command
         cmd = [
@@ -650,35 +651,43 @@ class SSHAdapter(PortForwardingAdapter):
 
     # Required abstract methods from PortForwardingAdapter
 
-    async def validate_connection_info(self, connection_info: dict[str, Any]) -> list[str]:
+    async def validate_connection_info(self, connection_info: "ConnectionInfo") -> list[str]:
         """Validate SSH connection configuration.
 
         Args:
-            connection_info: SSH connection configuration to validate
+            connection_info: SSH connection information object to validate
 
         Returns:
             List of validation errors (empty if valid)
         """
         errors = []
 
-        # Required fields validation
-        if 'host' not in connection_info:
+        # Validate that this is an SSH connection
+        from ...domain.enums import ForwardingTechnology
+        if connection_info.technology != ForwardingTechnology.SSH:
+            errors.append("Connection info is not for SSH technology")
+            return errors
+
+        try:
+            # Required fields validation - use object methods
+            host = connection_info.get_ssh_host()
+            if not host or not host.strip():
+                errors.append("SSH host cannot be empty. Provide a hostname like 'example.com' or IP address like '192.168.1.100'")
+        except ValueError:
             errors.append("SSH connection requires 'host' field. Example: host: 'example.com' or host: '192.168.1.100'")
-        elif not connection_info['host'].strip():
-            errors.append("SSH host cannot be empty. Provide a hostname like 'example.com' or IP address like '192.168.1.100'")
 
         # Port validation
-        if 'port' in connection_info:
-            try:
-                port = int(connection_info['port'])
-                if not 1 <= port <= 65535:
-                    errors.append(f"SSH port {port} must be between 1 and 65535 (default SSH port is 22)")
-            except (ValueError, TypeError):
-                errors.append(f"SSH port '{connection_info['port']}' must be a valid integer. Example: port: 22 or port: 2222")
+        try:
+            port = connection_info.get_ssh_port()
+            if not 1 <= port <= 65535:
+                errors.append(f"SSH port {port} must be between 1 and 65535 (default SSH port is 22)")
+        except (ValueError, TypeError):
+            errors.append("SSH port must be a valid integer. Example: port: 22 or port: 2222")
 
         # Key file validation
-        if 'key_file' in connection_info and connection_info['key_file']:
-            key_path = Path(connection_info['key_file']).expanduser()
+        key_file = connection_info.get_ssh_key_file()
+        if key_file:
+            key_path = Path(key_file).expanduser()
             if not key_path.exists():
                 errors.append(f"SSH key file not found: {key_path}. Check the path or generate a key with 'ssh-keygen -t rsa'")
             elif not key_path.is_file():
@@ -693,8 +702,8 @@ class SSHAdapter(PortForwardingAdapter):
                     errors.append(f"Cannot check SSH key file permissions: {key_path} - {str(e)}")
 
         # Authentication validation
-        has_key = 'key_file' in connection_info and connection_info['key_file']
-        has_password = 'password' in connection_info and connection_info['password']
+        has_key = key_file is not None
+        has_password = connection_info.has_ssh_password()
         
         if not has_key and not has_password:
             errors.append("SSH connection requires either 'key_file' or 'password' for authentication")
