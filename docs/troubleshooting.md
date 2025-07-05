@@ -295,17 +295,138 @@ mkdir -p ~/.local/share/localport/logs/services/
 
 #### macOS Issues
 
+##### Services Fail During Inactivity (Lunch Breaks, Overnight)
+
 **Symptoms:**
-- Frequent connection drops
+- Services work fine during active computer use
+- Services fail after periods of inactivity (lunch breaks, overnight)
+- Log shows "error: lost connection to pod" messages
+- Services restart automatically when you return to computer
+
+**Root Cause:**
+macOS aggressively manages network connections during idle periods to save power. When you step away from your computer, the system enters power-saving mode that can terminate kubectl port-forward processes.
+
+**Diagnostic Steps:**
+```bash
+# Check current power management settings
+pmset -g
+
+# Look for idle-related connection drops in logs
+localport logs --service <service-name> --grep "lost connection\|error.*connection"
+
+# Check if networkoversleep is disabled (this is the main culprit)
+pmset -g | grep networkoversleep
+```
+
+**Solution - Fix Power Management Settings:**
+
+The most critical fix is to prevent network sleep during idle periods:
+
+```bash
+# MOST IMPORTANT: Maintain network connections during idle (AC power)
+sudo pmset -c networkoversleep 1
+
+# Prevent display sleep from affecting network connections
+sudo pmset -c displaysleep 30  # Extend to 30 minutes, or 0 to disable
+
+# Disable disk sleep when plugged in
+sudo pmset -c disksleep 0
+
+# Ensure system doesn't sleep when plugged in
+sudo pmset -c sleep 0
+
+# Disable Power Nap which can interfere during idle periods
+sudo pmset -c powernap 0
+```
+
+**Additional Network Stability Improvements:**
+
+```bash
+# Enable TCP keepalives system-wide (temporary - resets on reboot)
+sudo sysctl -w net.inet.tcp.always_keepalive=1
+
+# Make TCP keepalives permanent
+echo "net.inet.tcp.always_keepalive=1" | sudo tee -a /etc/sysctl.conf
+```
+
+**Configuration Adjustments for Better Idle Tolerance:**
+
+Update your LocalPort configuration to be more tolerant of brief connection issues:
+
+```yaml
+defaults:
+  health_check:
+    interval: 60        # Increase from 30 seconds
+    timeout: 10.0       # Increase timeout
+    failure_threshold: 5  # Allow more failures before restart
+  restart_policy:
+    max_attempts: 10    # Increase max restart attempts
+    initial_delay: 5    # Longer initial delay
+    backoff_multiplier: 1.5  # Gentler backoff
+```
+
+**Testing the Fix:**
+1. Apply the power management changes above
+2. Start your services: `localport start --all`
+3. Leave your computer idle for 1-2 hours
+4. Return and check: `localport status`
+5. Services should still be running and healthy
+
+**Why This Happens:**
+- macOS treats "user away" differently than "user present but idle"
+- Network connections are deprioritized when no user activity is detected
+- Display sleep (after 10 minutes) triggers more aggressive power management
+- kubectl port-forward processes are seen as "background" and get throttled
+
+**Alternative Solutions:**
+If power management changes aren't suitable for your environment:
+
+1. **Use SSH tunnels with keepalive settings** (may be more resilient than kubectl):
+   ```yaml
+   technology: ssh
+   connection:
+     host: bastion.example.com
+     user: myuser
+     remote_host: internal-service
+     # SSH has better built-in keepalive mechanisms
+   ```
+   Note: SSH tunnels may still be affected by the same idle issues, but SSH has better built-in keepalive and reconnection mechanisms than kubectl port-forward.
+
+2. **Use a VPN connection** to your cluster network (most reliable for idle periods)
+
+3. **Set up ingress controllers** with stable external endpoints (eliminates port-forwarding entirely)
+
+4. **Use a dedicated always-on machine** (like a small server or Raspberry Pi) to maintain the tunnels
+
+**Important:** The power management fix above is the most effective solution. Alternative connection methods may still be affected by Mac's idle-state network management, though some (like VPN or ingress) can be more resilient.
+
+##### General macOS Connection Issues
+
+**Symptoms:**
+- Frequent connection drops during active use
 - Port forwarding instability
+- Network-related errors
 
 **Diagnostic Steps:**
 ```bash
 # Check for macOS-specific errors in logs
 localport logs --service <service-name> --grep "darwin\|macos\|network"
 
-# Monitor system logs
+# Monitor system logs for network issues
 log stream --predicate 'process == "kubectl"' --info
+
+# Check WiFi vs Ethernet connection stability
+networksetup -listallhardwareports
+```
+
+**Solutions:**
+```bash
+# If on WiFi, disable WiFi power management
+sudo /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport en0 prefs DisconnectOnLogout=NO
+
+# Consider using Ethernet for more stable connections
+# Check network interface statistics
+netstat -i
 ```
 
 #### Ubuntu/Linux Issues
