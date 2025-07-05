@@ -382,3 +382,114 @@ class TestSSHAdapter:
             
             # Should clear the active processes dict
             assert len(adapter._active_processes) == 0
+
+    @pytest.mark.asyncio
+    async def test_validate_ssh_connectivity_success(self):
+        """Test validate_ssh_connectivity with successful connection."""
+        adapter = SSHAdapter()
+        
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.stderr.read.return_value = b''
+        
+        connection_info = {
+            'host': 'example.com',
+            'user': 'testuser',
+            'port': 22
+        }
+        
+        with patch('asyncio.create_subprocess_exec', return_value=mock_process):
+            with patch('asyncio.wait_for', return_value=None):
+                success, message = await adapter.validate_ssh_connectivity(connection_info)
+                assert success is True
+                assert "SSH connectivity verified" in message
+
+    @pytest.mark.asyncio
+    async def test_validate_ssh_connectivity_failure(self):
+        """Test validate_ssh_connectivity with failed connection."""
+        adapter = SSHAdapter()
+        
+        mock_process = AsyncMock()
+        mock_process.returncode = 1
+        mock_process.stderr.read.return_value = b'Connection refused'
+        
+        connection_info = {
+            'host': 'example.com',
+            'user': 'testuser',
+            'port': 22
+        }
+        
+        with patch('asyncio.create_subprocess_exec', return_value=mock_process):
+            with patch('asyncio.wait_for', return_value=None):
+                success, message = await adapter.validate_ssh_connectivity(connection_info)
+                assert success is False
+                assert "SSH connection failed" in message
+                assert "Connection refused" in message
+
+    @pytest.mark.asyncio
+    async def test_validate_ssh_connectivity_timeout(self):
+        """Test validate_ssh_connectivity with timeout."""
+        adapter = SSHAdapter()
+        
+        mock_process = AsyncMock()
+        
+        connection_info = {
+            'host': 'example.com',
+            'user': 'testuser',
+            'port': 22
+        }
+        
+        with patch('asyncio.create_subprocess_exec', return_value=mock_process):
+            with patch('asyncio.wait_for', side_effect=asyncio.TimeoutError):
+                success, message = await adapter.validate_ssh_connectivity(connection_info)
+                assert success is False
+                assert "timed out" in message
+
+    @pytest.mark.asyncio
+    async def test_validate_dependencies_success(self):
+        """Test validate_dependencies when all dependencies are available."""
+        adapter = SSHAdapter()
+        
+        with patch.object(adapter, 'validate_ssh_available', return_value=True):
+            all_available, missing_tools = await adapter.validate_dependencies()
+            assert all_available is True
+            assert missing_tools == []
+
+    @pytest.mark.asyncio
+    async def test_validate_dependencies_missing_ssh(self):
+        """Test validate_dependencies when SSH is missing."""
+        adapter = SSHAdapter()
+        
+        with patch.object(adapter, 'validate_ssh_available', return_value=False):
+            all_available, missing_tools = await adapter.validate_dependencies()
+            assert all_available is False
+            assert len(missing_tools) == 1
+            assert "ssh" in missing_tools[0]
+
+    @pytest.mark.asyncio
+    async def test_check_prerequisites_success(self):
+        """Test check_prerequisites when all prerequisites are met."""
+        adapter = SSHAdapter()
+        
+        with patch.object(adapter, 'validate_dependencies', return_value=(True, [])):
+            result = await adapter.check_prerequisites()
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_check_prerequisites_failure(self):
+        """Test check_prerequisites when prerequisites are missing."""
+        adapter = SSHAdapter()
+        
+        missing_tools = ["ssh - Install OpenSSH client"]
+        with patch.object(adapter, 'validate_dependencies', return_value=(False, missing_tools)):
+            result = await adapter.check_prerequisites()
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_prerequisites_exception(self):
+        """Test check_prerequisites when an exception occurs."""
+        adapter = SSHAdapter()
+        
+        with patch.object(adapter, 'validate_dependencies', side_effect=Exception("Test error")):
+            result = await adapter.check_prerequisites()
+            assert result is False

@@ -554,6 +554,100 @@ class SSHAdapter(PortForwardingAdapter):
         except Exception:
             return False
 
+    async def validate_ssh_connectivity(self, connection_info: dict[str, Any]) -> tuple[bool, str]:
+        """Pre-flight SSH connectivity check.
+
+        Args:
+            connection_info: SSH connection configuration
+
+        Returns:
+            Tuple of (success, message)
+        """
+        host = connection_info['host']
+        port = connection_info.get('port', 22)
+        user = connection_info.get('user')
+        key_file = connection_info.get('key_file')
+        
+        # Build test command
+        cmd = [
+            'ssh',
+            '-o', 'ConnectTimeout=5',
+            '-o', 'BatchMode=yes',  # Don't prompt for passwords
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-p', str(port)
+        ]
+        
+        # Add key file if specified
+        if key_file:
+            key_path = Path(key_file).expanduser()
+            if key_path.exists():
+                cmd.extend(['-i', str(key_path)])
+        
+        # Add user and host
+        if user:
+            cmd.extend([f'{user}@{host}', 'exit'])
+        else:
+            cmd.extend([host, 'exit'])
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            await asyncio.wait_for(process.wait(), timeout=10.0)
+            
+            if process.returncode == 0:
+                return True, "SSH connectivity verified"
+            else:
+                stderr = await process.stderr.read()
+                error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                return False, f"SSH connection failed: {error_msg}"
+                
+        except asyncio.TimeoutError:
+            return False, "SSH connectivity check timed out"
+        except Exception as e:
+            return False, f"SSH connectivity check failed: {str(e)}"
+
+    async def validate_dependencies(self) -> tuple[bool, list[str]]:
+        """Validate that required dependencies are available.
+
+        Returns:
+            Tuple of (all_available, missing_tools)
+        """
+        missing_tools = []
+        
+        # Check SSH availability
+        if not await self.validate_ssh_available():
+            missing_tools.append("ssh - Install OpenSSH client")
+        
+        return len(missing_tools) == 0, missing_tools
+
+    async def check_prerequisites(self) -> bool:
+        """Check if all prerequisites for SSH adapter are met.
+
+        Returns:
+            True if all prerequisites are available, False otherwise
+        """
+        try:
+            all_available, missing_tools = await self.validate_dependencies()
+            
+            if not all_available:
+                logger.warning("SSH adapter prerequisites not met",
+                             missing_tools=missing_tools)
+                return False
+            
+            logger.debug("SSH adapter prerequisites check passed")
+            return True
+            
+        except Exception as e:
+            logger.error("Error checking SSH adapter prerequisites",
+                        error=str(e))
+            return False
+
     # Required abstract methods from PortForwardingAdapter
 
     async def validate_connection_info(self, connection_info: dict[str, Any]) -> list[str]:
