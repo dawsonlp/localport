@@ -84,15 +84,33 @@ class KubectlClient:
                     if 'is not running' in line.lower() or 'error' in line.lower():
                         core_services_healthy = False
             
-            # Try to get cluster version
+            # Try to get cluster version (handle kubectl version compatibility)
             try:
-                version_cmd = ["kubectl", "version", "--context", context, "--short", "--client=false"]
+                # Try new format first (kubectl v1.28+)
+                version_cmd = ["kubectl", "version", "--context", context, "--output=json"]
                 version_stdout, _, version_returncode = await self._execute_command(version_cmd)
+                
                 if version_returncode == 0:
-                    for line in version_stdout.split('\n'):
-                        if 'Server Version' in line:
-                            cluster_version = line.split(':')[-1].strip()
-                            break
+                    try:
+                        version_data = json.loads(version_stdout)
+                        server_version = version_data.get('serverVersion', {})
+                        if server_version:
+                            cluster_version = server_version.get('gitVersion', '').replace('v', '')
+                    except json.JSONDecodeError:
+                        # Fallback to parsing text output
+                        for line in version_stdout.split('\n'):
+                            if 'Server Version' in line:
+                                cluster_version = line.split(':')[-1].strip()
+                                break
+                else:
+                    # Fallback to older format for compatibility
+                    version_cmd = ["kubectl", "version", "--context", context]
+                    version_stdout, _, version_returncode = await self._execute_command(version_cmd)
+                    if version_returncode == 0:
+                        for line in version_stdout.split('\n'):
+                            if 'Server Version' in line:
+                                cluster_version = line.split(':')[-1].strip()
+                                break
             except Exception as e:
                 logger.debug(f"Failed to get cluster version for {context}: {e}")
             
@@ -227,10 +245,10 @@ class KubectlClient:
             KubectlError: If kubectl command fails
         """
         try:
+            # Build command without --limit flag for kubectl v1.28+ compatibility
             cmd = [
                 "kubectl", "get", "events",
                 "--sort-by=.lastTimestamp",
-                f"--limit={limit}",
                 "--output=json",
                 "--context", context
             ]
@@ -245,7 +263,11 @@ class KubectlClient:
             data = json.loads(stdout)
             events = []
             
-            for item in data.get('items', []):
+            # Apply limit manually since --limit flag is not available in newer kubectl versions
+            items = data.get('items', [])
+            limited_items = items[-limit:] if len(items) > limit else items
+            
+            for item in limited_items:
                 try:
                     event = self._parse_cluster_event(item, context)
                     if event:

@@ -49,8 +49,10 @@ class ClusterConfigManager:
                 self._context_configs[context] = self._create_cluster_monitor_config(merged_config)
         
         logger.info("Loaded cluster health configuration",
-                   default_enabled=self._default_config.enable_cluster_info if self._default_config else False,
-                   context_overrides=len(self._context_configs))
+                   extra={
+                       "default_enabled": self._default_config.enable_cluster_info if self._default_config else False,
+                       "context_overrides": len(self._context_configs)
+                   })
     
     def get_cluster_monitor_config(self, context: str) -> ClusterMonitorConfig:
         """
@@ -108,14 +110,22 @@ class ClusterConfigManager:
         for service in services:
             # Only consider kubectl services for cluster monitoring
             if service.technology == ForwardingTechnology.KUBECTL:
-                connection_info = service.connection_info
-                if hasattr(connection_info, 'context') and connection_info.context:
-                    contexts.add(connection_info.context)
+                try:
+                    # Use the proper method to get kubectl context
+                    context = service.connection_info.get_kubectl_context()
+                    if context:
+                        contexts.add(context)
+                except Exception as e:
+                    logger.warning("Failed to extract context from service",
+                                 service_name=service.name,
+                                 error=str(e))
         
-        logger.debug("Extracted cluster contexts from services",
-                    contexts=list(contexts),
-                    total_services=len(services),
-                    kubectl_services=len([s for s in services if s.technology == ForwardingTechnology.KUBECTL]))
+        logger.info("Extracted cluster contexts from services",
+                   extra={
+                       "contexts": list(contexts),
+                       "total_services": len(services),
+                       "kubectl_services": len([s for s in services if s.technology == ForwardingTechnology.KUBECTL])
+                   })
         
         return contexts
     
