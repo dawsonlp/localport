@@ -15,6 +15,7 @@ from ...domain.entities.service import ForwardingTechnology, Service, ServiceSta
 from ...infrastructure.adapters.kubectl_adapter import KubectlAdapter
 from ...infrastructure.adapters.ssh_adapter import SSHAdapter
 from ...infrastructure.health_checks.tcp_health_check import TCPHealthCheck
+from ...infrastructure.logging.service_log_manager import get_service_log_manager
 from ..dto.service_dto import ServiceStartResult, ServiceStatusInfo, ServiceStopResult
 
 logger = structlog.get_logger()
@@ -92,12 +93,48 @@ class ServiceManager:
             # Get appropriate adapter
             adapter = self._adapters[service.technology]
 
-            # Start the port forward
-            process_id = await adapter.start_port_forward(
-                service.local_port,
-                service.remote_port,
-                service.connection_info
-            )
+            # Start the port forward with service logging
+            try:
+                # Try to start with service logging first
+                if hasattr(adapter, 'start_port_forward_with_logging'):
+                    process_id, service_log_id = await adapter.start_port_forward_with_logging(
+                        service.name,
+                        service.local_port,
+                        service.remote_port,
+                        service.connection_info
+                    )
+                    
+                    logger.info("Service started with logging",
+                               service_name=service.name,
+                               process_id=process_id,
+                               service_log_id=service_log_id)
+                else:
+                    # Fallback to regular port forwarding
+                    process_id = await adapter.start_port_forward(
+                        service.local_port,
+                        service.remote_port,
+                        service.connection_info
+                    )
+                    
+                    logger.info("Service started without logging (adapter doesn't support it)",
+                               service_name=service.name,
+                               process_id=process_id)
+                    
+            except Exception as logging_error:
+                # If service logging fails, fall back to regular port forwarding
+                logger.warning("Service logging failed, falling back to regular port forwarding",
+                              service_name=service.name,
+                              error=str(logging_error))
+                
+                process_id = await adapter.start_port_forward(
+                    service.local_port,
+                    service.remote_port,
+                    service.connection_info
+                )
+                
+                logger.info("Service started with fallback method",
+                           service_name=service.name,
+                           process_id=process_id)
 
             # Create port forward entity
             port_forward = PortForward(
