@@ -33,6 +33,34 @@ logger = structlog.get_logger()
 console = Console()
 
 
+async def _check_daemon_running() -> bool:
+    """Check if LocalPort daemon is currently running."""
+    try:
+        import psutil
+        
+        # Look for LocalPort daemon processes
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                cmdline = proc.info['cmdline']
+                if (cmdline and 
+                    len(cmdline) > 0 and 
+                    'python' in cmdline[0] and 
+                    any('localport' in arg and 'daemon' in arg for arg in cmdline)):
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+        
+        return False
+        
+    except ImportError:
+        # If psutil is not available, assume daemon is not running
+        logger.warning("psutil not available, cannot check daemon status")
+        return False
+    except Exception as e:
+        logger.warning("Error checking daemon status", error=str(e))
+        return False
+
+
 async def start_services_command(
     services: list[str] | None = None,
     all_services: bool = False,
@@ -215,6 +243,24 @@ async def stop_services_command(
 ) -> None:
     """Stop port forwarding services."""
     try:
+        # Check if daemon is running first
+        daemon_running = await _check_daemon_running()
+        
+        if daemon_running and not force:
+            console.print(create_error_panel(
+                "Daemon is Running",
+                "LocalPort daemon is currently running and will automatically restart stopped services.\n\n" +
+                "This means services will be stopped and immediately restarted, causing the stop command to hang.",
+                "Choose one of these options:\n" +
+                "• Stop the daemon first: 'localport daemon stop'\n" +
+                "• Use force flag to stop anyway: 'localport stop --all --force'\n" +
+                "• Restart services instead: 'localport start --force <service-names>'"
+            ))
+            raise typer.Exit(1)
+        
+        if daemon_running and force:
+            console.print("[yellow]⚠️  Warning: Daemon is running. Services may be restarted automatically after stopping.[/yellow]")
+
         # Load configuration (same logic as start command)
         config_path = None
         for path in ["./localport.yaml", "~/.config/localport/config.yaml"]:
