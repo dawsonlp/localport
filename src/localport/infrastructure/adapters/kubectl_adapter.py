@@ -6,13 +6,14 @@ from typing import Any, Optional
 import psutil
 import structlog
 
+from .base_adapter import PortForwardingAdapter
 from ...domain.value_objects.connection_info import ConnectionInfo
 from ..logging.service_log_manager import get_service_log_manager
 
 logger = structlog.get_logger()
 
 
-class KubectlAdapter:
+class KubectlAdapter(PortForwardingAdapter):
     """Adapter for kubectl port-forward operations."""
 
     def __init__(self) -> None:
@@ -469,3 +470,204 @@ class KubectlAdapter:
         except Exception as e:
             logger.error("Error listing kubectl contexts", error=str(e))
             return []
+
+    async def validate_kubectl_connectivity(self, connection_info: ConnectionInfo) -> tuple[bool, str]:
+        """Pre-flight kubectl connectivity check.
+
+        Args:
+            connection_info: Kubectl connection information
+
+        Returns:
+            Tuple of (success, message)
+        """
+        namespace = connection_info.get_kubectl_namespace()
+        context = connection_info.get_kubectl_context()
+        
+        # Build test command
+        cmd = ['kubectl', 'get', 'pods', '--namespace', namespace, '--limit=1']
+        if context:
+            cmd.extend(['--context', context])
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            await asyncio.wait_for(process.wait(), timeout=10.0)
+            
+            if process.returncode == 0:
+                return True, "kubectl connectivity verified"
+            else:
+                stderr = await process.stderr.read()
+                error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                return False, f"kubectl connection failed: {error_msg}"
+                
+        except asyncio.TimeoutError:
+            return False, "kubectl connectivity check timed out"
+        except Exception as e:
+            return False, f"kubectl connectivity check failed: {str(e)}"
+
+    async def validate_resource_exists(self, connection_info: ConnectionInfo) -> tuple[bool, str]:
+        """Check if specified resource exists before starting port-forward.
+
+        Args:
+            connection_info: Kubectl connection information
+
+        Returns:
+            Tuple of (success, message)
+        """
+        namespace = connection_info.get_kubectl_namespace()
+        resource_type = connection_info.get_kubectl_resource_type()
+        resource_name = connection_info.get_kubectl_resource_name()
+        context = connection_info.get_kubectl_context()
+        
+        if not resource_name:
+            return False, "Resource name is required"
+        
+        cmd = ['kubectl', 'get', f'{resource_type}/{resource_name}', '--namespace', namespace]
+        if context:
+            cmd.extend(['--context', context])
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            await asyncio.wait_for(process.wait(), timeout=10.0)
+            
+            if process.returncode == 0:
+                return True, f"Resource {resource_type}/{resource_name} found"
+            else:
+                return False, f"Resource {resource_type}/{resource_name} not found in namespace {namespace}"
+        except Exception as e:
+            return False, f"Resource validation failed: {str(e)}"
+
+    async def validate_dependencies(self) -> tuple[bool, list[str]]:
+        """Validate that required dependencies are available.
+
+        Returns:
+            Tuple of (all_available, missing_tools)
+        """
+        missing_tools = []
+        
+        # Check kubectl availability
+        if not await self.validate_kubectl_available():
+            missing_tools.append("kubectl - Install kubectl and ensure it's in PATH")
+        
+        return len(missing_tools) == 0, missing_tools
+
+    async def check_prerequisites(self) -> bool:
+        """Check if all prerequisites for kubectl adapter are met.
+
+        Returns:
+            True if all prerequisites are available, False otherwise
+        """
+        try:
+            all_available, missing_tools = await self.validate_dependencies()
+            
+            if not all_available:
+                logger.warning("kubectl adapter prerequisites not met",
+                             missing_tools=missing_tools)
+                return False
+            
+            logger.debug("kubectl adapter prerequisites check passed")
+            return True
+            
+        except Exception as e:
+            logger.error("Error checking kubectl adapter prerequisites",
+                        error=str(e))
+            return False
+
+    # Required abstract methods from PortForwardingAdapter
+
+    async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
+        """Validate kubectl connection configuration.
+
+        Args:
+            connection_info: Kubectl connection information object to validate
+
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+
+        # Validate that this is a kubectl connection
+        from ...domain.enums import ForwardingTechnology
+        if connection_info.technology != ForwardingTechnology.KUBECTL:
+            errors.append("Connection info is not for kubectl technology")
+            return errors
+
+        try:
+            # Required fields validation - use object methods
+            resource_name = connection_info.get_kubectl_resource_name()
+            if not resource_name or not resource_name.strip():
+                errors.append("kubectl resource_name cannot be empty. Provide a valid Kubernetes resource name like 'my-service' or 'my-pod'")
+        except ValueError:
+            errors.append("kubectl connection requires 'resource_name' field. Example: resource_name: 'my-service'")
+
+        # Namespace validation
+        try:
+            namespace = connection_info.get_kubectl_namespace()
+            if not namespace or not namespace.strip():
+                errors.append("kubectl namespace cannot be empty if provided. Use a valid namespace like 'default' or 'production'")
+        except ValueError:
+            # Namespace is optional, so this is fine
+            pass
+
+        # Resource type validation
+        try:
+            resource_type = connection_info.get_kubectl_resource_type()
+            valid_types = ["service", "pod", "deployment", "statefulset"]
+            if resource_type not in valid_types:
+                errors.append(f"kubectl resource_type '{resource_type}' is invalid. Valid options: {', '.join(valid_types)}")
+        except ValueError:
+            # Resource type has a default, so this shouldn't happen
+            pass
+
+        # Context validation (if kubectl is available)
+        context = connection_info.get_kubectl_context()
+        if context:
+            try:
+                available_contexts = await self.list_contexts()
+                if context not in available_contexts:
+                    if available_contexts:
+                        errors.append(f"kubectl context '{context}' not found. Available contexts: {', '.join(available_contexts[:5])}")
+                    else:
+                        errors.append(f"kubectl context '{context}' not found. No contexts available or kubectl not accessible")
+            except Exception:
+                # If we can't list contexts, just warn
+                errors.append(f"Cannot verify kubectl context '{context}' - kubectl may not be available")
+
+        return errors
+
+    def get_adapter_name(self) -> str:
+        """Get the name of this adapter.
+
+        Returns:
+            Human-readable adapter name
+        """
+        return "Kubectl Port Forward"
+
+    def get_required_tools(self) -> list[str]:
+        """Get list of required external tools for this adapter.
+
+        Returns:
+            List of required tool names
+        """
+        return ["kubectl"]
+
+    async def is_port_forward_running(self, process_id: int) -> bool:
+        """Check if a port forward process is still running.
+
+        Args:
+            process_id: Process ID to check
+
+        Returns:
+            True if process is running, False otherwise
+        """
+        # Delegate to existing method (renamed for interface compliance)
+        return await self.is_process_running(process_id)
