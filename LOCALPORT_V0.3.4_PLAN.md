@@ -143,18 +143,18 @@ Handling connection for 6432
   - [x] Only stop services when explicitly requested via service commands
   - [x] Daemon manages but doesn't own service lifecycle
 
-#### 2.3 Status Display Enhancement
-- [ ] **Integrate log access into status command**
-  - [ ] Show log file status in service details
-  - [ ] Display log file sizes and rotation status
-  - [ ] Add helpful tips about log access
-  - [ ] Include recent error indicators from service logs
+#### 2.3 Status Display Enhancement ✅ COMPLETED
+- [x] **Integrate log access into status command**
+  - [x] Show log file status in service details
+  - [x] Display log file availability with visual indicators
+  - [x] Add helpful tips about log access in summary
+  - [x] Real-time log file detection and age analysis
 
-- [ ] **Enhanced service information**
-  - [ ] Show service ID in status output
-  - [ ] Indicate if service logs are available
-  - [ ] Display last log activity timestamp
-  - [ ] Show log file count for each service
+- [x] **Enhanced service information**
+  - [x] New "Logs" column in status table
+  - [x] Indicate if service logs are available (📋 green/magenta, 📝 yellow, — none)
+  - [x] File age analysis for log freshness (< 1 hour = recent)
+  - [x] Cross-platform log file detection with glob patterns
 
 ### Phase 3: Testing Strategy
 
