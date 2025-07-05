@@ -7,6 +7,8 @@ from uuid import UUID
 import structlog
 
 from ...domain.entities.service import Service, ServiceStatus
+from ...domain.enums import ForwardingTechnology
+from ...domain.services.cluster_health_provider import ClusterHealthProvider
 from ...infrastructure.health_checks.health_check_factory import HealthCheckFactory
 from ..dto.health_dto import HealthCheckResult
 from .restart_manager import RestartManager
@@ -17,9 +19,15 @@ logger = structlog.get_logger()
 class HealthMonitorScheduler:
     """Schedules and coordinates health checks for all services."""
 
-    def __init__(self, health_check_factory: HealthCheckFactory, restart_manager: RestartManager):
+    def __init__(
+        self, 
+        health_check_factory: HealthCheckFactory, 
+        restart_manager: RestartManager,
+        cluster_health_provider: ClusterHealthProvider | None = None
+    ):
         self._health_check_factory = health_check_factory
         self._restart_manager = restart_manager
+        self._cluster_health_provider = cluster_health_provider
         self._running = False
         self._tasks: dict[UUID, asyncio.Task] = {}
         self._service_health: dict[UUID, HealthCheckResult] = {}
@@ -175,6 +183,57 @@ class HealthMonitorScheduler:
             health_config = service.health_check_config
             check_type = health_config.get('type', 'tcp')
             timeout = health_config.get('timeout', 5.0)
+            cluster_aware = health_config.get('cluster_aware', False)
+
+            # NEW: Check cluster health first if cluster-aware health checking is enabled
+            cluster_context = None
+            cluster_healthy = None
+            
+            if (cluster_aware and 
+                self._cluster_health_provider and 
+                service.technology == ForwardingTechnology.KUBECTL):
+                
+                # Extract cluster context from kubectl service
+                cluster_context = getattr(service.connection_info, 'context', None)
+                
+                if cluster_context:
+                    try:
+                        cluster_healthy = await self._cluster_health_provider.is_cluster_healthy(cluster_context)
+                        
+                        if not cluster_healthy:
+                            # Get cluster health details for better error reporting
+                            cluster_health = await self._cluster_health_provider.get_cluster_health(cluster_context)
+                            cluster_error = "Unknown cluster issue"
+                            
+                            if cluster_health and cluster_health.error_message:
+                                cluster_error = cluster_health.error_message
+                            elif cluster_health and not cluster_health.is_healthy:
+                                cluster_error = f"Cluster unhealthy: {cluster_health.status.value}"
+                            
+                            logger.warning("Skipping service health check due to cluster issues",
+                                         service_name=service.name,
+                                         cluster_context=cluster_context,
+                                         cluster_error=cluster_error)
+                            
+                            # Return cluster-unhealthy result
+                            return HealthCheckResult.cluster_unhealthy_result(
+                                service_id=service.id,
+                                service_name=service.name,
+                                check_type=check_type,
+                                cluster_context=cluster_context,
+                                cluster_error=cluster_error
+                            )
+                        else:
+                            logger.debug("Cluster is healthy, proceeding with service health check",
+                                       service_name=service.name,
+                                       cluster_context=cluster_context)
+                            
+                    except Exception as cluster_error:
+                        logger.warning("Failed to check cluster health, proceeding with service check",
+                                     service_name=service.name,
+                                     cluster_context=cluster_context,
+                                     error=str(cluster_error))
+                        # Continue with service health check if cluster check fails
 
             # Get appropriate health checker
             health_checker = self._health_check_factory.create_health_checker(
@@ -221,7 +280,9 @@ class HealthMonitorScheduler:
                 is_healthy=health_result.status.value == 'healthy',
                 checked_at=start_time,
                 response_time=check_duration,
-                error=health_result.error
+                error=health_result.error,
+                cluster_context=cluster_context,
+                cluster_healthy=cluster_healthy
             )
 
         except Exception as e:
@@ -241,10 +302,26 @@ class HealthMonitorScheduler:
 
     async def _trigger_service_restart(self, service: Service, health_result: HealthCheckResult) -> None:
         """Trigger service restart due to health check failures."""
+        
+        # NEW: Check if restart should be skipped due to cluster issues
+        if health_result.skip_restart_due_to_cluster:
+            logger.info("Skipping service restart due to cluster health issues",
+                       service_name=service.name,
+                       cluster_context=health_result.cluster_context,
+                       cluster_healthy=health_result.cluster_healthy,
+                       failure_count=self._failure_counts.get(service.id, 0),
+                       reason="cluster_unhealthy")
+            
+            # Don't increment restart attempts or change service status
+            # The service will be retried when cluster health improves
+            return
+
         logger.critical("Service restart triggered by health check failures",
                        service_name=service.name,
                        failure_count=self._failure_counts.get(service.id, 0),
-                       last_error=health_result.error)
+                       last_error=health_result.error,
+                       cluster_context=health_result.cluster_context,
+                       cluster_healthy=health_result.cluster_healthy)
 
         # Use restart manager to schedule restart with exponential backoff
         restart_scheduled = await self._restart_manager.schedule_restart(

@@ -378,10 +378,16 @@ class DaemonManager:
             services = await self._service_repository.find_all()
             monitored_services = [s for s in services if s.health_check_config]
 
+            # NEW: Set cluster health provider on health monitor if available
+            if self._cluster_health_manager and hasattr(self._health_monitor, '_cluster_health_provider'):
+                self._health_monitor._cluster_health_provider = self._cluster_health_manager
+                logger.info("Connected cluster health provider to health monitor")
+
             if monitored_services:
                 await self._health_monitor.start_monitoring(monitored_services)
                 logger.info("Health monitoring started",
-                           monitored_count=len(monitored_services))
+                           monitored_count=len(monitored_services),
+                           cluster_aware_enabled=self._cluster_health_manager is not None)
             else:
                 logger.info("No services configured for health monitoring")
 
