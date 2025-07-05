@@ -2,10 +2,12 @@
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import psutil
 import structlog
+
+from ..logging.service_log_manager import get_service_log_manager
 
 logger = structlog.get_logger()
 
@@ -16,6 +18,168 @@ class SSHAdapter:
     def __init__(self) -> None:
         """Initialize the SSH adapter."""
         self._active_processes: dict[int, asyncio.subprocess.Process] = {}
+        self._service_log_manager = get_service_log_manager()
+        self._service_logs: dict[int, str] = {}  # Maps PID to service_id
+
+    async def start_port_forward_with_logging(
+        self,
+        service_name: str,
+        local_port: int,
+        remote_port: int,
+        connection_info: dict[str, Any]
+    ) -> tuple[int, str]:
+        """Start an SSH tunnel port-forward process with service logging.
+
+        Args:
+            service_name: Name of the service for logging
+            local_port: Local port to bind to
+            remote_port: Remote port to forward to
+            connection_info: SSH-specific connection details
+
+        Returns:
+            Tuple of (process_id, service_id)
+
+        Raises:
+            RuntimeError: If SSH tunnel fails to start
+            ValueError: If connection_info is invalid
+        """
+        # Extract connection details
+        host = connection_info['host']
+        user = connection_info.get('user')
+        ssh_port = connection_info.get('port', 22)
+        key_file = connection_info.get('key_file')
+        password = connection_info.get('password')
+
+        # Create service configuration for logging
+        service_config = {
+            'local_port': local_port,
+            'host': host,
+            'port': remote_port,
+            'type': 'ssh',
+            'ssh_port': ssh_port,
+            'user': user,
+            'key_file': key_file,
+            'has_password': bool(password)  # Don't log actual password
+        }
+
+        # Create service log
+        try:
+            service_id, log_file = self._service_log_manager.create_service_log(
+                service_name, service_config
+            )
+            
+            logger.info("service_log_created_for_ssh",
+                       service_name=service_name,
+                       service_id=service_id,
+                       log_file=str(log_file))
+        except Exception as e:
+            logger.error("failed_to_create_service_log",
+                        service_name=service_name,
+                        error=str(e))
+            # Fall back to original behavior if logging fails
+            return await self.start_port_forward(local_port, remote_port, connection_info), None
+
+        # Build SSH command
+        cmd = [
+            'ssh',
+            '-N',  # Don't execute remote command
+            '-L', f'{local_port}:localhost:{remote_port}',  # Local port forwarding
+            '-o', 'StrictHostKeyChecking=no',  # Don't prompt for host key verification
+            '-o', 'UserKnownHostsFile=/dev/null',  # Don't save host keys
+            '-o', 'LogLevel=INFO',  # More verbose for logging (changed from ERROR)
+            '-o', 'ServerAliveInterval=30',  # Keep connection alive
+            '-o', 'ServerAliveCountMax=3',  # Max missed keepalives
+            '-p', str(ssh_port),  # SSH port
+        ]
+
+        # Add key file if specified
+        if key_file:
+            key_path = Path(key_file).expanduser()
+            if not key_path.exists():
+                raise ValueError(f"SSH key file not found: {key_path}")
+            cmd.extend(['-i', str(key_path)])
+
+        # Add user and host
+        if user:
+            cmd.append(f'{user}@{host}')
+        else:
+            cmd.append(host)
+
+        logger.info("Starting SSH tunnel with logging",
+                   command=' '.join(cmd[:-1] + ['***@***']),  # Hide credentials
+                   local_port=local_port,
+                   remote_port=remote_port,
+                   host=host,
+                   ssh_port=ssh_port,
+                   service_id=service_id,
+                   log_file=str(log_file))
+
+        try:
+            # Handle password authentication if needed
+            if password and not key_file:
+                # Use sshpass for password authentication
+                cmd = ['sshpass', '-p', password] + cmd
+
+            # Open log file for writing
+            log_file_handle = open(log_file, 'a', encoding='utf-8', buffering=1)  # Line buffered
+
+            # Start the process with log file output
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=log_file_handle,
+                stderr=asyncio.subprocess.STDOUT,  # Combine stderr with stdout
+                stdin=asyncio.subprocess.DEVNULL
+            )
+
+            logger.info("SSH subprocess created with logging", 
+                       pid=process.pid,
+                       service_id=service_id)
+
+            # Wait a moment to ensure it starts successfully
+            await asyncio.sleep(2)
+
+            if process.returncode is not None:
+                # Process has already terminated
+                log_file_handle.close()
+                logger.error("SSH process terminated early", 
+                           pid=process.pid,
+                           service_id=service_id)
+                raise RuntimeError("SSH tunnel failed to start")
+
+            # Store the process and service log mapping
+            if process.pid:
+                self._active_processes[process.pid] = process
+                self._service_logs[process.pid] = service_id
+
+            # Note: We don't close log_file_handle here as the process needs to write to it
+            # It will be closed when the process terminates
+
+            logger.info("SSH tunnel started successfully with logging",
+                       pid=process.pid,
+                       service_id=service_id,
+                       local_port=local_port,
+                       remote_port=remote_port,
+                       host=host)
+
+            return process.pid, service_id
+
+        except FileNotFoundError as e:
+            if 'log_file_handle' in locals():
+                log_file_handle.close()
+            if 'sshpass' in str(e):
+                raise RuntimeError("sshpass command not found. Please install sshpass for password authentication")
+            else:
+                raise RuntimeError("ssh command not found. Please ensure OpenSSH client is installed")
+        except Exception as e:
+            if 'log_file_handle' in locals():
+                log_file_handle.close()
+            logger.error("Failed to start SSH tunnel with logging",
+                        error=str(e),
+                        service_id=service_id,
+                        local_port=local_port,
+                        remote_port=remote_port,
+                        host=host)
+            raise RuntimeError(f"Failed to start SSH tunnel: {e}")
 
     async def start_port_forward(
         self,
@@ -136,6 +300,9 @@ class SSHAdapter:
         """
         logger.info("Stopping SSH tunnel", pid=process_id)
 
+        # Get service_id for cleanup if this process has logging
+        service_id = self._service_logs.get(process_id)
+
         try:
             # Try to get the process from our active processes first
             process = self._active_processes.get(process_id)
@@ -169,7 +336,19 @@ class SSHAdapter:
 
                 except psutil.NoSuchProcess:
                     logger.warning("Process not found", pid=process_id)
+                    # Still need to clean up service log tracking
+                    if service_id:
+                        self._service_logs.pop(process_id, None)
+                        self._service_log_manager.remove_service_log(service_id)
                     return
+
+            # Clean up service log tracking
+            if service_id:
+                self._service_logs.pop(process_id, None)
+                self._service_log_manager.remove_service_log(service_id)
+                logger.info("service_log_cleaned_up", 
+                           pid=process_id,
+                           service_id=service_id)
 
             logger.info("SSH tunnel stopped successfully", pid=process_id)
 
