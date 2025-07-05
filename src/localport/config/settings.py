@@ -54,6 +54,28 @@ class Settings(BaseSettings):
         description="Runtime directory for PID files, logs, etc."
     )
 
+    # Service Logging Configuration
+    service_logging_enabled: bool = Field(
+        default=True,
+        description="Enable service logging (captures kubectl/ssh output)"
+    )
+    service_log_retention_days: int = Field(
+        default=3,
+        description="Number of days to retain service logs"
+    )
+    service_log_rotation_size_mb: int = Field(
+        default=10,
+        description="Size in MB at which to rotate service logs"
+    )
+    service_log_directory: str | None = Field(
+        default=None,
+        description="Custom directory for service logs (default: runtime_dir/logs/services)"
+    )
+    service_log_buffer_size: int = Field(
+        default=8192,
+        description="Buffer size for service log writes (bytes)"
+    )
+
     class Config:
         """Pydantic configuration."""
         env_prefix = "LOCALPORT_"
@@ -124,6 +146,33 @@ class Settings(BaseSettings):
     def get_socket_path(self) -> Path:
         """Get the path for the daemon socket."""
         return Path(self.runtime_dir) / "localport.sock"
+
+    def get_service_log_directory(self) -> Path:
+        """Get the directory for service logs."""
+        if self.service_log_directory:
+            return Path(self.service_log_directory).expanduser().resolve()
+        else:
+            return Path(self.runtime_dir) / "logs" / "services"
+
+    def get_daemon_log_directory(self) -> Path:
+        """Get the directory for daemon logs."""
+        return Path(self.runtime_dir) / "logs"
+
+    def get_daemon_log_file_path(self) -> Path:
+        """Get the path for the daemon log file."""
+        return self.get_daemon_log_directory() / "daemon.log"
+
+    def is_service_logging_enabled(self) -> bool:
+        """Check if service logging is enabled."""
+        return self.service_logging_enabled
+
+    def get_service_log_retention_seconds(self) -> int:
+        """Get service log retention period in seconds."""
+        return self.service_log_retention_days * 24 * 60 * 60
+
+    def get_service_log_rotation_size_bytes(self) -> int:
+        """Get service log rotation size in bytes."""
+        return self.service_log_rotation_size_mb * 1024 * 1024
 
 
 # Global settings instance (will be initialized by CLI)

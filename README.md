@@ -172,11 +172,31 @@ localport start --all                      # All services
 # Monitor services
 localport status                           # Current status
 localport status --watch                   # Live monitoring
-localport logs postgres                    # Service logs
 
 # Stop services
 localport stop postgres redis              # Specific services
 localport stop --all                      # All services
+```
+
+### Service Logging & Diagnostics
+```bash
+# View all available service logs
+localport logs --list
+
+# View specific service logs
+localport logs --service postgres
+
+# Get log file path for external tools
+localport logs --service postgres --path
+
+# Filter logs with grep
+localport logs --service postgres --grep "error"
+
+# Show log directory locations
+localport logs --location
+
+# Use with external tools
+tail -f $(localport logs --service postgres --path)
 ```
 
 ### Daemon Mode (Background Operation)

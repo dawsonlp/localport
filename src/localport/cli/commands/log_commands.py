@@ -13,6 +13,7 @@ from rich.table import Table
 from ..formatters.format_router import FormatRouter
 from ..formatters.output_format import OutputFormat
 from ..utils.rich_utils import create_error_panel, create_info_panel
+from ...infrastructure.logging.service_log_manager import get_service_log_manager
 
 logger = structlog.get_logger()
 console = Console()
@@ -359,7 +360,7 @@ def _display_logs(entries: list[dict], output_format: OutputFormat, format_route
         console.print(f"\n[dim]Showing {len(entries)} log entries[/dim]")
 
 
-# Sync wrapper for Typer
+# Enhanced sync wrapper for Typer with new service logging features
 def logs_sync(
     ctx: typer.Context,
     services: list[str] | None = typer.Argument(None, help="Service names to filter logs"),
@@ -368,19 +369,477 @@ def logs_sync(
     until: str | None = typer.Option(None, "--until", help="Show logs until time (ISO format or relative like '1h', '30m')"),
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output in real-time"),
     lines: int = typer.Option(100, "--lines", "-n", help="Number of lines to show (0 for all)"),
-    grep: str | None = typer.Option(None, "--grep", "-g", help="Filter logs by pattern (case-insensitive)")
+    grep: str | None = typer.Option(None, "--grep", "-g", help="Filter logs by pattern (case-insensitive)"),
+    # New service logging options
+    list_services: bool = typer.Option(False, "--list", help="List all available service logs"),
+    location: bool = typer.Option(False, "--location", help="Show log directory locations"),
+    service: str | None = typer.Option(None, "--service", "-s", help="Show logs for a specific service"),
+    path: bool = typer.Option(False, "--path", help="Show log file path for a service (use with --service)")
 ) -> None:
     """View and filter LocalPort service logs.
 
-    Examples:
-        localport logs                          # Show recent logs
-        localport logs postgres                 # Show logs for postgres service
-        localport logs --level ERROR            # Show only error logs
-        localport logs --since 1h              # Show logs from last hour
-        localport logs --grep "failed"         # Show logs containing "failed"
-        localport --output text logs           # Plain text output for piping
-        localport --output json logs           # JSON output for processing
+    [bold]Enhanced Service Logging (v0.3.4+):[/bold]
+    
+    LocalPort now captures raw subprocess output from kubectl and SSH processes
+    in dedicated service log files, providing comprehensive diagnostic information.
+
+    [bold]Examples:[/bold]
+    
+        [dim]# Show recent daemon logs (default behavior)[/dim]
+        localport logs
+        
+        [dim]# List all available service logs[/dim]
+        localport logs --list
+        
+        [dim]# Show logs for a specific service[/dim]
+        localport logs --service postgres
+        localport logs -s postgres
+        
+        [dim]# Show service log file path[/dim]
+        localport logs --service postgres --path
+        
+        [dim]# Show log directory locations[/dim]
+        localport logs --location
+        
+        [dim]# Filter service logs[/dim]
+        localport logs --service postgres --grep "error"
+        localport logs --service postgres --lines 50
+        
+        [dim]# Legacy service filtering (searches all logs)[/dim]
+        localport logs postgres
+        localport logs --level ERROR
+        localport logs --since 1h
+        
+        [dim]# Output formats[/dim]
+        localport --output text logs --service postgres
+        localport --output json logs --list
+
+    [bold]Service vs Daemon Logs:[/bold]
+    
+    • [cyan]Service logs[/cyan]: Raw kubectl/SSH output for each service instance
+    • [cyan]Daemon logs[/cyan]: Structured LocalPort application logs
+    • Use --service for service-specific diagnostics
+    • Use default behavior for daemon/application logs
     """
     # Get output format from context
     output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    
+    # Handle new service logging commands
+    if list_services:
+        asyncio.run(list_service_logs_command(output_format))
+        return
+    
+    if location:
+        asyncio.run(show_log_location_command(output_format))
+        return
+    
+    if service:
+        if path:
+            # Show service log file path
+            try:
+                service_log_manager = get_service_log_manager()
+                service_logs = service_log_manager.list_service_logs()
+                
+                # Find matching service logs (fuzzy matching)
+                matching_logs = [
+                    log for log in service_logs 
+                    if service.lower() in log["service_name"].lower()
+                ]
+                
+                if not matching_logs:
+                    if output_format == OutputFormat.JSON:
+                        import json
+                        error_data = {"error": "service_not_found", "service": service}
+                        console.print(json.dumps(error_data))
+                    else:
+                        available_services = [log["service_name"] for log in service_logs]
+                        console.print(create_error_panel(
+                            f"Service '{service}' Not Found",
+                            f"No service logs found matching '{service}'.",
+                            f"Available services: {', '.join(available_services) if available_services else 'None'}"
+                        ))
+                    raise typer.Exit(1)
+                
+                # Use most recent if multiple matches
+                target_log = max(matching_logs, key=lambda x: x["modified"])
+                
+                if output_format == OutputFormat.JSON:
+                    import json
+                    path_data = {
+                        "service_name": target_log["service_name"],
+                        "service_id": target_log["service_id"],
+                        "log_file": str(target_log["log_file"])
+                    }
+                    console.print(json.dumps(path_data, indent=2))
+                else:
+                    console.print(str(target_log["log_file"]))
+                    
+            except Exception as e:
+                if output_format == OutputFormat.JSON:
+                    import json
+                    error_data = {"error": "path_lookup_error", "message": str(e)}
+                    console.print(json.dumps(error_data))
+                else:
+                    console.print(create_error_panel(
+                        "Error Getting Log Path",
+                        str(e),
+                        "Check if the service exists and logs are accessible."
+                    ))
+                raise typer.Exit(1)
+        else:
+            # Show service logs
+            asyncio.run(show_service_log_command(service, lines, follow, grep, output_format))
+        return
+    
+    # Default behavior: show daemon logs (backward compatibility)
     asyncio.run(logs_command(services, level, since, until, follow, lines, grep, output_format))
+
+
+# New service logging commands for v0.3.4
+
+async def list_service_logs_command(output_format: OutputFormat = OutputFormat.TABLE) -> None:
+    """List all available service logs with metadata."""
+    try:
+        service_log_manager = get_service_log_manager()
+        service_logs = service_log_manager.list_service_logs()
+        
+        if output_format == OutputFormat.JSON:
+            import json
+            from ..formatters.json_formatter import JSONEncoder
+            
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "command": "logs --list",
+                "total_services": len(service_logs),
+                "services": [
+                    {
+                        "service_id": log["service_id"],
+                        "service_name": log["service_name"],
+                        "log_file": str(log["log_file"]),
+                        "size_bytes": log["size"],
+                        "size_mb": round(log["size"] / (1024 * 1024), 2),
+                        "modified": log["modified"].isoformat(),
+                        "is_active": log["is_active"],
+                        "rotated_files": log["rotated_files"]
+                    }
+                    for log in service_logs
+                ]
+            }
+            
+            json_output = json.dumps(log_data, cls=JSONEncoder, indent=2, ensure_ascii=False)
+            console.print(json_output)
+            
+        elif output_format == OutputFormat.TEXT:
+            # Plain text format
+            for log in service_logs:
+                size_mb = round(log["size"] / (1024 * 1024), 2)
+                status = "active" if log["is_active"] else "stopped"
+                rotated = f" ({log['rotated_files']} rotated)" if log["rotated_files"] > 0 else ""
+                print(f"{log['service_name']} ({status}, {size_mb}MB{rotated})")
+                
+        else:
+            # Table format (default)
+            if not service_logs:
+                console.print(create_info_panel(
+                    "No Service Logs Found",
+                    "No service logs are available. This is normal if no services have been started yet."
+                ))
+                return
+                
+            table = Table(title="🚀 Available Service Logs")
+            table.add_column("Service", style="cyan", no_wrap=True)
+            table.add_column("Status", style="bold")
+            table.add_column("Size", style="dim", justify="right")
+            table.add_column("Last Modified", style="dim")
+            table.add_column("Files", style="dim", justify="center")
+            
+            for log in service_logs:
+                # Format size
+                size_mb = log["size"] / (1024 * 1024)
+                if size_mb < 0.1:
+                    size_str = f"{log['size']} B"
+                else:
+                    size_str = f"{size_mb:.1f} MB"
+                
+                # Format status
+                if log["is_active"]:
+                    status = "[green]🟢 Active[/green]"
+                else:
+                    status = "[dim]⚫ Stopped[/dim]"
+                
+                # Format modified time
+                modified = log["modified"]
+                if modified.date() == datetime.now().date():
+                    time_str = modified.strftime("%H:%M:%S")
+                else:
+                    time_str = modified.strftime("%m/%d %H:%M")
+                
+                # Format file count
+                total_files = 1 + log["rotated_files"]
+                files_str = str(total_files) if total_files == 1 else f"{total_files} files"
+                
+                table.add_row(
+                    log["service_name"],
+                    status,
+                    size_str,
+                    time_str,
+                    files_str
+                )
+            
+            console.print(table)
+            console.print(f"\n[dim]💡 Tip: Use 'localport logs <service>' to view specific service logs[/dim]")
+            
+    except Exception as e:
+        logger.exception("Error listing service logs")
+        if output_format == OutputFormat.JSON:
+            error_data = {"error": "service_log_listing_error", "message": str(e)}
+            console.print(json.dumps(error_data))
+        else:
+            console.print(create_error_panel(
+                "Error Listing Service Logs",
+                str(e),
+                "Check if the service log manager is properly initialized."
+            ))
+        raise typer.Exit(1)
+
+
+async def show_log_location_command(output_format: OutputFormat = OutputFormat.TABLE) -> None:
+    """Show service log directory locations."""
+    try:
+        service_log_manager = get_service_log_manager()
+        log_directory = service_log_manager.get_log_directory()
+        daemon_log_dir = log_directory.parent
+        
+        if output_format == OutputFormat.JSON:
+            import json
+            
+            location_data = {
+                "timestamp": datetime.now().isoformat(),
+                "command": "logs --location",
+                "daemon_logs": str(daemon_log_dir),
+                "service_logs": str(log_directory),
+                "exists": log_directory.exists()
+            }
+            
+            json_output = json.dumps(location_data, indent=2, ensure_ascii=False)
+            console.print(json_output)
+            
+        elif output_format == OutputFormat.TEXT:
+            # Plain text format
+            print(f"Service logs: {log_directory}")
+            print(f"Daemon logs: {daemon_log_dir}")
+            
+        else:
+            # Table format (default)
+            table = Table(title="📁 LocalPort Log Locations")
+            table.add_column("Type", style="cyan")
+            table.add_column("Location", style="white")
+            table.add_column("Status", style="bold")
+            
+            # Service logs
+            service_status = "[green]✓ Exists[/green]" if log_directory.exists() else "[yellow]⚠ Not Created[/yellow]"
+            table.add_row("Service Logs", str(log_directory), service_status)
+            
+            # Daemon logs
+            daemon_status = "[green]✓ Exists[/green]" if daemon_log_dir.exists() else "[yellow]⚠ Not Created[/yellow]"
+            table.add_row("Daemon Logs", str(daemon_log_dir), daemon_status)
+            
+            console.print(table)
+            
+            if not log_directory.exists():
+                console.print("\n[dim]💡 Service log directory will be created when the first service starts[/dim]")
+                
+    except Exception as e:
+        logger.exception("Error showing log locations")
+        if output_format == OutputFormat.JSON:
+            error_data = {"error": "log_location_error", "message": str(e)}
+            console.print(json.dumps(error_data))
+        else:
+            console.print(create_error_panel(
+                "Error Showing Log Locations",
+                str(e),
+                "Check if the service log manager is properly initialized."
+            ))
+        raise typer.Exit(1)
+
+
+async def show_service_log_command(
+    service_name: str,
+    lines: int = 100,
+    follow: bool = False,
+    grep: str | None = None,
+    output_format: OutputFormat = OutputFormat.TABLE
+) -> None:
+    """Show logs for a specific service."""
+    try:
+        service_log_manager = get_service_log_manager()
+        service_logs = service_log_manager.list_service_logs()
+        
+        # Find matching service logs (fuzzy matching)
+        matching_logs = [
+            log for log in service_logs 
+            if service_name.lower() in log["service_name"].lower()
+        ]
+        
+        if not matching_logs:
+            if output_format == OutputFormat.JSON:
+                error_data = {"error": "service_not_found", "service": service_name}
+                console.print(json.dumps(error_data))
+            else:
+                available_services = [log["service_name"] for log in service_logs]
+                console.print(create_error_panel(
+                    f"Service '{service_name}' Not Found",
+                    f"No service logs found matching '{service_name}'.",
+                    f"Available services: {', '.join(available_services) if available_services else 'None'}"
+                ))
+            raise typer.Exit(1)
+        
+        # If multiple matches, use the most recent one
+        if len(matching_logs) > 1:
+            target_log = max(matching_logs, key=lambda x: x["modified"])
+            if output_format != OutputFormat.JSON:
+                console.print(f"[yellow]Multiple matches found, showing most recent: {target_log['service_name']}[/yellow]")
+        else:
+            target_log = matching_logs[0]
+        
+        # Read and display the log file
+        log_file = target_log["log_file"]
+        
+        if not log_file.exists():
+            if output_format == OutputFormat.JSON:
+                error_data = {"error": "log_file_not_found", "file": str(log_file)}
+                console.print(json.dumps(error_data))
+            else:
+                console.print(create_error_panel(
+                    "Log File Not Found",
+                    f"Log file does not exist: {log_file}",
+                    "The service may have been stopped and logs cleaned up."
+                ))
+            raise typer.Exit(1)
+        
+        # Compile grep pattern if provided
+        grep_pattern = re.compile(grep, re.IGNORECASE) if grep else None
+        
+        # Read log file
+        log_lines = []
+        try:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.rstrip('\n\r')
+                    if grep_pattern and not grep_pattern.search(line):
+                        continue
+                    log_lines.append({
+                        'line_number': line_num,
+                        'content': line,
+                        'timestamp': datetime.now()  # We could parse timestamps from service logs
+                    })
+        except Exception as e:
+            if output_format == OutputFormat.JSON:
+                error_data = {"error": "log_read_error", "message": str(e)}
+                console.print(json.dumps(error_data))
+            else:
+                console.print(create_error_panel(
+                    "Error Reading Log File",
+                    str(e),
+                    "Check if the log file is readable and not corrupted."
+                ))
+            raise typer.Exit(1)
+        
+        # Apply line limit
+        if lines > 0:
+            log_lines = log_lines[-lines:]
+        
+        # Display logs
+        if output_format == OutputFormat.JSON:
+            import json
+            
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "command": f"logs {service_name}",
+                "service_name": target_log["service_name"],
+                "service_id": target_log["service_id"],
+                "log_file": str(log_file),
+                "total_lines": len(log_lines),
+                "lines": [
+                    {
+                        "line_number": line["line_number"],
+                        "content": line["content"]
+                    }
+                    for line in log_lines
+                ]
+            }
+            
+            json_output = json.dumps(log_data, indent=2, ensure_ascii=False)
+            console.print(json_output)
+            
+        elif output_format == OutputFormat.TEXT:
+            # Plain text format - just output the log lines
+            for line in log_lines:
+                print(line["content"])
+                
+        else:
+            # Rich format (default)
+            if not log_lines:
+                console.print(create_info_panel(
+                    "No Log Content",
+                    f"No log content found for service '{target_log['service_name']}'."
+                ))
+                return
+            
+            # Show header with service info
+            console.print(f"\n[bold cyan]📋 Service Logs: {target_log['service_name']}[/bold cyan]")
+            console.print(f"[dim]Service ID: {target_log['service_id']}[/dim]")
+            console.print(f"[dim]Log File: {log_file}[/dim]")
+            console.print(f"[dim]Showing {len(log_lines)} lines{' (filtered)' if grep else ''}[/dim]\n")
+            
+            # Display log content with line numbers
+            for line in log_lines:
+                line_num_str = f"{line['line_number']:4d}"
+                console.print(f"[dim]{line_num_str}[/dim] {line['content']}")
+            
+            console.print(f"\n[dim]💡 Use --follow to stream logs in real-time[/dim]")
+        
+        # TODO: Implement follow mode for service logs
+        if follow:
+            console.print("\n[yellow]Note: Real-time following for service logs not yet implemented.[/yellow]")
+            
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.exception("Error showing service log")
+        if output_format == OutputFormat.JSON:
+            error_data = {"error": "service_log_error", "message": str(e)}
+            console.print(json.dumps(error_data))
+        else:
+            console.print(create_error_panel(
+                "Error Showing Service Log",
+                str(e),
+                "Check if the service exists and logs are accessible."
+            ))
+        raise typer.Exit(1)
+
+
+# Sync wrappers for new commands
+
+def list_service_logs_sync(ctx: typer.Context) -> None:
+    """List all available service logs with metadata."""
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    asyncio.run(list_service_logs_command(output_format))
+
+
+def show_log_location_sync(ctx: typer.Context) -> None:
+    """Show service log directory locations."""
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    asyncio.run(show_log_location_command(output_format))
+
+
+def show_service_log_sync(
+    ctx: typer.Context,
+    service_name: str,
+    lines: int = typer.Option(100, "--lines", "-n", help="Number of lines to show (0 for all)"),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output in real-time"),
+    grep: str | None = typer.Option(None, "--grep", "-g", help="Filter logs by pattern (case-insensitive)")
+) -> None:
+    """Show logs for a specific service."""
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    asyncio.run(show_service_log_command(service_name, lines, follow, grep, output_format))

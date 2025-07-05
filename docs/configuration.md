@@ -547,6 +547,51 @@ localport --config /path/to/config.yaml start --all
 3. **Use exponential backoff** to avoid overwhelming failing services
 4. **Monitor restart patterns** to identify underlying issues
 
+## Service Logging Configuration
+
+LocalPort v0.3.4+ includes comprehensive service logging that captures raw output from kubectl and SSH processes. While service logging works automatically, you can access and manage logs through the CLI.
+
+### Log Access Commands
+
+```bash
+# List all available service logs
+localport logs --list
+
+# View logs for specific service
+localport logs --service postgres
+
+# Get log file path for external tools
+localport logs --service postgres --path
+
+# Filter logs with grep
+localport logs --service postgres --grep "error"
+
+# Show log directory locations
+localport logs --location
+```
+
+### Log File Locations
+
+Service logs are automatically stored in:
+- **Service logs**: `~/.local/share/localport/logs/services/`
+- **Daemon logs**: `~/.local/share/localport/logs/daemon.log`
+- **Log format**: `<service-name>_<unique-id>.log`
+
+### Log Content
+
+Each service log file contains:
+- **Metadata headers** with service configuration and diagnostic information
+- **Raw subprocess output** from kubectl/ssh processes
+- **Connection events**, errors, and reconnections
+- **Platform-specific diagnostic information**
+
+### Log Rotation and Retention
+
+LocalPort automatically manages log files:
+- **Size-based rotation**: Logs rotate when they reach 10MB
+- **Time-based cleanup**: Logs older than 3 days are automatically removed
+- **Cross-platform support**: Works on Windows, macOS, and Linux
+
 ## Troubleshooting Configuration
 
 ### Common Issues
@@ -554,13 +599,14 @@ localport --config /path/to/config.yaml start --all
 **Service won't start:**
 - Check port availability: `lsof -i :5432`
 - Verify connection details (kubectl context, SSH connectivity)
-- Check service logs: `localport logs service-name`
+- Check service logs: `localport logs --service service-name`
+- Look for specific errors: `localport logs --service service-name --grep "error"`
 
 **Health checks failing:**
 - Test connectivity manually
 - Verify health check configuration
 - Check timeout values
-- Review health check logs
+- Review health check logs: `localport logs --service service-name --grep "health"`
 
 **Environment variables not substituted:**
 - Verify variable names and syntax
@@ -572,4 +618,20 @@ localport --config /path/to/config.yaml start --all
 - Check YAML syntax with a YAML validator
 - Verify all required fields are present
 
-For more troubleshooting help, see the [Troubleshooting Guide](troubleshooting.md).
+### Using Service Logs for Troubleshooting
+
+```bash
+# Check recent service activity
+localport logs --service postgres | tail -50
+
+# Look for connection issues
+localport logs --service postgres --grep "connection\|error\|failed"
+
+# Monitor logs in real-time with external tools
+tail -f $(localport logs --service postgres --path)
+
+# Search for specific patterns
+grep -E "(error|timeout|refused)" $(localport logs --service postgres --path)
+```
+
+For comprehensive troubleshooting guidance, see the [Troubleshooting Guide](troubleshooting.md).

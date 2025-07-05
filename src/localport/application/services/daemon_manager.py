@@ -131,8 +131,9 @@ class DaemonManager:
             # Stop health monitoring
             await self._health_monitor.stop_monitoring()
 
-            # Stop all services
-            await self._stop_all_services()
+            # NOTE: We do NOT stop services when stopping the daemon
+            # Services should continue running independently
+            # Only stop services if explicitly requested via service commands
 
             # Cancel background tasks
             await self._cancel_background_tasks(timeout)
@@ -140,7 +141,7 @@ class DaemonManager:
             # Restore signal handlers
             self._restore_signal_handlers()
 
-            logger.info("Daemon manager stopped")
+            logger.info("Daemon manager stopped - services continue running independently")
 
         except Exception as e:
             logger.error("Error during daemon shutdown", error=str(e))
