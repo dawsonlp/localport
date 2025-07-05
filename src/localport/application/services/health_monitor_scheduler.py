@@ -10,6 +10,7 @@ from ...domain.entities.service import Service, ServiceStatus
 from ...domain.enums import ForwardingTechnology
 from ...domain.services.cluster_health_provider import ClusterHealthProvider
 from ...infrastructure.health_checks.health_check_factory import HealthCheckFactory
+from ...infrastructure.shutdown import CooperativeTask, TaskManager
 from ..dto.health_dto import HealthCheckResult
 from .restart_manager import RestartManager
 
@@ -23,63 +24,87 @@ class HealthMonitorScheduler:
         self, 
         health_check_factory: HealthCheckFactory, 
         restart_manager: RestartManager,
-        cluster_health_provider: ClusterHealthProvider | None = None
+        cluster_health_provider: ClusterHealthProvider | None = None,
+        task_manager: TaskManager | None = None
     ):
         self._health_check_factory = health_check_factory
         self._restart_manager = restart_manager
         self._cluster_health_provider = cluster_health_provider
+        self._task_manager = task_manager or TaskManager()
         self._running = False
-        self._tasks: dict[UUID, asyncio.Task] = {}
+        
+        # Replace direct task management with cooperative tasks
+        self._cooperative_tasks: dict[UUID, CooperativeTask] = {}
         self._service_health: dict[UUID, HealthCheckResult] = {}
         self._failure_counts: dict[UUID, int] = {}
         self._last_check_times: dict[UUID, datetime] = {}
 
     async def start_monitoring(self, services: list[Service]) -> None:
-        """Start health monitoring for the given services."""
-        logger.info("Starting health monitoring", service_count=len(services))
+        """Start health monitoring for the given services using cooperative tasks."""
+        logger.info("Starting cooperative health monitoring", service_count=len(services))
 
         self._running = True
 
-        # Start monitoring task for each service
+        # Start cooperative monitoring task for each service
         for service in services:
             if service.health_check_config and service.status == ServiceStatus.RUNNING:
-                task = asyncio.create_task(
-                    self._monitor_service_health(service),
-                    name=f"health_monitor_{service.name}"
-                )
-                self._tasks[service.id] = task
-                self._failure_counts[service.id] = 0
-
-                logger.info("Started health monitoring for service",
-                           service_name=service.name,
-                           check_interval=service.health_check_config.get('interval', 30))
+                await self._start_service_monitoring(service)
 
     async def stop_monitoring(self, service_ids: set[UUID] | None = None) -> None:
         """Stop health monitoring for specified services or all services."""
         if service_ids is None:
             # Stop all monitoring
-            service_ids = set(self._tasks.keys())
+            service_ids = set(self._cooperative_tasks.keys())
             self._running = False
             logger.info("Stopping all health monitoring")
         else:
             logger.info("Stopping health monitoring for services",
                        service_count=len(service_ids))
 
-        # Cancel monitoring tasks
+        # Stop cooperative tasks gracefully
         for service_id in service_ids:
-            if service_id in self._tasks:
-                task = self._tasks[service_id]
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-                del self._tasks[service_id]
+            if service_id in self._cooperative_tasks:
+                cooperative_task = self._cooperative_tasks[service_id]
+                await cooperative_task.stop()
+                del self._cooperative_tasks[service_id]
 
                 # Clean up tracking data
                 self._failure_counts.pop(service_id, None)
                 self._last_check_times.pop(service_id, None)
                 self._service_health.pop(service_id, None)
+
+    async def _start_service_monitoring(self, service: Service) -> None:
+        """Start cooperative monitoring for a single service."""
+        health_config = service.health_check_config
+        check_interval = health_config.get('interval', 30)
+        
+        # Create cooperative task for this service
+        cooperative_task = ServiceHealthMonitorTask(
+            service=service,
+            health_scheduler=self,
+            check_interval=check_interval
+        )
+        
+        # Register with task manager
+        task_name = f"health_monitor_{service.name}"
+        self._task_manager.register_task(
+            task_name,
+            cooperative_task._run_loop(),
+            group="health_monitoring",
+            priority=5,
+            resource_tags={"service_id", "health_monitoring"}
+        )
+        
+        # Store cooperative task
+        self._cooperative_tasks[service.id] = cooperative_task
+        self._failure_counts[service.id] = 0
+        
+        # Start the cooperative task
+        await cooperative_task.start()
+
+        logger.info("Started cooperative health monitoring for service",
+                   service_name=service.name,
+                   check_interval=check_interval)
 
     async def add_service(self, service: Service) -> None:
         """Add a new service to health monitoring."""
@@ -341,3 +366,96 @@ class HealthMonitorScheduler:
 
             # Update service status to failed if restart can't be scheduled
             service.status = ServiceStatus.FAILED
+
+
+class ServiceHealthMonitorTask(CooperativeTask):
+    """Cooperative task for monitoring a single service's health."""
+
+    def __init__(
+        self,
+        service: Service,
+        health_scheduler: HealthMonitorScheduler,
+        check_interval: float = 30.0
+    ):
+        """Initialize the service health monitor task.
+        
+        Args:
+            service: Service to monitor
+            health_scheduler: Parent health scheduler
+            check_interval: How often to check health (seconds)
+        """
+        super().__init__(
+            name=f"health_monitor_{service.name}",
+            check_interval=check_interval
+        )
+        self._service = service
+        self._health_scheduler = health_scheduler
+        self._check_interval = check_interval
+
+    async def _execute_iteration(self) -> None:
+        """Execute one health check iteration."""
+        # Check if service is still being monitored
+        if not self._health_scheduler._running:
+            logger.debug("Health monitoring stopped, ending task",
+                        service_name=self._service.name)
+            await self.request_shutdown()
+            return
+
+        if self._service.id not in self._health_scheduler._cooperative_tasks:
+            logger.debug("Service no longer monitored, ending task",
+                        service_name=self._service.name)
+            await self.request_shutdown()
+            return
+
+        try:
+            # Perform health check
+            health_result = await self._health_scheduler._perform_health_check(self._service)
+
+            # Update tracking data
+            self._health_scheduler._service_health[self._service.id] = health_result
+            self._health_scheduler._last_check_times[self._service.id] = datetime.now()
+
+            # Get health config for failure threshold
+            health_config = self._service.health_check_config
+            failure_threshold = health_config.get('failure_threshold', 3)
+
+            if health_result.is_healthy:
+                # Reset failure count on successful check
+                if self._health_scheduler._failure_counts.get(self._service.id, 0) > 0:
+                    logger.info("Service health recovered",
+                               service_name=self._service.name,
+                               previous_failures=self._health_scheduler._failure_counts[self._service.id])
+                self._health_scheduler._failure_counts[self._service.id] = 0
+            else:
+                # Increment failure count
+                self._health_scheduler._failure_counts[self._service.id] += 1
+                failure_count = self._health_scheduler._failure_counts[self._service.id]
+
+                logger.warning("Service health check failed",
+                             service_name=self._service.name,
+                             failure_count=failure_count,
+                             failure_threshold=failure_threshold,
+                             error=health_result.error)
+
+                # Check if we've reached the failure threshold
+                if failure_count >= failure_threshold:
+                    logger.error("Service health failure threshold reached",
+                               service_name=self._service.name,
+                               failure_count=failure_count,
+                               threshold=failure_threshold)
+
+                    # Trigger restart logic
+                    await self._health_scheduler._trigger_service_restart(self._service, health_result)
+
+        except Exception as e:
+            logger.exception("Error in health check iteration",
+                           service_name=self._service.name,
+                           error=str(e))
+
+    async def _handle_iteration_error(self, error: Exception) -> bool:
+        """Handle errors during health check iterations."""
+        logger.warning("Health check iteration error, continuing",
+                      service_name=self._service.name,
+                      error=str(error))
+        # Continue monitoring despite errors
+        return True
