@@ -114,7 +114,36 @@ services:
 
 ## Health Check Configuration
 
-LocalPort supports multiple health check types for automatic service monitoring:
+LocalPort supports multiple health check types for automatic service monitoring, including cluster-aware health checking for Kubernetes services.
+
+### Basic Health Check Configuration
+
+```yaml
+health_check:
+  type: tcp
+  interval: 30                   # Check interval in seconds
+  timeout: 5.0                   # Timeout in seconds
+  failure_threshold: 3           # Failures before restart
+  success_threshold: 1           # Successes to mark healthy
+  cluster_aware: false           # Enable cluster-aware health checking (v0.3.6+)
+```
+
+### Cluster-Aware Health Checking (v0.3.6+)
+
+For Kubernetes services, enable cluster-aware health checking to prevent unnecessary restarts when cluster connectivity issues are detected:
+
+```yaml
+health_check:
+  type: tcp
+  cluster_aware: true            # Consider cluster health in decisions
+  interval: 30
+  failure_threshold: 3
+```
+
+When `cluster_aware: true` is enabled:
+- LocalPort checks cluster health before performing service health checks
+- Services won't restart if cluster connectivity is the issue
+- Particularly beneficial for Mac users experiencing idle-state connection drops
 
 ### TCP Health Check
 
@@ -217,6 +246,49 @@ restart_policy:
 delay = min(initial_delay * (backoff_multiplier ^ attempt), max_delay)
 ```
 
+## Cluster Health Monitoring Configuration (v0.3.6+)
+
+Configure cluster health monitoring to prevent unnecessary service restarts when cluster connectivity issues are detected:
+
+```yaml
+defaults:
+  cluster_health:
+    enabled: true                # Enable cluster health monitoring
+    interval: 240               # Monitoring interval in seconds (4 minutes)
+    timeout: 30                 # Timeout for kubectl commands
+    retry_attempts: 2           # Number of retries for failed commands
+    failure_threshold: 3        # Consecutive failures before marking unhealthy
+    
+    # Commands to execute for health checking
+    commands:
+      cluster_info: true        # kubectl cluster-info
+      pod_status: true         # kubectl get pods
+      node_status: true        # kubectl get nodes
+      events_on_failure: true  # kubectl get events (only on failures)
+
+# Per-cluster context overrides
+cluster_contexts:
+  production:
+    cluster_health:
+      interval: 120            # More frequent for production
+      timeout: 60
+      failure_threshold: 5
+  
+  development:
+    cluster_health:
+      interval: 600            # Less frequent for development
+      commands:
+        node_status: false     # Skip node checking
+```
+
+**Cluster Health Configuration Fields:**
+- `enabled` (optional): Enable cluster health monitoring. Default: `true`
+- `interval` (optional): Monitoring interval in seconds. Default: `240` (4 minutes)
+- `timeout` (optional): Timeout for kubectl commands. Default: `30` seconds
+- `retry_attempts` (optional): Retry attempts for failed commands. Default: `2`
+- `failure_threshold` (optional): Consecutive failures before unhealthy. Default: `3`
+- `commands.*` (optional): Enable/disable specific kubectl commands
+
 ## Default Configuration
 
 Use the `defaults` section to set global defaults for all services:
@@ -231,12 +303,20 @@ defaults:
     timeout: 5.0
     failure_threshold: 3
     success_threshold: 1
+    cluster_aware: true         # Enable cluster-aware health checking
+  
   restart_policy:
     enabled: true
     max_attempts: 5
     backoff_multiplier: 2.0
     initial_delay: 1
     max_delay: 300
+  
+  cluster_health:               # Cluster health monitoring configuration
+    enabled: true
+    interval: 240
+    timeout: 30
+    failure_threshold: 3
 
 services:
   - name: postgres
