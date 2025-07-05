@@ -1,0 +1,14 @@
+# Test configuration for daemon validation
+services:
+  test-service:
+    name: "test-service"
+    local_port: 8080
+    technology: "ssh"
+    connection:
+      host: "localhost"
+      port: 22
+      user: "testuser"
+    remote_port: 80
+    enabled: false  # Don't actually start the service
+    health_check:
+      enabled: false  # Don't run health checks for this test
