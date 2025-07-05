@@ -282,6 +282,74 @@ redis-cli -h localhost -p 6379
 redis-cli -h localhost -p 6379 ping
 ```
 
+## Troubleshooting with Service Logs
+
+LocalPort automatically captures detailed logs from your port forwarding processes, making troubleshooting much easier:
+
+### Viewing Service Logs
+
+```bash
+# List all available service logs
+localport logs --list
+
+# View logs for a specific service
+localport logs --service postgres
+
+# Search for errors in logs
+localport logs --service postgres --grep "error"
+localport logs --service postgres --grep "connection"
+
+# Get the log file path for external tools
+localport logs --service postgres --path
+```
+
+### Log Locations
+
+LocalPort stores service logs in organized directories:
+
+```bash
+# Show log directory locations
+localport logs --location
+
+# Service logs are stored at:
+# ~/.local/share/localport/logs/services/
+```
+
+### Using External Tools
+
+```bash
+# Follow logs in real-time with tail
+tail -f $(localport logs --service postgres --path)
+
+# View logs with less for easy navigation
+less $(localport logs --service postgres --path)
+
+# Search logs with grep
+grep "error" $(localport logs --service postgres --path)
+```
+
+### What's in the Logs
+
+Service logs contain:
+- **Raw kubectl/ssh output** - Everything the underlying process produces
+- **Connection events** - When connections start, stop, or fail
+- **Error messages** - Detailed error information for troubleshooting
+- **Metadata headers** - Service configuration and diagnostic information
+
+### Common Troubleshooting Patterns
+
+```bash
+# Check if a service is having connection issues
+localport logs --service postgres --grep "connection\|error\|failed"
+
+# Look for recent activity
+localport logs --service postgres | tail -50
+
+# Check service status and logs together
+localport status
+localport logs --service postgres
+```
+
 ## Stopping Services
 
 ### Stop Specific Services

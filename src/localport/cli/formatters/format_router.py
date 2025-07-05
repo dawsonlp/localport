@@ -204,11 +204,66 @@ class FormatRouter:
                 self.console.print("\n[dim]💡 Tip: Start services with 'localport start --all' or 'localport daemon start'[/dim]")
             elif data.healthy_services < data.running_services:
                 unhealthy_count = data.running_services - data.healthy_services
-                self.console.print(f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs'[/dim]")
+                self.console.print(f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs --list'[/dim]")
+            else:
+                # All services healthy - show log access tip
+                self.console.print("\n[dim]📋 View service logs: 'localport logs --list' | Get log details: 'localport logs --service <name>'[/dim]")
         else:
             self.console.print("\n[dim]💡 Get started: Create a config with 'localport config init' or see 'localport --help'[/dim]")
 
         return ""  # Return empty string since we printed directly
+
+    def _get_service_log_status(self, service_name: str, is_running: bool) -> str:
+        """Get service log status for display.
+
+        Args:
+            service_name: Name of the service
+            is_running: Whether the service is currently running
+
+        Returns:
+            Formatted log status string
+        """
+        try:
+            from pathlib import Path
+            import os
+            
+            # Get log directory path
+            log_dir = Path.home() / ".local" / "share" / "localport" / "logs" / "services"
+            
+            if not log_dir.exists():
+                return "[dim]—[/dim]"
+            
+            # Look for log files matching this service name
+            log_files = list(log_dir.glob(f"{service_name}_*.log"))
+            
+            if not log_files:
+                if is_running:
+                    return "[yellow]📝[/yellow]"  # Service running but no logs yet
+                else:
+                    return "[dim]—[/dim]"  # Service not running, no logs
+            
+            # Check if we have recent log files
+            recent_logs = []
+            for log_file in log_files:
+                try:
+                    # Check if file was modified recently (within last hour)
+                    import time
+                    file_age = time.time() - log_file.stat().st_mtime
+                    if file_age < 3600:  # 1 hour
+                        recent_logs.append(log_file)
+                except (OSError, AttributeError):
+                    continue
+            
+            if recent_logs:
+                return "[green]📋[/green]"  # Recent logs available
+            elif log_files:
+                return "[dim magenta]📋[/dim magenta]"  # Old logs available
+            else:
+                return "[dim]—[/dim]"
+                
+        except Exception:
+            # If anything fails, just return a neutral indicator
+            return "[dim]—[/dim]"
 
     def _format_service_operation_table(self, data: Any, command_name: str) -> str:
         """Format service operation as Rich table.
