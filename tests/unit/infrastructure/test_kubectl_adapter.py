@@ -184,7 +184,8 @@ class TestKubectlAdapter:
         
         mock_process = AsyncMock()
         mock_process.returncode = 1
-        mock_process.stderr.read.return_value = b'connection refused'
+        mock_process.stderr = AsyncMock()
+        mock_process.stderr.read = AsyncMock(return_value=b'connection refused')
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process):
             with patch('asyncio.wait_for', return_value=None):
@@ -202,7 +203,7 @@ class TestKubectlAdapter:
             resource_type='service'
         )
         
-        mock_process = AsyncMock()
+        mock_process = MagicMock()
         mock_process.returncode = 0
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process):
@@ -221,7 +222,7 @@ class TestKubectlAdapter:
             resource_type='service'
         )
         
-        mock_process = AsyncMock()
+        mock_process = MagicMock()
         mock_process.returncode = 1
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process):
