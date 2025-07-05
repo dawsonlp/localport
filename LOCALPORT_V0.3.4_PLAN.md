@@ -59,78 +59,91 @@ Handling connection for 6432
 
 ### Phase 1: Core Infrastructure (Foundation)
 
-#### 1.1 Service Log Management
-- [ ] **Create `ServiceLogManager` class**
-  - [ ] Location: `src/localport/infrastructure/logging/service_log_manager.py`
-  - [ ] Generate unique service IDs (service_name + timestamp hash)
-  - [ ] Create service-specific log directories with proper permissions
-  - [ ] Write metadata headers on service start
-  - [ ] Handle cross-platform path differences
+#### 1.1 Service Log Management ✅ COMPLETED
+- [x] **Create `ServiceLogManager` class**
+  - [x] Location: `src/localport/infrastructure/logging/service_log_manager.py`
+  - [x] Generate unique service IDs (service_name + timestamp hash)
+  - [x] Create service-specific log directories with proper permissions
+  - [x] Write metadata headers on service start
+  - [x] Handle cross-platform path differences
 
-- [ ] **Implement log rotation logic**
-  - [ ] Size-based rotation (10MB threshold)
-  - [ ] Time-based cleanup (3-day retention)
-  - [ ] Atomic file operations for safe rotation
-  - [ ] Handle concurrent access with file locking
-  - [ ] Graceful handling of disk space issues
+- [x] **Implement log rotation logic**
+  - [x] Size-based rotation (10MB threshold)
+  - [x] Time-based cleanup (3-day retention)
+  - [x] Atomic file operations for safe rotation
+  - [x] Handle concurrent access with file locking
+  - [x] Graceful handling of disk space issues
 
-- [ ] **Create log directory management**
-  - [ ] Ensure `~/.local/share/localport/logs/services/` exists
-  - [ ] Handle permission errors gracefully
-  - [ ] Cross-platform path resolution
-  - [ ] Cleanup orphaned log files
+- [x] **Create log directory management**
+  - [x] Ensure `~/.local/share/localport/logs/services/` exists
+  - [x] Handle permission errors gracefully
+  - [x] Cross-platform path resolution
+  - [x] Cleanup orphaned log files
 
-#### 1.2 Process Output Capture
-- [ ] **Modify subprocess spawning in adapters**
-  - [ ] Replace `/dev/null` redirects with service log files
-  - [ ] Maintain real-time output streaming
-  - [ ] Handle process termination and cleanup
-  - [ ] Ensure no blocking on log writes
+#### 1.2 Process Output Capture ✅ COMPLETED
+- [x] **Modify subprocess spawning in adapters**
+  - [x] Replace `/dev/null` redirects with service log files
+  - [x] Maintain real-time output streaming
+  - [x] Handle process termination and cleanup
+  - [x] Ensure no blocking on log writes
 
-- [ ] **Update `kubectl_adapter.py`**
-  - [ ] Integrate with ServiceLogManager
-  - [ ] Capture kubectl port-forward stdout/stderr
-  - [ ] Log connection events, errors, and reconnections
-  - [ ] Handle kubectl-specific error patterns
+- [x] **Update `kubectl_adapter.py`**
+  - [x] Integrate with ServiceLogManager
+  - [x] Capture kubectl port-forward stdout/stderr
+  - [x] Log connection events, errors, and reconnections
+  - [x] Handle kubectl-specific error patterns
 
-- [ ] **Update `ssh_adapter.py`**
-  - [ ] Apply same logging pattern as kubectl
-  - [ ] Capture SSH tunnel output and diagnostics
-  - [ ] Handle SSH-specific connection issues
-  - [ ] Log authentication and key-related errors
+- [x] **Update `ssh_adapter.py`**
+  - [x] Apply same logging pattern as kubectl
+  - [x] Capture SSH tunnel output and diagnostics
+  - [x] Handle SSH-specific connection issues
+  - [x] Log authentication and key-related errors
 
-#### 1.3 Integration with Existing Systems
-- [ ] **Enhance structured logging**
-  - [ ] Add service log file references to structured logs
-  - [ ] Cross-reference service IDs between systems
-  - [ ] Maintain timestamp synchronization
-  - [ ] Log service log rotation events
+#### 1.3 Integration with Existing Systems ✅ COMPLETED
+- [x] **Enhance structured logging**
+  - [x] Add service log file references to structured logs
+  - [x] Cross-reference service IDs between systems
+  - [x] Maintain timestamp synchronization
+  - [x] Log service log rotation events
 
 ### Phase 2: CLI Integration (User Interface)
 
-#### 2.1 Enhanced Log Commands
-- [ ] **Core log access commands**
-  - [ ] `localport logs --list` - Show all available service logs with metadata
-  - [ ] `localport logs --location` - Show log directory paths
-  - [ ] `localport logs <service>` - Show latest service log content
+#### 2.1 Enhanced Log Commands ✅ COMPLETED
+- [x] **Core log access commands**
+  - [x] `localport logs --list` - Show all available service logs with metadata
+  - [x] `localport logs --location` - Show log directory paths
+  - [x] `localport logs --service <name>` - Show latest service log content
   - [ ] `localport logs <service> --follow` - Stream service logs in real-time
-  - [ ] `localport logs <service> --path` - Show log file path for external tools
+  - [x] `localport logs --service <name> --path` - Show log file path for external tools
 
-- [ ] **Advanced log features**
+- [x] **Advanced log features**
   - [ ] `--tail N` - Show last N lines (default 100)
   - [ ] `--since TIME` - Show logs since timestamp (1h, 30m, 2d formats)
   - [ ] `--all` - Show all rotated files for service
-  - [ ] `--grep PATTERN` - Filter log lines by pattern
+  - [x] `--grep PATTERN` - Filter log lines by pattern
   - [ ] Service name auto-completion via shell completion
-  - [ ] Fuzzy service name matching for user convenience
+  - [x] Fuzzy service name matching for user convenience
 
-- [ ] **User guidance features**
-  - [ ] Add log access hints to `localport status` output
-  - [ ] Include log instructions in error messages
-  - [ ] Help text with common log access patterns
-  - [ ] Examples in `--help` output
+- [x] **User guidance features**
+  - [x] Add log access hints to `localport status` output
+  - [x] Include log instructions in error messages
+  - [x] Help text with common log access patterns
+  - [x] Examples in `--help` output
 
-#### 2.2 Status Display Enhancement
+#### 2.2 Service Manager Integration ✅ COMPLETED
+- [x] **ServiceManager integration with service logging**
+  - [x] Automatic fallback to regular port forwarding if logging fails
+  - [x] Graceful error handling for service logging failures
+  - [x] Backward compatibility with adapters that don't support logging
+  - [x] Service log integration with existing service lifecycle management
+
+- [x] **Critical daemon behavior fixes**
+  - [x] **FIXED**: Daemon no longer stops services when shutting down
+  - [x] Services continue running independently when daemon stops
+  - [x] Only stop services when explicitly requested via service commands
+  - [x] Daemon manages but doesn't own service lifecycle
+
+#### 2.3 Status Display Enhancement
 - [ ] **Integrate log access into status command**
   - [ ] Show log file status in service details
   - [ ] Display log file sizes and rotation status
