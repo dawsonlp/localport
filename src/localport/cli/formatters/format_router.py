@@ -130,7 +130,6 @@ class FormatRouter:
         table.add_column("Local", style="bold green", justify="center", min_width=8)
         table.add_column("→ Target", style="yellow", min_width=15)
         table.add_column("Health", style="bold", justify="center", min_width=10)
-        table.add_column("Logs", style="dim magenta", justify="center", min_width=8)
         table.add_column("Uptime", style="dim white", justify="right", min_width=10)
 
         # Check if we have services to display
@@ -161,9 +160,6 @@ class FormatRouter:
                 # Add status icons for better visual clarity
                 status_icon = "🟢" if status_str.lower() == "running" else "🔴" if status_str.lower() == "failed" else "🟡"
                 
-                # Check for service log availability
-                log_status = self._get_service_log_status(service_info.name, status_str.lower() == "running")
-                
                 table.add_row(
                     format_service_name(service_info.name),
                     f"{status_icon} [{status_color}]{status_str.title()}[/{status_color}]",
@@ -171,7 +167,6 @@ class FormatRouter:
                     f":{service_info.local_port}",
                     target,
                     health_status,
-                    log_status,
                     format_uptime(service_info.uptime_seconds or 0)
                 )
         else:
@@ -183,7 +178,6 @@ class FormatRouter:
                 "[dim]—[/dim]", 
                 "[dim]—[/dim]", 
                 "[dim]—[/dim]", 
-                "[dim]—[/dim]",
                 "[dim]—[/dim]"
             )
 
@@ -210,7 +204,10 @@ class FormatRouter:
                 self.console.print("\n[dim]💡 Tip: Start services with 'localport start --all' or 'localport daemon start'[/dim]")
             elif data.healthy_services < data.running_services:
                 unhealthy_count = data.running_services - data.healthy_services
-                self.console.print(f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs'[/dim]")
+                self.console.print(f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs --list'[/dim]")
+            else:
+                # All services healthy - show log access tip
+                self.console.print("\n[dim]📋 View service logs: 'localport logs --list' | Get log details: 'localport logs --service <name>'[/dim]")
         else:
             self.console.print("\n[dim]💡 Get started: Create a config with 'localport config init' or see 'localport --help'[/dim]")
 
