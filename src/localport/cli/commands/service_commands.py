@@ -239,7 +239,8 @@ async def start_services_command(
 async def stop_services_command(
     services: list[str] | None = None,
     all_services: bool = False,
-    force: bool = False
+    force: bool = False,
+    config_file: str | None = None
 ) -> None:
     """Stop port forwarding services."""
     try:
@@ -261,13 +262,17 @@ async def stop_services_command(
         if daemon_running and force:
             console.print("[yellow]⚠️  Warning: Daemon is running. Services may be restarted automatically after stopping.[/yellow]")
 
-        # Load configuration (same logic as start command)
-        config_path = None
-        for path in ["./localport.yaml", "~/.config/localport/config.yaml"]:
-            test_path = Path(path).expanduser()
-            if test_path.exists():
-                config_path = test_path
-                break
+        # Load configuration
+        if config_file:
+            config_path = Path(config_file)
+        else:
+            # Use default config discovery
+            config_path = None
+            for path in ["./localport.yaml", "~/.config/localport/config.yaml"]:
+                test_path = Path(path).expanduser()
+                if test_path.exists():
+                    config_path = test_path
+                    break
 
         # Initialize repositories and services
         service_repo = MemoryServiceRepository()
@@ -465,18 +470,22 @@ def start_services_sync(
     force: bool = typer.Option(False, "--force", "-f", help="Force restart if already running")
 ) -> None:
     """Start port forwarding services."""
-    # Get output format from context
+    # Get config file and output format from context
+    config_file = ctx.obj.get('config_file')
     output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(start_services_command(services, all_services, tags, None, force, output_format))
+    asyncio.run(start_services_command(services, all_services, tags, config_file, force, output_format))
 
 
 def stop_services_sync(
+    ctx: typer.Context,
     services: list[str] | None = typer.Argument(None, help="Service names to stop"),
     all_services: bool = typer.Option(False, "--all", "-a", help="Stop all running services"),
     force: bool = typer.Option(False, "--force", "-f", help="Force stop services")
 ) -> None:
     """Stop port forwarding services."""
-    asyncio.run(stop_services_command(services, all_services, force))
+    # Get config file from context
+    config_file = ctx.obj.get('config_file')
+    asyncio.run(stop_services_command(services, all_services, force, config_file))
 
 
 def status_services_sync(
