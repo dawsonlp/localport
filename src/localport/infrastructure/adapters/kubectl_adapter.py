@@ -1,12 +1,13 @@
 """Kubectl adapter for port forwarding operations."""
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 import psutil
 import structlog
 
 from ...domain.value_objects.connection_info import ConnectionInfo
+from ..logging.service_log_manager import get_service_log_manager
 
 logger = structlog.get_logger()
 
@@ -17,6 +18,160 @@ class KubectlAdapter:
     def __init__(self) -> None:
         """Initialize the kubectl adapter."""
         self._active_processes: dict[int, asyncio.subprocess.Process] = {}
+        self._service_log_manager = get_service_log_manager()
+        self._service_logs: dict[int, str] = {}  # Maps PID to service_id
+
+    async def start_port_forward_with_logging(
+        self,
+        service_name: str,
+        local_port: int,
+        remote_port: int,
+        connection_info: ConnectionInfo
+    ) -> tuple[int, str]:
+        """Start a kubectl port-forward process with service logging.
+
+        Args:
+            service_name: Name of the service for logging
+            local_port: Local port to bind to
+            remote_port: Remote port to forward to
+            connection_info: Kubectl-specific connection details
+
+        Returns:
+            Tuple of (process_id, service_id)
+
+        Raises:
+            RuntimeError: If kubectl port-forward fails to start
+            ValueError: If connection_info is invalid
+        """
+        # Extract connection details using ConnectionInfo methods
+        namespace = connection_info.get_kubectl_namespace()
+        resource_type = connection_info.get_kubectl_resource_type()
+        resource_name = connection_info.get_kubectl_resource_name()
+        context = connection_info.get_kubectl_context()
+
+        # Create service configuration for logging
+        service_config = {
+            'local_port': local_port,
+            'host': resource_name,
+            'port': remote_port,
+            'type': 'kubectl',
+            'namespace': namespace,
+            'resource': f"{resource_type}/{resource_name}",
+            'context': context
+        }
+
+        # Create service log
+        try:
+            service_id, log_file = self._service_log_manager.create_service_log(
+                service_name, service_config
+            )
+            
+            logger.info("service_log_created_for_kubectl",
+                       service_name=service_name,
+                       service_id=service_id,
+                       log_file=str(log_file))
+        except Exception as e:
+            logger.error("failed_to_create_service_log",
+                        service_name=service_name,
+                        error=str(e))
+            # Fall back to original behavior if logging fails
+            return await self.start_port_forward(local_port, remote_port, connection_info), None
+
+        # Build kubectl command
+        cmd = [
+            'kubectl', 'port-forward',
+            f'{resource_type}/{resource_name}',
+            f'{local_port}:{remote_port}',
+            '--namespace', namespace
+        ]
+
+        if context:
+            cmd.extend(['--context', context])
+
+        logger.info("Starting kubectl port-forward with logging",
+                   command=' '.join(cmd),
+                   local_port=local_port,
+                   remote_port=remote_port,
+                   resource=f"{resource_type}/{resource_name}",
+                   namespace=namespace,
+                   service_id=service_id,
+                   log_file=str(log_file))
+
+        try:
+            import subprocess
+            import os
+            
+            # Open log file for writing
+            log_file_handle = open(log_file, 'a', encoding='utf-8', buffering=1)  # Line buffered
+            
+            # Use subprocess.Popen with log file output
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_file_handle,
+                stderr=subprocess.STDOUT,  # Combine stderr with stdout
+                stdin=subprocess.DEVNULL,
+                start_new_session=True  # Create new session
+            )
+
+            logger.info("kubectl subprocess created with logging", 
+                       pid=process.pid,
+                       service_id=service_id)
+
+            # Wait a moment to ensure it starts successfully
+            await asyncio.sleep(2)
+
+            # Check if process is still running using psutil
+            try:
+                psutil_process = psutil.Process(process.pid)
+                if not psutil_process.is_running():
+                    log_file_handle.close()
+                    logger.error("kubectl process terminated early", 
+                               pid=process.pid,
+                               service_id=service_id)
+                    raise RuntimeError("kubectl port-forward failed to start")
+                
+                logger.info("kubectl process confirmed running with logging", 
+                           pid=process.pid,
+                           service_id=service_id,
+                           status=psutil_process.status())
+                
+            except psutil.NoSuchProcess:
+                log_file_handle.close()
+                logger.error("kubectl process not found after creation", 
+                           pid=process.pid,
+                           service_id=service_id)
+                raise RuntimeError("kubectl port-forward failed to start")
+
+            # Store process and service log mapping
+            if process.pid:
+                self._active_processes[process.pid] = None  # Store PID but not process object
+                self._service_logs[process.pid] = service_id
+
+            # Note: We don't close log_file_handle here as the process needs to write to it
+            # It will be closed when the process terminates
+
+            logger.info("kubectl port-forward started successfully with logging",
+                       pid=process.pid,
+                       service_id=service_id,
+                       local_port=local_port,
+                       remote_port=remote_port,
+                       resource=f"{resource_type}/{resource_name}")
+
+            return process.pid, service_id
+
+        except FileNotFoundError:
+            if 'log_file_handle' in locals():
+                log_file_handle.close()
+            raise RuntimeError("kubectl command not found. Please ensure kubectl is installed and in PATH")
+        except Exception as e:
+            if 'log_file_handle' in locals():
+                log_file_handle.close()
+            logger.error("Failed to start kubectl port-forward with logging",
+                        error=str(e),
+                        service_id=service_id,
+                        local_port=local_port,
+                        remote_port=remote_port)
+            raise RuntimeError(f"Failed to start kubectl port-forward: {e}")
 
     async def start_port_forward(
         self,
@@ -132,6 +287,9 @@ class KubectlAdapter:
         """
         logger.info("Stopping kubectl port-forward", pid=process_id)
 
+        # Get service_id for cleanup if this process has logging
+        service_id = self._service_logs.get(process_id)
+
         try:
             # Try to get the process from our active processes first
             process = self._active_processes.get(process_id)
@@ -165,7 +323,19 @@ class KubectlAdapter:
 
                 except psutil.NoSuchProcess:
                     logger.warning("Process not found", pid=process_id)
+                    # Still need to clean up service log tracking
+                    if service_id:
+                        self._service_logs.pop(process_id, None)
+                        self._service_log_manager.remove_service_log(service_id)
                     return
+
+            # Clean up service log tracking
+            if service_id:
+                self._service_logs.pop(process_id, None)
+                self._service_log_manager.remove_service_log(service_id)
+                logger.info("service_log_cleaned_up", 
+                           pid=process_id,
+                           service_id=service_id)
 
             logger.info("kubectl port-forward stopped successfully", pid=process_id)
 
