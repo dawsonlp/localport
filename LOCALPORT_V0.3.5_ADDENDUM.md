@@ -1,7 +1,9 @@
-# LocalPort v0.3.6 - Kubectl Adapter Interface Compliance & Architectural Consistency
+# LocalPort v0.3.5 Addendum - Kubectl Adapter Interface Compliance & Architectural Consistency
 
 ## Overview
-LocalPort v0.3.6 will focus on fixing the architectural debt in the kubectl adapter by bringing it into full compliance with the `PortForwardingAdapter` interface, ensuring consistency across all adapters, and establishing a solid foundation for future adapter development.
+This addendum documents the additional architectural improvements implemented as part of LocalPort v0.3.5, focusing on fixing the architectural debt in the kubectl adapter by bringing it into full compliance with the `PortForwardingAdapter` interface, ensuring consistency across all adapters, and establishing a solid foundation for future adapter development.
+
+**Note**: Originally planned as v0.3.6, these improvements were accelerated and included in the v0.3.5 release due to their critical importance for architectural consistency.
 
 ## Release Goals
 - ✅ Fix kubectl adapter interface compliance issues
