@@ -253,3 +253,55 @@ Replaced deprecated actions with modern GitHub CLI commands:
 - Maintained backward compatibility with existing release process
 - No changes required to secrets or repository configuration
 
+## Health Monitoring Service Status Synchronization Fix (2025-07-06)
+
+### Problem
+Health monitoring was not working in the daemon despite the health monitoring system being fully functional. Services showed "✓ Healthy" in status output but no actual health checks were executing.
+
+### Root Cause
+**Service Status Synchronization Issue**: The daemon manager was loading services from configuration with default `ServiceStatus.STOPPED` status, but the actual services were running and tracked by the service manager with `ServiceStatus.RUNNING` status. The health monitor only monitors services with `RUNNING` status, so it skipped all services.
+
+**Flow of the Problem**:
+1. **Configuration Repository**: Services loaded with `ServiceStatus.STOPPED` (default from YAML)
+2. **Service Manager**: Services actually running, tracked separately with `ServiceStatus.RUNNING`
+3. **Health Monitor**: Gets services from configuration repository, sees all as `STOPPED`
+4. **Health Monitor**: Skips monitoring all services (only monitors `RUNNING` services)
+5. **Status Command**: Gets status from service manager, shows "✓ Healthy" (but from service manager, not health monitoring)
+
+### Solution
+Added service status synchronization in the daemon manager before starting health monitoring:
+
+```python
+# CRITICAL FIX: Synchronize service statuses with service manager
+# Services loaded from configuration have default STOPPED status, but may actually be running.
+# We need to get the actual status from the service manager before starting health monitoring.
+for service in services:
+    # Get actual status from service manager and update the service object
+    status_info = await self._service_manager.get_service_status(service)
+    service.update_status(status_info.status)
+```
+
+This ensures that:
+1. Services loaded from configuration get their actual runtime status
+2. Health monitor sees services with correct `RUNNING` status
+3. Health monitoring starts for all running services with health check configurations
+
+### Benefits
+- **Health Monitoring Works**: All running services with health check configs are now monitored
+- **Accurate Status**: Service objects reflect actual runtime status, not just configuration defaults
+- **Proper Integration**: Service manager and health monitor now work together correctly
+- **No Breaking Changes**: Existing functionality preserved, just fixed the integration
+
+### Verification
+After the fix:
+- ✅ Health checks execute on schedule (TCP every 30s, HTTP every 30s)
+- ✅ All 4 services show "✓ Healthy" status from actual health monitoring
+- ✅ Health check logs appear in daemon logs
+- ✅ Both TCP and HTTP health checks working correctly
+
+### Implementation Details
+- Modified `DaemonManager._start_health_monitoring()` to synchronize service statuses
+- Added service status synchronization before health monitor startup
+- Used `ServiceManager.get_service_status()` to get actual runtime status
+- Updated service objects with correct status before passing to health monitor
+- Maintained backward compatibility with existing service management

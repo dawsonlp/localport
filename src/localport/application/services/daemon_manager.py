@@ -205,7 +205,7 @@ class DaemonManager:
         active_forwards = len([s for s in services if s.status == ServiceStatus.RUNNING])
 
         # Get health monitoring status
-        health_checks_enabled = len(self._health_monitor._tasks) > 0
+        health_checks_enabled = len(self._health_monitor._cooperative_tasks) > 0
         last_health_check = None
         if health_checks_enabled:
             # Get the most recent health check time from any service
@@ -374,9 +374,25 @@ class DaemonManager:
 
     async def _start_health_monitoring(self) -> None:
         """Start health monitoring for services."""
+        logger.debug("Starting health monitoring for services")
+        
         try:
             services = await self._service_repository.find_all()
-            monitored_services = [s for s in services if s.health_check_config]
+            
+            # CRITICAL FIX: Synchronize service statuses with service manager
+            # Services loaded from configuration have default STOPPED status, but may actually be running.
+            # We need to get the actual status from the service manager before starting health monitoring.
+            logger.debug("Synchronizing service statuses with service manager")
+            for service in services:
+                # Get actual status from service manager and update the service object
+                status_info = await self._service_manager.get_service_status(service)
+                service.update_status(status_info.status)
+                logger.debug("Service status synchronized",
+                           service_name=service.name,
+                           new_status=status_info.status.value,
+                           is_running=status_info.status == ServiceStatus.RUNNING)
+            
+            monitored_services = [s for s in services if s.health_check_config and s.status == ServiceStatus.RUNNING]
 
             # NEW: Set cluster health provider on health monitor if available
             if self._cluster_health_manager and hasattr(self._health_monitor, '_cluster_health_provider'):
@@ -385,6 +401,7 @@ class DaemonManager:
 
             if monitored_services:
                 await self._health_monitor.start_monitoring(monitored_services)
+                
                 logger.info("Health monitoring started",
                            monitored_count=len(monitored_services),
                            cluster_aware_enabled=self._cluster_health_manager is not None)
@@ -607,9 +624,9 @@ class DaemonManager:
         self._enable_health_monitoring = enabled
 
         if self._is_running:
-            if enabled and len(self._health_monitor._tasks) == 0:
+            if enabled and len(self._health_monitor._cooperative_tasks) == 0:
                 await self._start_health_monitoring()
-            elif not enabled and len(self._health_monitor._tasks) > 0:
+            elif not enabled and len(self._health_monitor._cooperative_tasks) > 0:
                 await self._health_monitor.stop_monitoring()
 
         logger.info("Health monitoring configuration updated", enabled=enabled)
