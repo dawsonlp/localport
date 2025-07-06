@@ -354,6 +354,11 @@ class ServiceManager:
         Returns:
             ServiceStatusInfo with detailed status
         """
+        logger.debug("Getting service status",
+                    service_name=service.name,
+                    service_id=str(service.id),
+                    current_status=service.status.value)
+        
         port_forward = self._active_forwards.get(service.id)
 
         # Basic status info
