@@ -434,6 +434,31 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - ✅ Clean CLI output by default
 - ✅ **v0.3.5 Architectural Enhancements**: Complete kubectl adapter interface compliance with enhanced validation, type safety, and comprehensive testing (31 unit tests)
 
+## 🗺️ Roadmap
+
+LocalPort is actively evolving with exciting features planned for future releases. Our development is driven by community needs and contributions.
+
+### Upcoming Features
+
+- **🌐 Reverse Proxy Support**: HTTP/HTTPS reverse proxies with load balancing
+- **🔗 Advanced Routing**: Multi-hop routing and service mesh capabilities  
+- **📊 Enhanced Logging**: Ring buffer storage with real-time streaming
+- **🤖 AI Integration**: Natural language service management via MCP
+- **🔒 Enterprise Security**: mTLS, RBAC, and identity provider integration
+- **🛠️ Developer Tools**: IDE plugins and environment templates
+
+### Community-Driven Development
+
+**⚠️ Important**: Features are prioritized based on community demand, contributor availability, and technical feasibility. There are no commitments to specific timelines or delivery sequences.
+
+**Get Involved**:
+- 🗳️ **Vote on features** by reacting to GitHub issues
+- 💬 **Join discussions** to share your use cases
+- 🛠️ **Contribute** by implementing features you need
+- 📝 **Request features** with detailed GitHub issues
+
+**📖 [View Full Roadmap](docs/roadmap.md)** - Detailed feature descriptions, use cases, and contribution opportunities.
+
 ## 📋 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release notes and version history.
