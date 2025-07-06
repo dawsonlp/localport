@@ -253,14 +253,11 @@ async def restart_daemon_command(
             service_manager=service_manager
         )
 
-        # Restart daemon with progress indication
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Restarting daemon...", total=None)
-
+        # Restart daemon with enhanced progress indication
+        enhanced_progress = EnhancedProgress(console)
+        messages = get_operation_messages("restart")
+        
+        async def restart_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
                 ManageDaemonCommand,
@@ -271,9 +268,13 @@ async def restart_daemon_command(
                 config_file=config_file,
                 force=force
             )
-            result = await daemon_use_case.execute(command)
+            return await daemon_use_case.execute(command)
 
-            progress.update(task, completed=True)
+        result = await enhanced_progress.run_with_spinner(
+            restart_operation,
+            messages["daemon"],
+            messages["success"]
+        )
 
         # Display results
         if result.success:
@@ -428,23 +429,24 @@ async def reload_daemon_command() -> None:
             service_manager=service_manager
         )
 
-        # Reload daemon configuration
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Reloading configuration...", total=None)
-
+        # Reload daemon configuration with enhanced progress indication
+        enhanced_progress = EnhancedProgress(console)
+        messages = get_operation_messages("reload")
+        
+        async def reload_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
                 ManageDaemonCommand,
             )
 
             command = ManageDaemonCommand(command=DaemonCommand.RELOAD)
-            result = await daemon_use_case.execute(command)
+            return await daemon_use_case.execute(command)
 
-            progress.update(task, completed=True)
+        result = await enhanced_progress.run_with_spinner(
+            reload_operation,
+            messages["daemon"],
+            messages["success"]
+        )
 
         # Display results
         if result.success:
