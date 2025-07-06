@@ -179,12 +179,12 @@ class ShutdownCoordinator:
         if self._shutdown_successful:
             logger.info("Graceful shutdown completed successfully", 
                        duration=self._total_shutdown_time,
-                       phase_durations=self._phase_durations)
+                       phase_durations={k.value: v for k, v in self._phase_durations.items()})
         else:
             logger.error("Graceful shutdown failed", 
                         duration=self._total_shutdown_time,
                         failed_phase=self._current_phase.value if self._current_phase else "unknown",
-                        phase_durations=self._phase_durations)
+                        phase_durations={k.value: v for k, v in self._phase_durations.items()})
             
         return self._shutdown_successful
 
