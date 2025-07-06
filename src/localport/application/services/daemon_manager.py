@@ -374,42 +374,133 @@ class DaemonManager:
 
     async def _start_health_monitoring(self) -> None:
         """Start health monitoring for services."""
-        logger.debug("Starting health monitoring for services")
+        logger.info("Starting health monitoring subsystem")
         
         try:
+            # Step 1: Load services from repository
             services = await self._service_repository.find_all()
+            logger.info("Loaded services from repository",
+                       total_services=len(services),
+                       service_names=[s.name for s in services])
             
-            # CRITICAL FIX: Synchronize service statuses with service manager
+            # Step 2: Log initial service states from configuration
+            logger.info("Initial service states from configuration:")
+            for service in services:
+                logger.info("  Service configuration state",
+                           service_name=service.name,
+                           service_id=str(service.id),
+                           config_status=service.status.value,
+                           has_health_check=bool(service.health_check_config),
+                           health_check_type=service.health_check_config.get('type') if service.health_check_config else None)
+            
+            # Step 3: CRITICAL - Synchronize service statuses with service manager
             # Services loaded from configuration have default STOPPED status, but may actually be running.
             # We need to get the actual status from the service manager before starting health monitoring.
-            logger.debug("Synchronizing service statuses with service manager")
+            logger.info("Synchronizing service statuses with service manager")
+            
+            status_changes = []
             for service in services:
+                original_status = service.status
+                
                 # Get actual status from service manager and update the service object
                 status_info = await self._service_manager.get_service_status(service)
                 service.update_status(status_info.status)
+                
+                # Track status changes for logging
+                if original_status != status_info.status:
+                    status_changes.append({
+                        'service_name': service.name,
+                        'service_id': str(service.id),
+                        'original_status': original_status.value,
+                        'actual_status': status_info.status.value,
+                        'is_running': status_info.status == ServiceStatus.RUNNING,
+                        'has_health_check': bool(service.health_check_config)
+                    })
+                
                 logger.debug("Service status synchronized",
                            service_name=service.name,
-                           new_status=status_info.status.value,
-                           is_running=status_info.status == ServiceStatus.RUNNING)
+                           service_id=str(service.id),
+                           original_status=original_status.value,
+                           actual_status=status_info.status.value,
+                           status_changed=original_status != status_info.status,
+                           is_running=status_info.status == ServiceStatus.RUNNING,
+                           has_health_check=bool(service.health_check_config))
             
-            monitored_services = [s for s in services if s.health_check_config and s.status == ServiceStatus.RUNNING]
+            # Log summary of status synchronization
+            if status_changes:
+                logger.info("Service status synchronization completed",
+                           total_services=len(services),
+                           status_changes=len(status_changes),
+                           changes=status_changes)
+            else:
+                logger.info("Service status synchronization completed - no changes needed",
+                           total_services=len(services))
+            
+            # Step 4: Determine which services will be monitored
+            logger.info("Evaluating services for health monitoring eligibility:")
+            
+            monitored_services = []
+            skipped_services = []
+            
+            for service in services:
+                has_health_check = bool(service.health_check_config)
+                is_running = service.status == ServiceStatus.RUNNING
+                will_monitor = has_health_check and is_running
+                
+                service_info = {
+                    'service_name': service.name,
+                    'service_id': str(service.id),
+                    'has_health_check': has_health_check,
+                    'is_running': is_running,
+                    'status': service.status.value,
+                    'will_monitor': will_monitor
+                }
+                
+                if has_health_check:
+                    service_info['health_check_type'] = service.health_check_config.get('type')
+                    service_info['health_check_interval'] = service.health_check_config.get('interval')
+                
+                if will_monitor:
+                    monitored_services.append(service)
+                    logger.info("  ✓ Service eligible for monitoring", **service_info)
+                else:
+                    skipped_services.append(service_info)
+                    if not has_health_check:
+                        logger.info("  ⊘ Service skipped - no health check configured", **service_info)
+                    elif not is_running:
+                        logger.info("  ⊘ Service skipped - not running", **service_info)
+                    else:
+                        logger.info("  ⊘ Service skipped - unknown reason", **service_info)
 
-            # NEW: Set cluster health provider on health monitor if available
+            # Step 5: Set cluster health provider if available
             if self._cluster_health_manager and hasattr(self._health_monitor, '_cluster_health_provider'):
                 self._health_monitor._cluster_health_provider = self._cluster_health_manager
                 logger.info("Connected cluster health provider to health monitor")
 
+            # Step 6: Start health monitoring
             if monitored_services:
+                logger.info("Starting health monitor with eligible services",
+                           monitored_count=len(monitored_services),
+                           monitored_services=[s.name for s in monitored_services],
+                           skipped_count=len(skipped_services))
+                
                 await self._health_monitor.start_monitoring(monitored_services)
                 
-                logger.info("Health monitoring started",
+                logger.info("Health monitoring started successfully",
                            monitored_count=len(monitored_services),
-                           cluster_aware_enabled=self._cluster_health_manager is not None)
+                           cluster_aware_enabled=self._cluster_health_manager is not None,
+                           active_health_tasks=len(self._health_monitor._cooperative_tasks))
             else:
-                logger.info("No services configured for health monitoring")
+                logger.warning("No services eligible for health monitoring",
+                             total_services=len(services),
+                             services_with_health_checks=len([s for s in services if s.health_check_config]),
+                             running_services=len([s for s in services if s.status == ServiceStatus.RUNNING]),
+                             skipped_reasons=skipped_services)
 
         except Exception as e:
-            logger.error("Failed to start health monitoring", error=str(e))
+            logger.error("Failed to start health monitoring", 
+                        error=str(e),
+                        error_type=type(e).__name__)
             raise
 
     async def _start_cluster_health_monitoring(self) -> None:

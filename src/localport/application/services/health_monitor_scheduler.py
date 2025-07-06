@@ -41,14 +41,59 @@ class HealthMonitorScheduler:
 
     async def start_monitoring(self, services: list[Service]) -> None:
         """Start health monitoring for the given services using cooperative tasks."""
-        logger.info("Starting cooperative health monitoring", service_count=len(services))
+        logger.info("Health monitor scheduler received services for monitoring",
+                   total_services=len(services),
+                   service_names=[s.name for s in services])
 
         self._running = True
 
-        # Start cooperative monitoring task for each service
+        # Analyze and log which services will be monitored
+        eligible_services = []
+        skipped_services = []
+        
         for service in services:
-            if service.health_check_config and service.status == ServiceStatus.RUNNING:
-                await self._start_service_monitoring(service)
+            has_health_check = bool(service.health_check_config)
+            is_running = service.status == ServiceStatus.RUNNING
+            will_monitor = has_health_check and is_running
+            
+            service_info = {
+                'service_name': service.name,
+                'service_id': str(service.id),
+                'has_health_check': has_health_check,
+                'is_running': is_running,
+                'status': service.status.value,
+                'will_monitor': will_monitor
+            }
+            
+            if has_health_check:
+                service_info['health_check_type'] = service.health_check_config.get('type')
+                service_info['health_check_interval'] = service.health_check_config.get('interval', 30)
+                service_info['failure_threshold'] = service.health_check_config.get('failure_threshold', 3)
+            
+            if will_monitor:
+                eligible_services.append(service)
+                logger.info("Health monitor will monitor service", **service_info)
+            else:
+                skipped_services.append(service_info)
+                if not has_health_check:
+                    logger.info("Health monitor skipping service - no health check config", **service_info)
+                elif not is_running:
+                    logger.info("Health monitor skipping service - not running", **service_info)
+                else:
+                    logger.warning("Health monitor skipping service - unknown reason", **service_info)
+
+        logger.info("Health monitor service analysis complete",
+                   total_services=len(services),
+                   eligible_services=len(eligible_services),
+                   skipped_services=len(skipped_services))
+
+        # Start cooperative monitoring task for each eligible service
+        for service in eligible_services:
+            await self._start_service_monitoring(service)
+        
+        logger.info("Health monitoring startup complete",
+                   active_monitors=len(self._cooperative_tasks),
+                   monitored_services=[s.name for s in eligible_services])
 
     async def stop_monitoring(self, service_ids: set[UUID] | None = None) -> None:
         """Stop health monitoring for specified services or all services."""
@@ -148,6 +193,14 @@ class HealthMonitorScheduler:
             timeout = health_config.get('timeout', 5.0)
             cluster_aware = health_config.get('cluster_aware', False)
 
+            logger.info("Starting health check",
+                       service_name=service.name,
+                       service_id=str(service.id),
+                       check_type=check_type,
+                       timeout=timeout,
+                       cluster_aware=cluster_aware,
+                       local_port=service.local_port)
+
             # NEW: Check cluster health first if cluster-aware health checking is enabled
             cluster_context = None
             cluster_healthy = None
@@ -161,6 +214,10 @@ class HealthMonitorScheduler:
                 
                 if cluster_context:
                     try:
+                        logger.debug("Checking cluster health before service health check",
+                                   service_name=service.name,
+                                   cluster_context=cluster_context)
+                        
                         cluster_healthy = await self._cluster_health_provider.is_cluster_healthy(cluster_context)
                         
                         if not cluster_healthy:
@@ -199,6 +256,10 @@ class HealthMonitorScheduler:
                         # Continue with service health check if cluster check fails
 
             # Get appropriate health checker
+            logger.debug("Creating health checker",
+                        service_name=service.name,
+                        check_type=check_type)
+            
             health_checker = self._health_check_factory.create_health_checker(
                 check_type,
                 health_config.get('config', {})
@@ -229,14 +290,28 @@ class HealthMonitorScheduler:
                 check_config.setdefault('host', 'localhost')
                 check_config.setdefault('port', service.local_port)
 
+            logger.info("Executing health check",
+                       service_name=service.name,
+                       check_type=check_type,
+                       check_config=check_config)
+
             # Use polymorphic interface - all health checkers implement check_health()
             health_result = await health_checker.check_health(check_config)
             
             # Update timing information
             check_duration = (datetime.now() - start_time).total_seconds()
             
+            # Log health check completion
+            logger.info("Health check completed",
+                       service_name=service.name,
+                       check_type=check_type,
+                       is_healthy=health_result.status.value == 'healthy',
+                       response_time=check_duration,
+                       status=health_result.status.value,
+                       error=health_result.error)
+            
             # Create standardized result with service information
-            return HealthCheckResult(
+            final_result = HealthCheckResult(
                 service_id=service.id,
                 service_name=service.name,
                 check_type=check_type,
@@ -247,11 +322,21 @@ class HealthMonitorScheduler:
                 cluster_context=cluster_context,
                 cluster_healthy=cluster_healthy
             )
+            
+            # Log final result creation
+            logger.info("Health check result created",
+                       service_name=service.name,
+                       final_is_healthy=final_result.is_healthy,
+                       final_error=final_result.error)
+            
+            return final_result
 
         except Exception as e:
             logger.exception("Health check failed with exception",
                            service_name=service.name,
-                           error=str(e))
+                           check_type=health_config.get('type', 'tcp'),
+                           error=str(e),
+                           error_type=type(e).__name__)
 
             return HealthCheckResult(
                 service_id=service.id,

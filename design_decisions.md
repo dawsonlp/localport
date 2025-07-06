@@ -253,6 +253,90 @@ Replaced deprecated actions with modern GitHub CLI commands:
 - Maintained backward compatibility with existing release process
 - No changes required to secrets or repository configuration
 
+## Enhanced Logging for Daemon and Health Monitoring System (2025-07-06)
+
+### Problem
+The recent health monitoring bug was difficult to debug because the complex interactions between the daemon manager, service manager, and health monitor weren't well logged. The issue was hidden because each component appeared to be working individually, but their integration was broken.
+
+### Root Cause
+**Insufficient Logging Visibility**: The handoffs between components and decision-making processes lacked comprehensive logging, making it difficult to trace:
+- Service status transitions between components
+- Component integration points and data flow
+- Health monitor decision making (why services are included/excluded)
+- Service lifecycle events and state synchronization
+
+### Solution
+Implemented comprehensive logging enhancements across the daemon and health monitoring system:
+
+#### 1. Enhanced Daemon Manager Logging (`_start_health_monitoring`)
+- **Step-by-step process logging**: Each phase of health monitoring startup is clearly logged
+- **Service status synchronization tracking**: Detailed logging of status changes during sync
+- **Service eligibility evaluation**: Clear logging of which services will be monitored and why
+- **Integration point logging**: Handoffs between service manager and health monitor
+
+#### 2. Enhanced Health Monitor Scheduler Logging
+- **Service analysis logging**: Detailed evaluation of each service for monitoring eligibility
+- **Health check execution logging**: Comprehensive logging of health check process
+- **Decision making transparency**: Clear logging of why services are monitored or skipped
+- **Configuration and timing details**: Health check types, intervals, and configurations
+
+#### 3. Enhanced Service Manager Logging
+- **Service status queries**: Logging when service status is requested and what's returned
+- **Process lifecycle tracking**: Better visibility into service start/stop operations
+- **State transitions**: Clear logging of service status changes
+
+### Key Logging Improvements
+
+#### Service Status Synchronization
+```
+INFO: Starting health monitoring subsystem
+INFO: Loaded services from repository (total_services=4, service_names=[...])
+INFO: Initial service states from configuration:
+INFO:   Service configuration state (service_name=X, config_status=STOPPED, has_health_check=true)
+INFO: Synchronizing service statuses with service manager
+INFO: Service status synchronization completed (status_changes=4, changes=[...])
+```
+
+#### Health Monitor Decision Making
+```
+INFO: Evaluating services for health monitoring eligibility:
+INFO:   ✓ Service eligible for monitoring (service_name=X, will_monitor=true, health_check_type=tcp)
+INFO:   ⊘ Service skipped - not running (service_name=Y, will_monitor=false, status=STOPPED)
+INFO: Health monitoring startup complete (active_monitors=4, monitored_services=[...])
+```
+
+#### Health Check Execution
+```
+INFO: Starting health check (service_name=X, check_type=tcp, timeout=5.0, local_port=6432)
+INFO: Executing health check (service_name=X, check_type=tcp, check_config={...})
+INFO: Health check completed (service_name=X, is_healthy=true, response_time=0.001)
+INFO: Health check result created (service_name=X, final_is_healthy=true)
+```
+
+### Benefits
+- **Faster Debugging**: Complex integration issues are now immediately visible in logs
+- **Clear Decision Tracking**: Every decision point is logged with context and reasoning
+- **Component Integration Visibility**: Handoffs between components are clearly tracked
+- **Service Lifecycle Transparency**: Service status changes and synchronization are fully logged
+- **Health Check Transparency**: Complete visibility into health check execution and results
+
+### Implementation Details
+- Enhanced `DaemonManager._start_health_monitoring()` with step-by-step logging
+- Added comprehensive service analysis logging in `HealthMonitorScheduler.start_monitoring()`
+- Enhanced health check execution logging in `HealthMonitorScheduler._perform_health_check()`
+- Added service status query logging in `ServiceManager.get_service_status()`
+- Used structured logging with consistent field names and detailed context
+
+### Verification
+The enhanced logging successfully provides:
+- ✅ Clear visibility into service status synchronization process
+- ✅ Detailed health monitor decision making and service eligibility
+- ✅ Comprehensive health check execution tracking
+- ✅ Component integration and handoff transparency
+- ✅ Service lifecycle and state transition logging
+
+This logging enhancement ensures that future debugging of daemon and health monitoring issues will be significantly faster and more effective.
+
 ## Health Monitoring Service Status Synchronization Fix (2025-07-06)
 
 ### Problem
