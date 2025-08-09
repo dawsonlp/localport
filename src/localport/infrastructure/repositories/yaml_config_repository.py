@@ -624,7 +624,8 @@ class YamlConfigRepository(ConfigRepository):
                         user=conn_config.get('user'),
                         port=conn_config.get('port', 22),
                         key_file=conn_config.get('key_file'),
-                        password=conn_config.get('password')
+                        password=conn_config.get('password'),
+                        remote_host=conn_config.get('remote_host')
                     )
                 else:
                     raise ValueError(f"Unsupported technology: {technology}")

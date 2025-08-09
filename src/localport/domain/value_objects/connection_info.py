@@ -71,6 +71,11 @@ class ConnectionInfo:
             if not key_path.exists():
                 raise ValueError(f"SSH key file not found: {key_path}. Check the path or generate a key with 'ssh-keygen -t rsa'")
 
+        # Validate remote_host if provided
+        if "remote_host" in self.config and self.config["remote_host"]:
+            if not self.config["remote_host"].strip():
+                raise ValueError("SSH remote_host cannot be empty if provided. Use a hostname like 'example.com' or remove the field")
+
     @classmethod
     def kubectl(
         cls,
@@ -259,6 +264,19 @@ class ConnectionInfo:
         if self.technology != ForwardingTechnology.SSH:
             raise ValueError("Not an SSH connection")
         return "password" in self.config and self.config["password"] is not None
+
+    def get_ssh_remote_host(self) -> str:
+        """Get the SSH remote host for tunneling.
+        
+        Returns:
+            Remote host for SSH tunnel destination, defaults to 'localhost'
+            
+        Raises:
+            ValueError: If not an SSH connection
+        """
+        if self.technology != ForwardingTechnology.SSH:
+            raise ValueError("Not an SSH connection")
+        return self.config.get("remote_host", "localhost")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
