@@ -81,11 +81,14 @@ class SSHAdapter(PortForwardingAdapter):
             # Fall back to original behavior if logging fails
             return await self.start_port_forward(local_port, remote_port, connection_info), None
 
+        # Get remote host for tunnel destination (supports bastion host scenarios)
+        remote_host = connection_info.get_ssh_remote_host()
+        
         # Build SSH command
         cmd = [
             'ssh',
             '-N',  # Don't execute remote command
-            '-L', f'{local_port}:localhost:{remote_port}',  # Local port forwarding
+            '-L', f'{local_port}:{remote_host}:{remote_port}',  # Local port forwarding
             '-o', 'StrictHostKeyChecking=no',  # Don't prompt for host key verification
             '-o', 'UserKnownHostsFile=/dev/null',  # Don't save host keys
             '-o', 'LogLevel=INFO',  # More verbose for logging (changed from ERROR)
@@ -107,11 +110,13 @@ class SSHAdapter(PortForwardingAdapter):
         else:
             cmd.append(host)
 
+
         logger.info("Starting SSH tunnel with logging",
                    command=' '.join(cmd[:-1] + ['***@***']),  # Hide credentials
                    local_port=local_port,
                    remote_port=remote_port,
                    host=host,
+                   remote_host=remote_host,
                    ssh_port=ssh_port,
                    service_id=service_id,
                    log_file=str(log_file))
@@ -210,11 +215,14 @@ class SSHAdapter(PortForwardingAdapter):
         key_file = connection_info.get_ssh_key_file()
         password = connection_info.config.get('password')  # Direct access for password since no method exists
 
+        # Get remote host for tunnel destination (supports bastion host scenarios)
+        remote_host = connection_info.get_ssh_remote_host()
+
         # Build SSH command
         cmd = [
             'ssh',
             '-N',  # Don't execute remote command
-            '-L', f'{local_port}:localhost:{remote_port}',  # Local port forwarding
+            '-L', f'{local_port}:{remote_host}:{remote_port}',  # Local port forwarding
             '-o', 'StrictHostKeyChecking=no',  # Don't prompt for host key verification
             '-o', 'UserKnownHostsFile=/dev/null',  # Don't save host keys
             '-o', 'LogLevel=ERROR',  # Reduce SSH output
@@ -236,11 +244,13 @@ class SSHAdapter(PortForwardingAdapter):
         else:
             cmd.append(host)
 
+
         logger.info("Starting SSH tunnel",
                    command=' '.join(cmd[:-1] + ['***@***']),  # Hide credentials
                    local_port=local_port,
                    remote_port=remote_port,
                    host=host,
+                   remote_host=remote_host,
                    ssh_port=ssh_port)
 
         try:
