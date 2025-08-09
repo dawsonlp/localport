@@ -5,6 +5,50 @@ All notable changes to LocalPort will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2025-01-08
+
+### Added
+- **SSH Bastion Host Support**: Complete SSH bastion host/jump server functionality for accessing internal resources
+  - New `remote_host` parameter in SSH connection configuration
+  - Support for connecting through bastion hosts to reach RDS databases and other internal services
+  - Automatic SSH tunnel generation with proper bastion host routing
+  - Real-world tested with AWS RDS through EC2 bastion hosts
+
+### Enhanced
+- **SSH Tunneling**: Significantly improved SSH tunneling capabilities
+  - Enhanced `ConnectionInfo` value object with `get_ssh_remote_host()` method
+  - Updated SSH adapter to use configurable remote hosts instead of hardcoded localhost
+  - Fixed YAML configuration repository to properly pass `remote_host` parameter
+  - Clean CLI experience with professional terminal output
+
+### Configuration
+- **Bastion Host Configuration**: New configuration format for SSH bastion scenarios
+  ```yaml
+  - name: database-service
+    technology: ssh
+    local_port: 5433
+    remote_port: 5432
+    connection:
+      host: bastion.example.com      # Bastion/jump host
+      user: ec2-user
+      key_file: ~/.ssh/key.pem
+      port: 22
+      remote_host: internal-db.rds.amazonaws.com  # Target host behind bastion
+  ```
+
+### Compatibility
+- **Backward Compatibility**: All existing SSH configurations continue to work unchanged
+- **Migration**: No configuration changes required for existing SSH services
+- **Version Management**: Proper version progression from v0.3.7.3 to v0.3.8
+
+### Technical
+- **SSH Command Generation**: Proper SSH command generation for bastion host scenarios
+  - Example: `ssh -N -L 5433:internal-db.rds.amazonaws.com:5432 -i ~/.ssh/key.pem user@bastion.example.com`
+- **Error Handling**: Enhanced error handling for SSH connection scenarios
+- **Testing**: Comprehensive testing with real-world bastion host configurations
+
+This release enables LocalPort users to easily access internal infrastructure through bastion hosts while maintaining the familiar LocalPort interface and experience. Perfect for accessing RDS databases, internal APIs, and other services behind corporate firewalls or in private subnets.
+
 ## [0.3.7.1] - 2025-01-05
 
 ### Fixed
@@ -131,11 +175,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version Support
 
-- **Current**: 0.3.7.1 (Active development and support)
-- **Supported**: 0.3.6+ (Security updates and critical bug fixes)
-- **Legacy**: 0.3.5 and below (No longer supported)
+- **Current**: 0.3.8 (Active development and support)
+- **Supported**: 0.3.7+ (Security updates and critical bug fixes)
+- **Legacy**: 0.3.6 and below (No longer supported)
 
 ## Upgrade Guide
+
+### From 0.3.7 to 0.3.8
+- **New SSH Bastion Host Support**: Add `remote_host` parameter to SSH configurations for bastion scenarios
+- **No Breaking Changes**: All existing SSH configurations work unchanged
+- **Enhanced SSH Tunneling**: Improved SSH tunnel management and error handling
+- **Configuration Example**: See v0.3.8 release notes for bastion host configuration format
 
 ### From 0.3.6 to 0.3.7
 - No breaking changes
