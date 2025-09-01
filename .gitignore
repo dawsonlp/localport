@@ -197,3 +197,6 @@ htmlcov/
 # Build artifacts
 *.whl
 *.tar.gz
+
+# Cline dev environment rules
+.clinerules/
