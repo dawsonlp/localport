@@ -143,11 +143,57 @@ For more installation options and development setup, see the [main README](../RE
 
 ## Your First Configuration
 
-LocalPort uses YAML configuration files to define your port forwarding services. Let's create your first configuration.
+LocalPort offers two ways to set up your port forwarding services:
 
-### Step 1: Create a Configuration File
+1. **Interactive Setup** (Recommended for beginners) - Use built-in commands to discover and configure services automatically
+2. **Manual Configuration** - Create YAML configuration files directly
 
-Create a file named `localport.yaml` in your current directory:
+### Method 1: Interactive Setup (Recommended)
+
+The easiest way to get started is using LocalPort's interactive configuration commands that automatically discover available services.
+
+#### Adding Your First Kubernetes Service
+
+```bash
+# Interactive setup - LocalPort will guide you through the process
+localport config add
+
+# Or specify what you want upfront
+localport config add --technology kubectl --resource postgres --namespace default
+```
+
+LocalPort will:
+- Automatically discover Kubernetes resources and their available ports
+- Resolve namespace ambiguity if the resource exists in multiple namespaces
+- Suggest appropriate local ports
+- Handle all the configuration details for you
+
+#### Adding Your First SSH Connection
+
+```bash
+# Interactive setup for SSH
+localport config add --technology ssh
+
+# Or specify connection details
+localport config add --technology ssh --host server.com --user myuser
+```
+
+#### Managing Your Connections
+
+```bash
+# List all configured connections
+localport config list
+
+# Remove a connection
+localport config remove postgres
+
+# View detailed connection information
+localport config list --output json
+```
+
+### Method 2: Manual Configuration
+
+If you prefer to create configuration files manually, create a file named `localport.yaml` in your current directory:
 
 ```yaml
 version: "1.0"
@@ -177,7 +223,7 @@ services:
     description: "Redis cache server"
 ```
 
-### Step 2: Customize for Your Environment
+#### Customizing Manual Configuration
 
 #### For Kubernetes Services
 

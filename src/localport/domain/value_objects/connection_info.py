@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from ..enums import ForwardingTechnology
+from ..exceptions import SSHKeyNotFoundError, ConfigurationValidationError
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,11 @@ class ConnectionInfo:
         if "key_file" in self.config and self.config["key_file"]:
             key_path = Path(self.config["key_file"]).expanduser()
             if not key_path.exists():
-                raise ValueError(f"SSH key file not found: {key_path}. Check the path or generate a key with 'ssh-keygen -t rsa'")
+                raise SSHKeyNotFoundError(
+                    key_path=str(key_path),
+                    service_name=None,  # Will be populated by higher layers
+                    config_source=None  # Will be populated by higher layers
+                )
 
         # Validate remote_host if provided
         if "remote_host" in self.config and self.config["remote_host"]:
@@ -277,6 +282,97 @@ class ConnectionInfo:
         if self.technology != ForwardingTechnology.SSH:
             raise ValueError("Not an SSH connection")
         return self.config.get("remote_host", "localhost")
+
+    def validate_against_discovered_resource(self, discovered_resource) -> list[str]:
+        """Validate connection info against a discovered Kubernetes resource.
+        
+        Args:
+            discovered_resource: KubernetesResource instance from discovery
+            
+        Returns:
+            List of validation warnings/errors (empty if valid)
+            
+        Raises:
+            ValueError: If not a kubectl connection or resource is incompatible
+        """
+        if self.technology != ForwardingTechnology.KUBECTL:
+            raise ValueError("Can only validate kubectl connections against discovered resources")
+        
+        from .discovery import KubernetesResource  # Import here to avoid circular imports
+        if not isinstance(discovered_resource, KubernetesResource):
+            raise ValueError("discovered_resource must be a KubernetesResource instance")
+        
+        warnings = []
+        
+        # Validate resource name matches
+        if self.get_kubectl_resource_name() != discovered_resource.name:
+            warnings.append(f"Resource name mismatch: expected '{discovered_resource.name}', got '{self.get_kubectl_resource_name()}'")
+        
+        # Validate namespace matches
+        if self.get_kubectl_namespace() != discovered_resource.namespace:
+            warnings.append(f"Namespace mismatch: expected '{discovered_resource.namespace}', got '{self.get_kubectl_namespace()}'")
+        
+        # Validate resource type matches
+        if self.get_kubectl_resource_type() != discovered_resource.resource_type:
+            warnings.append(f"Resource type mismatch: expected '{discovered_resource.resource_type}', got '{self.get_kubectl_resource_type()}'")
+        
+        # Check if resource has any ports
+        if not discovered_resource.has_ports:
+            warnings.append(f"Resource '{discovered_resource.name}' has no exposed ports")
+        
+        return warnings
+
+    def set_discovered_namespace(self, namespace: str) -> "ConnectionInfo":
+        """Create a new ConnectionInfo with the discovered namespace set.
+        
+        Args:
+            namespace: Namespace discovered from Kubernetes resource
+            
+        Returns:
+            New ConnectionInfo instance with updated namespace
+            
+        Raises:
+            ValueError: If not a kubectl connection
+        """
+        if self.technology != ForwardingTechnology.KUBECTL:
+            raise ValueError("Can only set namespace for kubectl connections")
+        
+        # Create new config dictionary with updated namespace
+        new_config = dict(self.config)
+        new_config["namespace"] = namespace
+        
+        # Return new instance (since this is a frozen dataclass)
+        return ConnectionInfo(self.technology, new_config)
+
+    def update_from_discovered_resource(self, discovered_resource) -> "ConnectionInfo":
+        """Create a new ConnectionInfo updated with information from discovered resource.
+        
+        Args:
+            discovered_resource: KubernetesResource instance from discovery
+            
+        Returns:
+            New ConnectionInfo instance with updated information
+            
+        Raises:
+            ValueError: If not a kubectl connection or resource is incompatible
+        """
+        if self.technology != ForwardingTechnology.KUBECTL:
+            raise ValueError("Can only update kubectl connections from discovered resources")
+        
+        from .discovery import KubernetesResource  # Import here to avoid circular imports
+        if not isinstance(discovered_resource, KubernetesResource):
+            raise ValueError("discovered_resource must be a KubernetesResource instance")
+        
+        # Create new config dictionary with discovered information
+        new_config = dict(self.config)
+        new_config["namespace"] = discovered_resource.namespace
+        new_config["resource_type"] = discovered_resource.resource_type
+        
+        # Ensure resource name matches what was discovered
+        new_config["resource_name"] = discovered_resource.name
+        
+        # Return new instance (since this is a frozen dataclass)
+        return ConnectionInfo(self.technology, new_config)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
