@@ -112,6 +112,134 @@ class Service:
             **kwargs
         )
 
+    @classmethod
+    def from_kubectl_discovery(
+        cls,
+        resource_name: str,
+        namespace: str,
+        local_port: int,
+        remote_port: int,
+        service_name: str | None = None,
+        resource_type: str = "service",
+        context: str | None = None,
+        **kwargs: Any,
+    ) -> "Service":
+        """Factory method to create a kubectl service from discovery information.
+        
+        Args:
+            resource_name: Name of the Kubernetes resource
+            namespace: Kubernetes namespace
+            local_port: Local port to bind
+            remote_port: Remote port discovered from resource
+            service_name: Service name (defaults to resource_name if not provided)
+            resource_type: Type of Kubernetes resource (service, pod, deployment)
+            context: Kubernetes context to use
+            **kwargs: Additional service options (tags, description, etc.)
+            
+        Returns:
+            Service instance configured for kubectl forwarding
+        """
+        # Default service name to resource name for kubectl
+        name = service_name if service_name else resource_name
+        
+        # Validate service name
+        cls._validate_service_name(name)
+        
+        # Create kubectl connection info
+        connection_info = ConnectionInfo.kubectl(
+            resource_name=resource_name,
+            namespace=namespace,
+            resource_type=resource_type,
+            context=context
+        )
+        
+        return cls.create(
+            name=name,
+            technology=ForwardingTechnology.KUBECTL,
+            local_port=local_port,
+            remote_port=remote_port,
+            connection_info=connection_info,
+            **kwargs
+        )
+
+    @classmethod
+    def from_ssh_config(
+        cls,
+        service_name: str,
+        host: str,
+        local_port: int,
+        remote_port: int,
+        user: str | None = None,
+        port: int = 22,
+        key_file: str | None = None,
+        remote_host: str | None = None,
+        **kwargs: Any,
+    ) -> "Service":
+        """Factory method to create an SSH service from configuration.
+        
+        Args:
+            service_name: Name for the service
+            host: SSH host to connect to
+            local_port: Local port to bind
+            remote_port: Remote port to forward to
+            user: SSH username
+            port: SSH port (default 22)
+            key_file: Path to SSH private key file
+            remote_host: Remote host for tunneling (defaults to localhost)
+            **kwargs: Additional service options (tags, description, etc.)
+            
+        Returns:
+            Service instance configured for SSH forwarding
+        """
+        # Validate service name
+        cls._validate_service_name(service_name)
+        
+        # Create SSH connection info
+        connection_info = ConnectionInfo.ssh(
+            host=host,
+            user=user,
+            port=port,
+            key_file=key_file,
+            remote_host=remote_host
+        )
+        
+        return cls.create(
+            name=service_name,
+            technology=ForwardingTechnology.SSH,
+            local_port=local_port,
+            remote_port=remote_port,
+            connection_info=connection_info,
+            **kwargs
+        )
+
+    @staticmethod
+    def _validate_service_name(name: str) -> None:
+        """Validate service name according to LocalPort naming conventions.
+        
+        Args:
+            name: Service name to validate
+            
+        Raises:
+            ValueError: If service name is invalid
+        """
+        if not name or not name.strip():
+            raise ValueError("Service name cannot be empty")
+        
+        # Check for reasonable length
+        if len(name) > 100:
+            raise ValueError("Service name cannot exceed 100 characters")
+        
+        # Check for invalid characters (keeping it simple for now)
+        invalid_chars = [' ', '\t', '\n', '\r']
+        for char in invalid_chars:
+            if char in name:
+                raise ValueError(f"Service name cannot contain whitespace characters")
+        
+        # Reserved names
+        reserved_names = ['all', 'default', 'system']
+        if name.lower() in reserved_names:
+            raise ValueError(f"'{name}' is a reserved service name")
+
     def is_healthy(self) -> bool:
         """Check if service is in a healthy state."""
         return self.status == ServiceStatus.RUNNING

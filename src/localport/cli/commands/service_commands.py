@@ -29,6 +29,7 @@ from ..utils.rich_utils import (
     format_service_name,
     format_technology,
 )
+from ..utils.error_formatter import ErrorFormatter, VerbosityLevel
 
 logger = structlog.get_logger()
 console = Console()
@@ -68,7 +69,8 @@ async def start_services_command(
     tags: list[str] | None = None,
     config_file: str | None = None,
     force: bool = False,
-    output_format: OutputFormat = OutputFormat.TABLE
+    output_format: OutputFormat = OutputFormat.TABLE,
+    verbosity_level: int = 0
 ) -> None:
     """Start port forwarding services."""
     try:
@@ -211,15 +213,50 @@ async def start_services_command(
                 console.print(table)
 
         if result.failure_count > 0:
-            error_messages = []
-            for service_name, error in result.errors.items():
-                error_messages.append(f"• {service_name}: {error}")
+            # Use improved error formatting for service failures
+            error_formatter = ErrorFormatter(console)
             
-            console.print(create_error_panel(
-                "Failed to Start Some Services",
-                f"Failed to start {result.failure_count} service(s):\n" + "\n".join(error_messages),
-                "Check the logs for more details or try with --verbose flag."
-            ))
+            # Convert verbosity level integer to VerbosityLevel enum
+            if verbosity_level >= 2:
+                error_verbosity = VerbosityLevel.DEBUG
+            elif verbosity_level >= 1:
+                error_verbosity = VerbosityLevel.VERBOSE
+            else:
+                error_verbosity = VerbosityLevel.NORMAL
+            
+            # Convert service errors to structured exceptions where possible
+            structured_errors = []
+            for service_name, error_msg in result.errors.items():
+                # Check if this is an SSH key error (common shared config problem)
+                from ...domain.exceptions import SSHKeyNotFoundError, LocalPortError
+                
+                if "SSH key file not found" in str(error_msg) or "key file not found" in str(error_msg).lower():
+                    # Extract key path from error message if possible
+                    import re
+                    key_match = re.search(r'([~\/][^\s]+\.(?:pem|key|rsa|ed25519))', str(error_msg))
+                    key_path = key_match.group(1) if key_match else "unknown"
+                    
+                    structured_errors.append(SSHKeyNotFoundError(
+                        key_path=key_path,
+                        service_name=service_name
+                    ))
+                else:
+                    # Generic error - create a LocalPortError for consistent formatting
+                    from ...domain.exceptions import UserError
+                    structured_errors.append(UserError(
+                        message=f"Failed to start service '{service_name}': {error_msg}",
+                        suggestions=[
+                            "Check service configuration",
+                            "Verify connection details",
+                            "Use --verbose for detailed error information"
+                        ]
+                    ))
+            
+            # Display formatted errors
+            if len(structured_errors) == 1:
+                error_formatter.print_error(structured_errors[0], error_verbosity)
+            else:
+                error_formatter.print_multiple_errors(structured_errors, error_verbosity)
             
             if result.success_count == 0:
                 raise typer.Exit(1)
@@ -465,11 +502,21 @@ async def status_services_command(
             error_output = error_formatter._format_error("service_status_error", str(e))
             console.print(error_output)
         else:
-            console.print(create_error_panel(
-                "Unexpected Error",
-                str(e),
-                "Check the logs for more details."
-            ))
+            # Use new error formatting system with verbosity from context
+            verbosity_level = VerbosityLevel.NORMAL
+            if output_format != OutputFormat.JSON:
+                # Get verbosity from CLI context if available
+                try:
+                    ctx_verbosity = ctx.obj.get('verbosity_level', 0) if hasattr(ctx, 'obj') and ctx.obj else 0
+                    if ctx_verbosity >= 2:
+                        verbosity_level = VerbosityLevel.DEBUG
+                    elif ctx_verbosity >= 1:
+                        verbosity_level = VerbosityLevel.VERBOSE
+                except:
+                    pass  # Fall back to normal verbosity
+            
+            error_formatter = ErrorFormatter(console)
+            error_formatter.print_error(e, verbosity_level)
         raise typer.Exit(1)
 
 
@@ -482,10 +529,11 @@ def start_services_sync(
     force: bool = typer.Option(False, "--force", "-f", help="Force restart if already running")
 ) -> None:
     """Start port forwarding services."""
-    # Get config file and output format from context
+    # Get config file, output format, and verbosity from context
     config_file = ctx.obj.get('config_file')
     output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(start_services_command(services, all_services, tags, config_file, force, output_format))
+    verbosity_level = ctx.obj.get('verbosity_level', 0)
+    asyncio.run(start_services_command(services, all_services, tags, config_file, force, output_format, verbosity_level))
 
 
 def stop_services_sync(

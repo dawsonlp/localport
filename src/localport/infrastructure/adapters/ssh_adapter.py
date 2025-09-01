@@ -101,7 +101,11 @@ class SSHAdapter(PortForwardingAdapter):
         if key_file:
             key_path = Path(key_file).expanduser()
             if not key_path.exists():
-                raise ValueError(f"SSH key file not found: {key_path}")
+                from ...domain.exceptions import SSHKeyNotFoundError
+                raise SSHKeyNotFoundError(
+                    key_path=str(key_path),
+                    service_name=service_name
+                )
             cmd.extend(['-i', str(key_path)])
 
         # Add user and host
@@ -235,7 +239,10 @@ class SSHAdapter(PortForwardingAdapter):
         if key_file:
             key_path = Path(key_file).expanduser()
             if not key_path.exists():
-                raise ValueError(f"SSH key file not found: {key_path}")
+                from ...domain.exceptions import SSHKeyNotFoundError
+                raise SSHKeyNotFoundError(
+                    key_path=str(key_path)
+                )
             cmd.extend(['-i', str(key_path)])
 
         # Add user and host
@@ -694,12 +701,15 @@ class SSHAdapter(PortForwardingAdapter):
         except (ValueError, TypeError):
             errors.append("SSH port must be a valid integer. Example: port: 22 or port: 2222")
 
-        # Key file validation
+        # Key file validation - Use concise error message
         key_file = connection_info.get_ssh_key_file()
         if key_file:
             key_path = Path(key_file).expanduser()
             if not key_path.exists():
-                errors.append(f"SSH key file not found: {key_path}. Check the path or generate a key with 'ssh-keygen -t rsa'")
+                # Create safe path for display
+                from ...domain.exceptions import SSHKeyNotFoundError
+                safe_path = SSHKeyNotFoundError._make_safe_path(str(key_path))
+                errors.append(f"SSH key file not found: {safe_path}. Check path or generate key: ssh-keygen -t rsa")
             elif not key_path.is_file():
                 errors.append(f"SSH key path is not a file: {key_path}")
             else:
@@ -707,9 +717,9 @@ class SSHAdapter(PortForwardingAdapter):
                 try:
                     stat_info = key_path.stat()
                     if stat_info.st_mode & 0o077:
-                        errors.append(f"SSH key file has overly permissive permissions: {key_path}. Run 'chmod 600 {key_path}' to fix")
+                        errors.append(f"SSH key file has overly permissive permissions. Run: chmod 600 {key_path}")
                 except Exception as e:
-                    errors.append(f"Cannot check SSH key file permissions: {key_path} - {str(e)}")
+                    errors.append(f"Cannot check SSH key file permissions: {str(e)}")
 
         # Authentication validation
         has_key = key_file is not None

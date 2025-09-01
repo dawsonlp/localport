@@ -20,6 +20,7 @@ from ...domain.repositories.config_repository import (
 )
 from ...domain.value_objects.connection_info import ConnectionInfo
 from ...domain.value_objects.port import Port
+from ...domain.exceptions import SSHKeyNotFoundError
 
 logger = structlog.get_logger()
 
@@ -643,6 +644,18 @@ class YamlConfigRepository(ConfigRepository):
                     restart_policy=service_config.get('restart_policy')
                 )
                 services.append(service)
+            except SSHKeyNotFoundError as e:
+                # Enrich SSH key error with service and config context
+                enriched_error = SSHKeyNotFoundError(
+                    key_path=e.context['key_path'],
+                    service_name=service_config.get('name', 'unknown'),
+                    config_source=str(self.config_path)
+                )
+                logger.error("SSH key not found for service",
+                           service_name=service_config.get('name', 'unknown'),
+                           key_path=e.context.get('safe_path', e.context['key_path']),
+                           config_source=str(self.config_path))
+                raise enriched_error
             except Exception as e:
                 logger.error("Failed to create service from config",
                            service_name=service_config.get('name', 'unknown'),
@@ -725,3 +738,285 @@ class YamlConfigRepository(ConfigRepository):
             return json.loads(substituted_str)
         except json.JSONDecodeError as e:
             raise ConfigurationError(f"Failed to parse configuration after environment variable substitution: {e}")
+
+    # Service Management Methods
+
+    async def add_service_config(self, service: dict[str, Any]) -> None:
+        """Add a new service configuration to the configuration file.
+        
+        Args:
+            service: Service configuration dictionary to add
+            
+        Raises:
+            ConfigurationError: If service cannot be added or configuration is invalid
+            ServiceAlreadyExistsError: If a service with the same name already exists
+        """
+        from ...domain.exceptions import ServiceAlreadyExistsError
+        
+        logger.debug("Adding service configuration", service_name=service.get('name'))
+        
+        # Load current configuration
+        config = await self.load_configuration()
+        
+        # Check if service already exists
+        service_name = service.get('name')
+        if not service_name:
+            raise ConfigurationError("Service configuration missing 'name' field")
+            
+        if await self.service_exists(service_name):
+            raise ServiceAlreadyExistsError(f"Service '{service_name}' already exists")
+        
+        # Create backup before modifying
+        backup_path = None
+        try:
+            if self.config_path.exists():
+                backup_path = await self.backup_configuration()
+            
+            # Add service to configuration
+            if 'services' not in config:
+                config['services'] = []
+            
+            config['services'].append(service)
+            
+            # Validate the updated configuration
+            validation_errors = await self.validate_configuration(config)
+            if validation_errors:
+                raise ConfigurationError(f"Invalid service configuration: {'; '.join(validation_errors)}")
+            
+            # Save updated configuration
+            await self.save_configuration(config)
+            
+            logger.info("Successfully added service configuration",
+                       service_name=service_name,
+                       total_services=len(config['services']))
+                       
+        except Exception as e:
+            # Restore from backup if operation failed
+            if backup_path and Path(backup_path).exists():
+                logger.warning("Restoring configuration from backup due to error",
+                              backup_path=backup_path, error=str(e))
+                try:
+                    import shutil
+                    shutil.copy2(backup_path, self.config_path)
+                    self.clear_cache()
+                except Exception as restore_error:
+                    logger.error("Failed to restore configuration backup",
+                               backup_path=backup_path, error=str(restore_error))
+            raise
+
+    async def remove_service_config(self, service_name: str) -> bool:
+        """Remove a service configuration from the configuration file.
+        
+        Args:
+            service_name: Name of the service to remove
+            
+        Returns:
+            True if service was removed, False if service was not found
+            
+        Raises:
+            ConfigurationError: If there's an error updating the configuration
+        """
+        logger.debug("Removing service configuration", service_name=service_name)
+        
+        # Load current configuration
+        config = await self.load_configuration()
+        
+        # Find and remove the service
+        services = config.get('services', [])
+        original_count = len(services)
+        
+        # Filter out the service to remove
+        config['services'] = [s for s in services if s.get('name') != service_name]
+        
+        if len(config['services']) == original_count:
+            logger.debug("Service not found for removal", service_name=service_name)
+            return False
+        
+        # Create backup before modifying
+        backup_path = None
+        try:
+            if self.config_path.exists():
+                backup_path = await self.backup_configuration()
+            
+            # Save updated configuration
+            await self.save_configuration(config)
+            
+            logger.info("Successfully removed service configuration",
+                       service_name=service_name,
+                       remaining_services=len(config['services']))
+            return True
+                       
+        except Exception as e:
+            # Restore from backup if operation failed
+            if backup_path and Path(backup_path).exists():
+                logger.warning("Restoring configuration from backup due to error",
+                              backup_path=backup_path, error=str(e))
+                try:
+                    import shutil
+                    shutil.copy2(backup_path, self.config_path)
+                    self.clear_cache()
+                except Exception as restore_error:
+                    logger.error("Failed to restore configuration backup",
+                               backup_path=backup_path, error=str(restore_error))
+            raise
+
+    async def get_service_names(self) -> list[str]:
+        """Get the names of all configured services.
+        
+        Returns:
+            List of service names from the configuration
+            
+        Raises:
+            ConfigurationError: If configuration cannot be loaded
+        """
+        logger.debug("Getting service names")
+        
+        try:
+            config = await self.load_configuration()
+            services = config.get('services', [])
+            
+            service_names = []
+            for service in services:
+                name = service.get('name')
+                if name:
+                    service_names.append(name)
+                else:
+                    logger.warning("Found service without name in configuration")
+            
+            logger.debug("Retrieved service names", count=len(service_names))
+            return service_names
+            
+        except Exception as e:
+            logger.error("Failed to get service names", error=str(e))
+            raise ConfigurationError(f"Failed to load configuration: {e}")
+
+    async def service_exists(self, service_name: str) -> bool:
+        """Check if a service with the given name exists in the configuration.
+        
+        Args:
+            service_name: Name of the service to check
+            
+        Returns:
+            True if service exists, False otherwise
+            
+        Raises:
+            ConfigurationError: If configuration cannot be loaded
+        """
+        logger.debug("Checking if service exists", service_name=service_name)
+        
+        try:
+            service_names = await self.get_service_names()
+            exists = service_name in service_names
+            
+            logger.debug("Service existence check completed",
+                        service_name=service_name, exists=exists)
+            return exists
+            
+        except Exception as e:
+            logger.error("Failed to check service existence",
+                        service_name=service_name, error=str(e))
+            raise ConfigurationError(f"Failed to check service existence: {e}")
+
+    async def get_service_config(self, service_name: str) -> dict[str, Any] | None:
+        """Get the configuration for a specific service.
+        
+        Args:
+            service_name: Name of the service to get configuration for
+            
+        Returns:
+            Service configuration dictionary, or None if service not found
+            
+        Raises:
+            ConfigurationError: If configuration cannot be loaded
+        """
+        logger.debug("Getting service configuration", service_name=service_name)
+        
+        try:
+            config = await self.load_configuration()
+            services = config.get('services', [])
+            
+            for service in services:
+                if service.get('name') == service_name:
+                    logger.debug("Found service configuration", service_name=service_name)
+                    return service
+            
+            logger.debug("Service configuration not found", service_name=service_name)
+            return None
+            
+        except Exception as e:
+            logger.error("Failed to get service configuration",
+                        service_name=service_name, error=str(e))
+            raise ConfigurationError(f"Failed to load configuration: {e}")
+
+    async def update_service_config(self, service_name: str, service: dict[str, Any]) -> bool:
+        """Update an existing service configuration.
+        
+        Args:
+            service_name: Name of the service to update
+            service: Updated service configuration dictionary
+            
+        Returns:
+            True if service was updated, False if service was not found
+            
+        Raises:
+            ConfigurationError: If there's an error updating the configuration
+        """
+        logger.debug("Updating service configuration", service_name=service_name)
+        
+        # Load current configuration
+        config = await self.load_configuration()
+        
+        # Find and update the service
+        services = config.get('services', [])
+        updated = False
+        
+        for i, existing_service in enumerate(services):
+            if existing_service.get('name') == service_name:
+                # Update the service configuration
+                services[i] = service
+                updated = True
+                break
+        
+        if not updated:
+            logger.debug("Service not found for update", service_name=service_name)
+            return False
+        
+        # Create backup before modifying
+        backup_path = None
+        try:
+            if self.config_path.exists():
+                backup_path = await self.backup_configuration()
+            
+            # Validate the updated configuration
+            validation_errors = await self.validate_configuration(config)
+            if validation_errors:
+                raise ConfigurationError(f"Invalid service configuration: {'; '.join(validation_errors)}")
+            
+            # Save updated configuration
+            await self.save_configuration(config)
+            
+            logger.info("Successfully updated service configuration",
+                       service_name=service_name)
+            return True
+                       
+        except Exception as e:
+            # Restore from backup if operation failed
+            if backup_path and Path(backup_path).exists():
+                logger.warning("Restoring configuration from backup due to error",
+                              backup_path=backup_path, error=str(e))
+                try:
+                    import shutil
+                    shutil.copy2(backup_path, self.config_path)
+                    self.clear_cache()
+                except Exception as restore_error:
+                    logger.error("Failed to restore configuration backup",
+                               backup_path=backup_path, error=str(restore_error))
+            raise
+
+    async def get_configuration_path(self) -> Path:
+        """Get the path to the currently active configuration file.
+        
+        Returns:
+            Path to the configuration file being used
+        """
+        return self.config_path

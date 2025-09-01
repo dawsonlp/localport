@@ -1,9 +1,27 @@
 # Changelog
 
-All notable changes to LocalPort will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### 🎯 Improved
+- **User-Friendly Error Messages**: Replaced verbose technical error messages with concise, actionable feedback
+  - SSH key not found errors now show safe paths (`~/.ssh/key.pem`) instead of full system paths
+  - Added contextual information (service name, configuration source) to help users identify issues
+  - Included actionable suggestions for common problems (e.g., "Ask your colleague to share the correct key file name")
+  - Technical details still available via `--verbose` and `--debug` flags for developers
+  - Particularly improves experience when sharing configuration files between team members
+
+### 🔧 Technical
+- Added structured error classification system with `LocalPortError` base class
+- Implemented `SSHKeyNotFoundError` with built-in path sanitization and context enrichment  
+- Created `ErrorFormatter` with multiple verbosity levels (normal, verbose, debug)
+- Updated domain validation to use structured exceptions instead of generic `ValueError`
+- Enhanced infrastructure layer to preserve error context through the application stack
+- Added comprehensive integration tests for error formatting behavior
 
 ## [0.3.8] - 2025-01-08
 

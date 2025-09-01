@@ -231,7 +231,13 @@ def main(
 
 
 # Import command implementations
-from .commands.config_commands import export_config_sync, validate_config_sync
+from .commands.config_commands import (
+    export_config_sync, 
+    validate_config_sync,
+    add_connection_sync,
+    remove_connection_sync,
+    list_connections_sync
+)
 from .commands.daemon_commands import (
     reload_daemon_sync,
     restart_daemon_sync,
@@ -295,6 +301,9 @@ config_app = typer.Typer(
 # Add config commands
 config_app.command(name="export")(export_config_sync)
 config_app.command(name="validate")(validate_config_sync)
+config_app.command(name="add")(add_connection_sync)
+config_app.command(name="remove")(remove_connection_sync)
+config_app.command(name="list")(list_connections_sync)
 
 # Add config subcommand
 app.add_typer(config_app, name="config")

@@ -3,6 +3,7 @@
 import asyncio
 import json
 from pathlib import Path
+from typing import Optional
 
 import structlog
 import typer
@@ -10,8 +11,26 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from ...application.dto.connection_dto import AddConnectionRequest, RemoveConnectionRequest
+from ...application.services.connection_discovery_service import ConnectionDiscoveryService
+from ...application.services.connection_validation_service import ConnectionValidationService
+from ...application.use_cases.add_connection import AddConnectionUseCase
+from ...application.use_cases.remove_connection import RemoveConnectionUseCase
+from ...application.use_cases.list_connections import ListConnectionsUseCase
+from ...domain.enums import ForwardingTechnology
+from ...domain.exceptions import (
+    ServiceAlreadyExistsError,
+    KubernetesResourceNotFoundError,
+    MultipleNamespacesFoundError,
+    NoPortsAvailableError,
+    ValidationError
+)
+from ...infrastructure.adapters.kubernetes_discovery_adapter import KubernetesDiscoveryAdapter
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from ..formatters.connection_formatter import ConnectionFormatterFactory
 from ..formatters.output_format import OutputFormat
+from ..utils.connection_prompts import ConnectionPrompts
+from ..utils.error_formatter import ErrorFormatter
 from ..utils.rich_utils import (
     create_error_panel,
     create_info_panel,
@@ -392,3 +411,353 @@ def validate_config_sync(
     # Get output format from context
     output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
     asyncio.run(validate_config_command(config_file, output_format))
+
+
+# New Connection Management Commands
+
+async def add_connection_command(
+    service_name: Optional[str] = None,
+    technology: Optional[str] = None,
+    resource_name: Optional[str] = None,
+    namespace: Optional[str] = None,
+    local_port: Optional[int] = None,
+    remote_port: Optional[int] = None,
+    ssh_host: Optional[str] = None,
+    ssh_user: Optional[str] = None,
+    ssh_key: Optional[str] = None,
+    ssh_port: int = 22,
+    output_format: OutputFormat = OutputFormat.TABLE,
+    verbosity: int = 0
+) -> None:
+    """Add a new connection configuration."""
+    error_formatter = ErrorFormatter(verbosity)
+    
+    try:
+        # Initialize repositories and services
+        config_repo = YamlConfigRepository()
+        validation_service = ConnectionValidationService(config_repo)
+        
+        # Determine technology if not provided
+        if not technology:
+            console.print("\n[bold blue]🚀 LocalPort Connection Setup[/bold blue]")
+            console.print("Which technology would you like to use?")
+            console.print("1. [green]kubectl[/green] - Kubernetes port forwarding")
+            console.print("2. [blue]ssh[/blue] - SSH tunnel")
+            
+            while True:
+                choice = typer.prompt("Choose technology (1 or 2)")
+                if choice in ["1", "kubectl", "k8s", "kubernetes"]:
+                    technology = "kubectl"
+                    break
+                elif choice in ["2", "ssh"]:
+                    technology = "ssh"
+                    break
+                else:
+                    console.print("[red]Please choose 1 (kubectl) or 2 (ssh)[/red]")
+        
+        # Handle kubectl connection
+        if technology.lower() == "kubectl":
+            await _handle_kubectl_connection(
+                config_repo, validation_service, service_name, resource_name, 
+                namespace, local_port, remote_port, output_format
+            )
+        
+        # Handle SSH connection
+        elif technology.lower() == "ssh":
+            await _handle_ssh_connection(
+                config_repo, validation_service, service_name, ssh_host, ssh_user,
+                ssh_key, ssh_port, local_port, remote_port, output_format
+            )
+        
+        else:
+            raise ValidationError(f"Unsupported technology: {technology}. Use 'kubectl' or 'ssh'")
+            
+    except (ServiceAlreadyExistsError, KubernetesResourceNotFoundError, 
+            MultipleNamespacesFoundError, NoPortsAvailableError, ValidationError) as e:
+        await error_formatter.format_error(e, output_format)
+        raise typer.Exit(1)
+    except Exception as e:
+        logger.exception("Error adding connection")
+        await error_formatter.format_error(e, output_format)
+        raise typer.Exit(1)
+
+
+async def _handle_kubectl_connection(
+    config_repo: YamlConfigRepository,
+    validation_service: ConnectionValidationService,
+    service_name: Optional[str],
+    resource_name: Optional[str],
+    namespace: Optional[str],
+    local_port: Optional[int],
+    remote_port: Optional[int],
+    output_format: OutputFormat
+) -> None:
+    """Handle kubectl connection setup."""
+    # Initialize discovery services
+    discovery_adapter = KubernetesDiscoveryAdapter()
+    discovery_service = ConnectionDiscoveryService(discovery_adapter)
+    add_use_case = AddConnectionUseCase(config_repo, discovery_adapter, validation_service)
+    
+    # Get resource name if not provided
+    if not resource_name:
+        resource_name = await ConnectionPrompts.prompt_for_kubectl_resource_name()
+    
+    # Get current namespace
+    current_namespace = await discovery_adapter.get_current_namespace()
+    
+    # Get namespace if not provided
+    if namespace is None:
+        namespace = await ConnectionPrompts.prompt_for_kubectl_namespace(current_namespace)
+        if namespace is None:  # User chose current namespace
+            namespace = current_namespace
+    
+    # Show discovery progress
+    ConnectionPrompts.show_discovery_progress(resource_name, namespace)
+    
+    # Create connection request
+    request = AddConnectionRequest(
+        service_name=service_name or resource_name,  # Default to resource name
+        technology="kubectl",
+        connection_params={
+            "resource_name": resource_name,
+            "namespace": namespace
+        },
+        options={
+            "local_port": local_port,
+            "remote_port": remote_port
+        }
+    )
+    
+    # Execute use case
+    response = await add_use_case.execute(request)
+    
+    # Format output
+    formatter = ConnectionFormatterFactory.create_formatter(output_format.value, console)
+    
+    if response.success:
+        target_info = f"{namespace}/{resource_name}"
+        if hasattr(formatter, 'format_add_success'):
+            formatter.format_add_success(
+                service_name=response.service_name,
+                technology="kubectl",
+                local_port=response.configuration_added.get("local_port", 0),
+                target_info=target_info
+            )
+        else:
+            formatter.format_add_success(
+                service_name=response.service_name,
+                technology="kubectl", 
+                local_port=response.configuration_added.get("local_port", 0),
+                target_info=target_info
+            )
+
+
+async def _handle_ssh_connection(
+    config_repo: YamlConfigRepository,
+    validation_service: ConnectionValidationService,
+    service_name: Optional[str],
+    ssh_host: Optional[str],
+    ssh_user: Optional[str],
+    ssh_key: Optional[str],
+    ssh_port: int,
+    local_port: Optional[int],
+    remote_port: Optional[int],
+    output_format: OutputFormat
+) -> None:
+    """Handle SSH connection setup."""
+    add_use_case = AddConnectionUseCase(config_repo, None, validation_service)
+    
+    # Get SSH connection details
+    if not ssh_host:
+        ssh_host = await ConnectionPrompts.prompt_for_ssh_host()
+    
+    if not ssh_user:
+        ssh_user = await ConnectionPrompts.prompt_for_ssh_user()
+    
+    if not ssh_key:
+        ssh_key = await ConnectionPrompts.prompt_for_ssh_key_file()
+    
+    if not remote_port:
+        remote_port = await ConnectionPrompts.prompt_for_remote_port()
+    
+    if not local_port:
+        local_port = await ConnectionPrompts.prompt_for_local_port(suggested=remote_port)
+    
+    # Get service name if not provided
+    if not service_name:
+        suggested_name = f"ssh-{ssh_host}".replace(".", "-")
+        service_name = await ConnectionPrompts.prompt_for_service_name(suggested_name)
+    
+    # Show validation progress
+    ConnectionPrompts.show_validation_progress(service_name)
+    
+    # Create connection request
+    connection_params = {
+        "host": ssh_host,
+        "port": ssh_port
+    }
+    if ssh_user:
+        connection_params["user"] = ssh_user
+    if ssh_key:
+        connection_params["key_file"] = ssh_key
+        
+    request = AddConnectionRequest(
+        service_name=service_name,
+        technology="ssh",
+        connection_params=connection_params,
+        options={
+            "local_port": local_port,
+            "remote_port": remote_port
+        }
+    )
+    
+    # Execute use case
+    response = await add_use_case.execute(request)
+    
+    # Format output
+    formatter = ConnectionFormatterFactory.create_formatter(output_format.value, console)
+    
+    if response.success:
+        target_info = ssh_host
+        if hasattr(formatter, 'format_add_success'):
+            formatter.format_add_success(
+                service_name=response.service_name,
+                technology="ssh",
+                local_port=response.configuration_added.get("local_port", 0),
+                target_info=target_info
+            )
+
+
+async def remove_connection_command(
+    service_name: str,
+    force: bool = False,
+    output_format: OutputFormat = OutputFormat.TABLE,
+    verbosity: int = 0
+) -> None:
+    """Remove a connection configuration."""
+    error_formatter = ErrorFormatter(verbosity)
+    
+    try:
+        # Initialize repositories and services
+        config_repo = YamlConfigRepository()
+        remove_use_case = RemoveConnectionUseCase(config_repo, None)  # Service repo not needed for config removal
+        
+        # Check if service exists
+        if not await config_repo.service_exists(service_name):
+            console.print(f"[red]Error: Service '{service_name}' not found in configuration.[/red]")
+            raise typer.Exit(1)
+        
+        # Confirm removal if not forced
+        if not force:
+            confirmed = await ConnectionPrompts.confirm_service_removal(service_name, False)  # TODO: Check if running
+            if not confirmed:
+                console.print("Removal cancelled.")
+                return
+        
+        # Create removal request
+        request = RemoveConnectionRequest(service_name=service_name)
+        
+        # Execute use case
+        response = await remove_use_case.execute(request)
+        
+        # Format output
+        formatter = ConnectionFormatterFactory.create_formatter(output_format.value, console)
+        
+        if response.success:
+            formatter.format_remove_success(service_name, response.was_running)
+        
+    except Exception as e:
+        logger.exception("Error removing connection")
+        await error_formatter.format_error(e, output_format)
+        raise typer.Exit(1)
+
+
+async def list_connections_command(
+    output_format: OutputFormat = OutputFormat.TABLE,
+    verbosity: int = 0
+) -> None:
+    """List all configured connections."""
+    error_formatter = ErrorFormatter(verbosity)
+    
+    try:
+        # Initialize repositories and services
+        config_repo = YamlConfigRepository()
+        list_use_case = ListConnectionsUseCase(config_repo)
+        
+        # Execute use case
+        response = await list_use_case.execute()
+        
+        # Format output
+        formatter = ConnectionFormatterFactory.create_formatter(output_format.value, console)
+        formatter.format_connections_list(response)
+        
+    except Exception as e:
+        logger.exception("Error listing connections")
+        await error_formatter.format_error(e, output_format)
+        raise typer.Exit(1)
+
+
+# Sync wrappers for Typer
+
+def add_connection_sync(
+    ctx: typer.Context,
+    service_name: Optional[str] = typer.Option(None, "--name", "-n", help="Service name"),
+    technology: Optional[str] = typer.Option(None, "--technology", "-t", help="Technology (kubectl/ssh)"),
+    resource_name: Optional[str] = typer.Option(None, "--resource", "-r", help="Kubernetes resource name"),
+    namespace: Optional[str] = typer.Option(None, "--namespace", help="Kubernetes namespace"),
+    local_port: Optional[int] = typer.Option(None, "--local-port", "-l", help="Local port"),
+    remote_port: Optional[int] = typer.Option(None, "--remote-port", help="Remote port"),
+    ssh_host: Optional[str] = typer.Option(None, "--host", help="SSH hostname"),
+    ssh_user: Optional[str] = typer.Option(None, "--user", "-u", help="SSH username"),
+    ssh_key: Optional[str] = typer.Option(None, "--key", "-k", help="SSH key file"),
+    ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port")
+) -> None:
+    """Add a new connection configuration.
+
+    Examples:
+        localport config add                                    # Interactive setup
+        localport config add --technology kubectl --resource postgres    # Kubectl connection
+        localport config add --technology ssh --host server.com         # SSH connection
+        localport --output json config add                     # JSON output format
+    """
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    verbosity = ctx.obj.get('verbosity', 0)
+    
+    asyncio.run(add_connection_command(
+        service_name, technology, resource_name, namespace,
+        local_port, remote_port, ssh_host, ssh_user, ssh_key, ssh_port,
+        output_format, verbosity
+    ))
+
+
+def remove_connection_sync(
+    ctx: typer.Context,
+    service_name: str = typer.Argument(..., help="Name of service to remove"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt")
+) -> None:
+    """Remove a connection configuration.
+
+    Examples:
+        localport config remove postgres            # Remove postgres service
+        localport config remove postgres --force    # Remove without confirmation
+        localport --output json config remove postgres    # JSON output format
+    """
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    verbosity = ctx.obj.get('verbosity', 0)
+    
+    asyncio.run(remove_connection_command(service_name, force, output_format, verbosity))
+
+
+def list_connections_sync(
+    ctx: typer.Context
+) -> None:
+    """List all configured connections.
+
+    Examples:
+        localport config list                       # List all connections
+        localport --output json config list        # JSON output format
+    """
+    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    verbosity = ctx.obj.get('verbosity', 0)
+    
+    asyncio.run(list_connections_command(output_format, verbosity))
