@@ -1,5 +1,6 @@
 """Main CLI application using Typer and Rich."""
 
+import asyncio
 import os
 import sys
 
@@ -10,6 +11,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from ..config.settings import Settings
+from ..config.config_path_manager import ConfigPathManager
 from .formatters.output_format import OutputFormat
 from .utils.rich_utils import setup_rich_logging
 
@@ -340,18 +342,34 @@ cluster_app.command(name="pods")(cluster_pods_sync)
 app.add_typer(cluster_app, name="cluster")
 
 
+async def get_config_status_display() -> str:
+    """Get formatted configuration status for help display."""
+    try:
+        config_status = await ConfigPathManager.format_config_status()
+        return f"\n[bold]Configuration:[/bold]\n{config_status}"
+    except Exception:
+        # Fallback to basic message if config detection fails
+        return "\n[bold]Configuration:[/bold]\n  Use 'localport config --help' for configuration options"
+
+
 def cli_main():
     """Entry point for the CLI application."""
     try:
         # Check if no arguments provided and show help
         if len(sys.argv) == 1:
-            # Manually show help without the error box
-            console.print("""[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring
+            # Get dynamic configuration status
+            try:
+                config_status = asyncio.run(get_config_status_display())
+            except Exception:
+                config_status = "\n[bold]Configuration:[/bold]\n  Use 'localport config --help' for configuration options"
+            
+            # Display help with dynamic configuration status
+            console.print(f"""[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring
 
 [bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues
 [blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]
 
-[bold]Usage:[/bold] localport [OPTIONS] COMMAND [ARGS]...
+[bold]Usage:[/bold] localport [OPTIONS] COMMAND [ARGS]...{config_status}
 
 [bold]Commands:[/bold]
   [cyan]start[/cyan]    Start port forwarding services

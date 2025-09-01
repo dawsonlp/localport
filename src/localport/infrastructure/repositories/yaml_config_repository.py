@@ -12,6 +12,7 @@ try:
 except ImportError:
     yaml = None
 
+from ...config.config_path_manager import ConfigPathManager
 from ...domain.entities.service import Service
 from ...domain.enums import ForwardingTechnology
 from ...domain.repositories.config_repository import (
@@ -44,23 +45,16 @@ class YamlConfigRepository(ConfigRepository):
         Returns:
             Path to configuration file
         """
-        # Search order: current directory, home directory, /etc
-        search_paths = [
-            Path.cwd() / "localport.yaml",
-            Path.cwd() / "localport.yml",
-            Path.cwd() / ".localport.yaml",
-            Path.home() / ".localport.yaml",
-            Path.home() / ".config" / "localport" / "config.yaml",
-            Path("/etc/localport/config.yaml"),
-        ]
+        # Use centralized config path manager
+        active_config = ConfigPathManager.find_active_config()
+        
+        if active_config and active_config.exists:
+            logger.info("Found configuration file", path=str(active_config.path))
+            return active_config.path
 
-        for path in search_paths:
-            if path.exists():
-                logger.info("Found configuration file", path=str(path))
-                return path
-
-        # Default to localport.yaml in current directory
-        default_path = Path.cwd() / "localport.yaml"
+        # Default to first search path if none found
+        search_paths = ConfigPathManager.get_default_search_paths()
+        default_path = search_paths[0]  # localport.yaml in current directory
         logger.debug("Using default configuration path", path=str(default_path))
         return default_path
 

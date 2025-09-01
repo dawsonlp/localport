@@ -326,6 +326,8 @@ class ServiceManager:
         
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
+                cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
+                
                 # Check if this is a kubectl process (handle different paths like /snap/kubectl/xxx/kubectl)
                 if (proc.info['cmdline'] and 
                     len(proc.info['cmdline']) > 0 and
@@ -333,9 +335,23 @@ class ServiceManager:
                     'port-forward' in proc.info['cmdline']):
                     
                     # Check if this kubectl process is forwarding our exact port mapping
-                    cmdline = ' '.join(proc.info['cmdline'])
                     if self._validate_port_mapping(cmdline, service.local_port, service.remote_port):
                         logger.debug("Found running kubectl process for service",
+                                   service_name=service.name,
+                                   process_id=proc.info['pid'],
+                                   cmdline=cmdline)
+                        return True
+                
+                # Check if this is an SSH process
+                elif (service.technology == ForwardingTechnology.SSH and
+                      proc.info['cmdline'] and 
+                      len(proc.info['cmdline']) > 0 and
+                      'ssh' in proc.info['cmdline'][0] and 
+                      '-L' in proc.info['cmdline']):
+                    
+                    # Check if this SSH process is forwarding our exact port mapping
+                    if self._validate_ssh_port_mapping(cmdline, service.local_port, service.remote_port):
+                        logger.debug("Found running SSH process for service",
                                    service_name=service.name,
                                    process_id=proc.info['pid'],
                                    cmdline=cmdline)
@@ -373,6 +389,9 @@ class ServiceManager:
             description=service.description
         )
 
+        # Check if service is actually running using improved detection
+        is_running = await self.is_service_running(service)
+        
         # Add port forward specific info if available
         if port_forward:
             status_info.process_id = port_forward.process_id
@@ -381,8 +400,8 @@ class ServiceManager:
             status_info.restart_count = port_forward.restart_count
             status_info.uptime_seconds = port_forward.get_uptime_seconds()
 
-            # Check if process is actually alive
-            if port_forward.is_process_alive():
+            # Check if process is actually alive using improved detection
+            if is_running:
                 status_info.is_healthy = True
                 service.update_status(ServiceStatus.RUNNING)
                 status_info.status = ServiceStatus.RUNNING
@@ -392,11 +411,19 @@ class ServiceManager:
                 service.update_status(ServiceStatus.FAILED)
                 status_info.status = ServiceStatus.FAILED
         else:
-            # No active forward in memory - service is not managed by LocalPort
-            # Only report what we know from our state, don't auto-adopt external processes
-            status_info.is_healthy = False
-            service.update_status(ServiceStatus.STOPPED)
-            status_info.status = ServiceStatus.STOPPED
+            # No active forward in memory - check if process is running externally
+            if is_running:
+                # Found running process that matches our service but not tracked
+                status_info.is_healthy = True
+                service.update_status(ServiceStatus.RUNNING)
+                status_info.status = ServiceStatus.RUNNING
+                logger.info("Found untracked running process for service", 
+                           service_name=service.name)
+            else:
+                # No process found
+                status_info.is_healthy = False
+                service.update_status(ServiceStatus.STOPPED)
+                status_info.status = ServiceStatus.STOPPED
 
         return status_info
 
@@ -856,6 +883,38 @@ class ServiceManager:
                     cmdline=cmdline)
         return False
 
+    def _validate_ssh_port_mapping(self, cmdline: str, local_port: int, remote_port: int) -> bool:
+        """Validate that an SSH command line contains the expected port mapping.
+        
+        Args:
+            cmdline: SSH command line string to check
+            local_port: Expected local port
+            remote_port: Expected remote port
+            
+        Returns:
+            True if the exact SSH port mapping is found, False otherwise
+        """
+        # SSH tunnel format: -L local_port:remote_host:remote_port
+        # We need to check for the local_port and remote_port parts
+        import re
+        
+        # Look for -L port mapping pattern: -L local_port:something:remote_port
+        ssh_pattern = rf'-L\s+{local_port}:[^:\s]+:{remote_port}'
+        
+        if re.search(ssh_pattern, cmdline):
+            logger.debug("SSH port mapping validation successful",
+                        local_port=local_port,
+                        remote_port=remote_port,
+                        pattern=ssh_pattern)
+            return True
+        
+        logger.debug("SSH port mapping validation failed",
+                    local_port=local_port,
+                    remote_port=remote_port,
+                    pattern=ssh_pattern,
+                    cmdline=cmdline)
+        return False
+
     def _validate_process(self, process_id: int, expected_local_port: int | None = None, expected_remote_port: int | None = None) -> bool:
         """Validate that a process exists and matches expected criteria.
         
@@ -879,15 +938,14 @@ class ServiceManager:
                         expected_remote_port=expected_remote_port)
             
             # Check if it's a kubectl port-forward process
-            # Look for kubectl in the command (handle different paths)
             has_kubectl = any('kubectl' in arg for arg in cmdline_list)
             has_port_forward = 'port-forward' in cmdline
             
             if has_kubectl and has_port_forward:
-                # If we have expected ports, verify they match exactly
+                # Validate kubectl process
                 if expected_local_port is not None and expected_remote_port is not None:
                     if not self._validate_port_mapping(cmdline, expected_local_port, expected_remote_port):
-                        logger.debug("Port mapping validation failed",
+                        logger.debug("Kubectl port mapping validation failed",
                                    process_id=process_id,
                                    expected_local_port=expected_local_port,
                                    expected_remote_port=expected_remote_port,
@@ -897,22 +955,53 @@ class ServiceManager:
                     # Fallback to local port only validation for backward compatibility
                     port_pattern = f'{expected_local_port}:'
                     if port_pattern not in cmdline:
-                        logger.debug("Local port validation failed",
+                        logger.debug("Kubectl local port validation failed",
                                    process_id=process_id,
                                    expected_local_port=expected_local_port,
                                    cmdline=cmdline)
                         return False
                 
-                logger.debug("Process validation successful",
+                logger.debug("Kubectl process validation successful",
                            process_id=process_id,
                            expected_local_port=expected_local_port,
                            expected_remote_port=expected_remote_port)
                 return True
+            
+            # Check if it's an SSH tunnel process
+            elif (cmdline_list and len(cmdline_list) > 0 and 
+                  'ssh' in cmdline_list[0] and '-L' in cmdline):
+                # Validate SSH process
+                if expected_local_port is not None and expected_remote_port is not None:
+                    if not self._validate_ssh_port_mapping(cmdline, expected_local_port, expected_remote_port):
+                        logger.debug("SSH port mapping validation failed",
+                                   process_id=process_id,
+                                   expected_local_port=expected_local_port,
+                                   expected_remote_port=expected_remote_port,
+                                   cmdline=cmdline)
+                        return False
+                elif expected_local_port is not None:
+                    # Fallback to local port only validation for backward compatibility
+                    port_pattern = f'-L {expected_local_port}:'
+                    if port_pattern not in cmdline:
+                        logger.debug("SSH local port validation failed",
+                                   process_id=process_id,
+                                   expected_local_port=expected_local_port,
+                                   cmdline=cmdline)
+                        return False
+                
+                logger.debug("SSH process validation successful",
+                           process_id=process_id,
+                           expected_local_port=expected_local_port,
+                           expected_remote_port=expected_remote_port)
+                return True
+            
             else:
-                logger.debug("Process validation failed - not kubectl port-forward",
+                logger.debug("Process validation failed - not kubectl port-forward or SSH tunnel",
                            process_id=process_id,
                            has_kubectl=has_kubectl,
                            has_port_forward=has_port_forward,
+                           has_ssh=('ssh' in cmdline_list[0] if cmdline_list else False),
+                           has_ssh_tunnel=('-L' in cmdline),
                            cmdline=cmdline)
                 return False
                 

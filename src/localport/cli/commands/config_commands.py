@@ -11,12 +11,17 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from ...application.dto.connection_dto import AddConnectionRequest, RemoveConnectionRequest
+from ...application.dto.connection_dto import (
+    AddConnectionRequest, 
+    RemoveConnectionRequest, 
+    ListConnectionsRequest
+)
 from ...application.services.connection_discovery_service import ConnectionDiscoveryService
 from ...application.services.connection_validation_service import ConnectionValidationService
 from ...application.use_cases.add_connection import AddConnectionUseCase
 from ...application.use_cases.remove_connection import RemoveConnectionUseCase
 from ...application.use_cases.list_connections import ListConnectionsUseCase
+from ...config.config_path_manager import ConfigPathManager
 from ...domain.enums import ForwardingTechnology
 from ...domain.exceptions import (
     ServiceAlreadyExistsError,
@@ -55,15 +60,10 @@ async def export_config_command(
         # Load current configuration
         config_repo = YamlConfigRepository()
 
-        # Try to find existing config file
-        config_path = None
-        for path in ["./localport.yaml", "~/.config/localport/config.yaml", "~/.localport.yaml"]:
-            test_path = Path(path).expanduser()
-            if test_path.exists():
-                config_path = str(test_path)
-                break
-
-        if not config_path:
+        # Use centralized config path manager to find config file
+        active_config = ConfigPathManager.find_active_config()
+        
+        if not active_config or not active_config.exists:
             if output_format == OutputFormat.JSON:
                 error_data = {
                     "timestamp": "2025-07-02T22:12:00.000000",
@@ -73,15 +73,16 @@ async def export_config_command(
                 }
                 console.print(json.dumps(error_data, indent=2))
             else:
+                # Use centralized search paths display
+                search_paths_text = await ConfigPathManager.format_search_paths_with_status()
                 console.print(create_info_panel(
                     "No Configuration Found",
-                    "No configuration file found in standard locations:\n" +
-                    "• ./localport.yaml\n" +
-                    "• ~/.config/localport/config.yaml\n" +
-                    "• ~/.localport.yaml\n\n" +
+                    f"No configuration file found. Searched:\n{search_paths_text}\n\n" +
                     "Create a configuration file first or use --config to specify a custom location."
                 ))
             return
+
+        config_path = str(active_config.path)
 
         # Load configuration
         config_repo = YamlConfigRepository(config_path)
@@ -206,13 +207,12 @@ async def validate_config_command(
         if config_file:
             config_path = config_file
         else:
-            # Try to find existing config file
-            config_path = None
-            for path in ["./localport.yaml", "~/.config/localport/config.yaml", "~/.localport.yaml"]:
-                test_path = Path(path).expanduser()
-                if test_path.exists():
-                    config_path = str(test_path)
-                    break
+            # Use centralized config path manager to find config file
+            active_config = ConfigPathManager.find_active_config()
+            if active_config and active_config.exists:
+                config_path = str(active_config.path)
+            else:
+                config_path = None
 
         if not config_path:
             if output_format == OutputFormat.JSON:
@@ -224,9 +224,12 @@ async def validate_config_command(
                 }
                 console.print(json.dumps(error_data, indent=2))
             else:
+                # Use centralized search paths display
+                search_paths_text = await ConfigPathManager.format_search_paths_with_status()
                 console.print(create_error_panel(
                     "No Configuration Found",
-                    "No configuration file found. Specify --config or create a configuration file."
+                    f"No configuration file found. Searched:\n{search_paths_text}\n\n" +
+                    "Specify --config or create a configuration file."
                 ))
             raise typer.Exit(1)
 
@@ -474,11 +477,11 @@ async def add_connection_command(
             
     except (ServiceAlreadyExistsError, KubernetesResourceNotFoundError, 
             MultipleNamespacesFoundError, NoPortsAvailableError, ValidationError) as e:
-        await error_formatter.format_error(e, output_format)
+        error_formatter.format_error(e, output_format)
         raise typer.Exit(1)
     except Exception as e:
         logger.exception("Error adding connection")
-        await error_formatter.format_error(e, output_format)
+        error_formatter.format_error(e, output_format)
         raise typer.Exit(1)
 
 
@@ -496,7 +499,7 @@ async def _handle_kubectl_connection(
     # Initialize discovery services
     discovery_adapter = KubernetesDiscoveryAdapter()
     discovery_service = ConnectionDiscoveryService(discovery_adapter)
-    add_use_case = AddConnectionUseCase(config_repo, discovery_adapter, validation_service)
+    add_use_case = AddConnectionUseCase(config_repo, discovery_adapter)
     
     # Get resource name if not provided
     if not resource_name:
@@ -517,7 +520,7 @@ async def _handle_kubectl_connection(
     # Create connection request
     request = AddConnectionRequest(
         service_name=service_name or resource_name,  # Default to resource name
-        technology="kubectl",
+        technology=ForwardingTechnology.KUBECTL,
         connection_params={
             "resource_name": resource_name,
             "namespace": namespace
@@ -565,7 +568,7 @@ async def _handle_ssh_connection(
     output_format: OutputFormat
 ) -> None:
     """Handle SSH connection setup."""
-    add_use_case = AddConnectionUseCase(config_repo, None, validation_service)
+    add_use_case = AddConnectionUseCase(config_repo, None)
     
     # Get SSH connection details
     if not ssh_host:
@@ -603,7 +606,7 @@ async def _handle_ssh_connection(
         
     request = AddConnectionRequest(
         service_name=service_name,
-        technology="ssh",
+        technology=ForwardingTechnology.SSH,
         connection_params=connection_params,
         options={
             "local_port": local_port,
@@ -668,7 +671,7 @@ async def remove_connection_command(
         
     except Exception as e:
         logger.exception("Error removing connection")
-        await error_formatter.format_error(e, output_format)
+        error_formatter.format_error(e, output_format)
         raise typer.Exit(1)
 
 
@@ -685,7 +688,8 @@ async def list_connections_command(
         list_use_case = ListConnectionsUseCase(config_repo)
         
         # Execute use case
-        response = await list_use_case.execute()
+        request = ListConnectionsRequest()  # Use default values
+        response = await list_use_case.execute(request)
         
         # Format output
         formatter = ConnectionFormatterFactory.create_formatter(output_format.value, console)
@@ -693,7 +697,7 @@ async def list_connections_command(
         
     except Exception as e:
         logger.exception("Error listing connections")
-        await error_formatter.format_error(e, output_format)
+        error_formatter.format_error(e, output_format)
         raise typer.Exit(1)
 
 

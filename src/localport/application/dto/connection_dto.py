@@ -237,6 +237,8 @@ class ServiceSummary:
     technology: str
     target: str  # Human-readable target description
     local_port: int
+    remote_port: int  # Add missing remote_port field
+    connection_params: dict[str, Any]  # Add missing connection_params field
     enabled: bool = True
     tags: list[str] = None
     description: str | None = None
@@ -245,6 +247,13 @@ class ServiceSummary:
         """Initialize default values."""
         if self.tags is None:
             self.tags = []
+        if self.connection_params is None:
+            self.connection_params = {}
+    
+    @property
+    def service_name(self) -> str:
+        """Alias for name to match formatter expectations."""
+        return self.name
 
 
 @dataclass

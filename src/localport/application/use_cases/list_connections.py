@@ -85,6 +85,8 @@ class ListConnectionsUseCase:
         name = service_config.get('name', 'unnamed')
         technology = service_config.get('technology', 'unknown')
         local_port = service_config.get('local_port', 0)
+        remote_port = service_config.get('remote_port', 0)
+        connection_params = service_config.get('connection', {})
         enabled = service_config.get('enabled', True)
         tags = service_config.get('tags', [])
         description = service_config.get('description')
@@ -97,6 +99,8 @@ class ListConnectionsUseCase:
             technology=technology,
             target=target,
             local_port=local_port,
+            remote_port=remote_port,
+            connection_params=connection_params,
             enabled=enabled,
             tags=tags,
             description=description
