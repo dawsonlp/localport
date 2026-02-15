@@ -200,3 +200,6 @@ htmlcov/
 
 # Cline dev environment rules
 .clinerules/
+
+# Communication / evaluation files
+comm/

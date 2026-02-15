@@ -108,6 +108,8 @@ class YamlConfigRepository(ConfigRepository):
     async def save_configuration(self, config: dict[str, Any]) -> None:
         """Save configuration to YAML file.
 
+        Creates a backup of the existing file before overwriting.
+
         Args:
             config: Configuration dictionary to save
         """
@@ -115,6 +117,14 @@ class YamlConfigRepository(ConfigRepository):
             raise ImportError("PyYAML is required for YAML configuration. Install with: pip install pyyaml")
 
         try:
+            # Create backup before overwriting if the file already exists
+            if self.config_path.exists():
+                try:
+                    await self.backup_configuration()
+                except Exception as backup_err:
+                    logger.warning("Failed to create backup before save",
+                                  error=str(backup_err))
+
             # Ensure parent directory exists
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
 

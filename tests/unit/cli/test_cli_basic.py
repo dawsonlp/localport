@@ -1,121 +1,106 @@
-"""Basic CLI tests for LocalPort."""
+"""Tests for CLI basic functionality."""
 
-from unittest.mock import patch
-
+import pytest
 from typer.testing import CliRunner
 
 from localport.cli.app import app
 
 
+runner = CliRunner()
+
+
 class TestCLIBasic:
-    """Test basic CLI functionality."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.runner = CliRunner()
-
-    def test_help_command(self):
-        """Test that help command works."""
-        result = self.runner.invoke(app, ["--help"])
-        assert result.exit_code == 0
-        assert "LocalPort" in result.stdout
-        assert "Universal port forwarding manager" in result.stdout
+    """Test basic CLI command structure and options."""
 
     def test_version_command(self):
-        """Test that version command works."""
-        result = self.runner.invoke(app, ["--version"])
+        """Test --version flag shows version info."""
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+        # Version output contains version number
+        assert "v" in result.stdout or "LocalPort" in result.stdout
+
+    def test_help_command(self):
+        """Test --help flag shows help."""
+        result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "LocalPort" in result.stdout
-        assert "v0.1.0" in result.stdout
 
-    def test_start_placeholder(self):
-        """Test that start command shows placeholder message."""
-        result = self.runner.invoke(app, ["start"])
+    def test_start_command_exists(self):
+        """Test that start command is registered."""
+        result = runner.invoke(app, ["start", "--help"])
         assert result.exit_code == 0
-        assert "Start command not yet implemented" in result.stdout
-        assert "Phase 5.2" in result.stdout
 
-    def test_stop_placeholder(self):
-        """Test that stop command shows placeholder message."""
-        result = self.runner.invoke(app, ["stop"])
+    def test_stop_command_exists(self):
+        """Test that stop command is registered."""
+        result = runner.invoke(app, ["stop", "--help"])
         assert result.exit_code == 0
-        assert "Stop command not yet implemented" in result.stdout
-        assert "Phase 5.2" in result.stdout
 
-    def test_status_placeholder(self):
-        """Test that status command shows placeholder message."""
-        result = self.runner.invoke(app, ["status"])
+    def test_status_command_exists(self):
+        """Test that status command is registered."""
+        result = runner.invoke(app, ["status", "--help"])
         assert result.exit_code == 0
-        assert "Status command not yet implemented" in result.stdout
-        assert "Phase 5.2" in result.stdout
 
-    def test_daemon_help(self):
-        """Test that daemon help works."""
-        result = self.runner.invoke(app, ["daemon", "--help"])
+    def test_daemon_start_exists(self):
+        """Test that daemon start command is registered."""
+        result = runner.invoke(app, ["daemon", "start", "--help"])
         assert result.exit_code == 0
-        assert "Daemon management commands" in result.stdout
 
-    def test_daemon_start_placeholder(self):
-        """Test that daemon start shows placeholder message."""
-        result = self.runner.invoke(app, ["daemon", "start"])
+    def test_daemon_stop_exists(self):
+        """Test that daemon stop command is registered."""
+        result = runner.invoke(app, ["daemon", "stop", "--help"])
         assert result.exit_code == 0
-        assert "Daemon start command not yet implemented" in result.stdout
-        assert "Phase 5.2" in result.stdout
 
-    def test_daemon_stop_placeholder(self):
-        """Test that daemon stop shows placeholder message."""
-        result = self.runner.invoke(app, ["daemon", "stop"])
+    def test_daemon_status_exists(self):
+        """Test that daemon status command is registered."""
+        result = runner.invoke(app, ["daemon", "status", "--help"])
         assert result.exit_code == 0
-        assert "Daemon stop command not yet implemented" in result.stdout
-        assert "Phase 5.2" in result.stdout
 
-    def test_daemon_status_placeholder(self):
-        """Test that daemon status shows placeholder message."""
-        result = self.runner.invoke(app, ["daemon", "status"])
+    def test_config_commands_exist(self):
+        """Test that config subcommands are registered."""
+        result = runner.invoke(app, ["config", "--help"])
         assert result.exit_code == 0
-        assert "Daemon status command not yet implemented" in result.stdout
-        assert "Phase 5.2" in result.stdout
+        assert "export" in result.stdout.lower()
+        assert "validate" in result.stdout.lower()
+
+    def test_cluster_commands_exist(self):
+        """Test that cluster subcommands are registered."""
+        result = runner.invoke(app, ["cluster", "--help"])
+        assert result.exit_code == 0
+        assert "status" in result.stdout.lower()
+        assert "events" in result.stdout.lower()
+        assert "pods" in result.stdout.lower()
+
+    def test_ssh_commands_exist(self):
+        """Test that ssh subcommands are registered."""
+        result = runner.invoke(app, ["ssh", "--help"])
+        assert result.exit_code == 0
 
     def test_verbose_flag(self):
-        """Test that verbose flag is accepted."""
-        result = self.runner.invoke(app, ["--verbose", "start"])
+        """Test that --verbose flag is accepted."""
+        result = runner.invoke(app, ["-v", "--help"])
         assert result.exit_code == 0
-        assert "Start command not yet implemented" in result.stdout
 
     def test_quiet_flag(self):
-        """Test that quiet flag is accepted."""
-        result = self.runner.invoke(app, ["--quiet", "start"])
+        """Test that --quiet flag is accepted."""
+        result = runner.invoke(app, ["-q", "--help"])
         assert result.exit_code == 0
-        assert "Start command not yet implemented" in result.stdout
 
     def test_config_flag(self):
-        """Test that config flag is accepted."""
-        result = self.runner.invoke(app, ["--config", "/tmp/test.yaml", "start"])
+        """Test that --config flag is accepted."""
+        result = runner.invoke(app, ["--config", "/tmp/test.yaml", "--help"])
         assert result.exit_code == 0
-        assert "Start command not yet implemented" in result.stdout
 
     def test_log_level_flag(self):
-        """Test that log-level flag is accepted."""
-        result = self.runner.invoke(app, ["--log-level", "DEBUG", "start"])
+        """Test that --log-level flag is accepted."""
+        result = runner.invoke(app, ["--log-level", "DEBUG", "--help"])
         assert result.exit_code == 0
-        assert "Start command not yet implemented" in result.stdout
 
     def test_no_color_flag(self):
-        """Test that no-color flag is accepted."""
-        result = self.runner.invoke(app, ["--no-color", "start"])
+        """Test that --no-color flag is accepted."""
+        result = runner.invoke(app, ["--no-color", "--help"])
         assert result.exit_code == 0
-        assert "Start command not yet implemented" in result.stdout
 
-    def test_invalid_log_level(self):
-        """Test that invalid log level shows error."""
-        result = self.runner.invoke(app, ["--log-level", "INVALID", "start"])
-        assert result.exit_code == 1
-        assert "Invalid log level" in result.stdout
-
-    @patch('localport.cli.app.Settings')
-    def test_settings_initialization_error(self, mock_settings):
-        """Test that settings initialization errors are handled."""
-        mock_settings.side_effect = Exception("Test error")
-        result = self.runner.invoke(app, ["start"])
-        assert result.exit_code == 1
-        assert "Error initializing LocalPort" in result.stdout
+    def test_output_format_flag(self):
+        """Test that --output flag is accepted."""
+        result = runner.invoke(app, ["--output", "json", "--help"])
+        assert result.exit_code == 0

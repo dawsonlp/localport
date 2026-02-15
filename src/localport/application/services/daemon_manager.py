@@ -159,31 +159,57 @@ class DaemonManager:
             raise
 
     async def reload_configuration(self) -> None:
-        """Reload configuration and restart services as needed."""
+        """Reload configuration and apply changes incrementally.
+        
+        Uses the ConfigurationDiffer to detect what changed and applies
+        only the necessary modifications:
+        - Services with connection/port changes are restarted
+        - Services with only metadata changes (tags, health_check) are
+          updated in-place without restart
+        - New services are started; removed services are stopped
+        """
         if not self._is_running:
             logger.warning("Cannot reload configuration: daemon not running")
             return
 
-        logger.info("Reloading configuration")
+        logger.info("Reloading configuration (incremental)")
 
         try:
-            # Load new configuration
+            # Capture old configuration before reloading
+            old_config = await self._config_repository.load_configuration()
+            old_services = await self._service_repository.find_all()
+
+            # Load new configuration into the repository
             await self._load_configuration()
 
-            # Get current and configured services
-            current_services = await self._service_repository.find_all()
+            # Get the new configuration for diffing
+            new_config = await self._config_repository.load_configuration()
 
-            # Stop services that are no longer configured
-            # Start new services that were added
-            # Restart services with changed configuration
-            await self._reconcile_services(current_services)
+            # Compute diff
+            from .configuration_differ import ConfigurationDiffer
+            differ = ConfigurationDiffer()
+            diff = await differ.compare_configurations(old_config, new_config)
 
-            # Restart health monitoring with new configuration
-            if self._enable_health_monitoring:
+            if not diff.has_changes:
+                logger.info("No configuration changes detected")
+                return
+
+            logger.info(
+                "Configuration changes detected",
+                summary=differ.format_diff_summary(diff),
+            )
+
+            # Apply changes incrementally
+            await self._apply_service_changes(diff)
+
+            # Only restart health monitoring if truly needed
+            if diff.requires_health_monitor_restart:
+                logger.info("Restarting health monitoring due to configuration changes")
                 await self._health_monitor.stop_monitoring()
-                await self._start_health_monitoring()
+                if self._enable_health_monitoring:
+                    await self._start_health_monitoring()
 
-            logger.info("Configuration reloaded successfully")
+            logger.info("Configuration reloaded successfully (incremental)")
 
         except Exception as e:
             logger.error("Failed to reload configuration", error=str(e))
@@ -665,20 +691,32 @@ class DaemonManager:
         logger.debug("Background tasks cancelled")
 
     async def _reconcile_services(self, current_services: list[Service]) -> None:
-        """Reconcile current services with configuration.
+        """Reconcile current services with loaded configuration.
+
+        Compares currently tracked services against the freshly loaded
+        configuration and stops any services that are no longer present.
 
         Args:
             current_services: Currently managed services
         """
-        # This is a placeholder for service reconciliation logic
-        # In a full implementation, this would:
-        # 1. Compare current services with newly loaded configuration
-        # 2. Stop services that are no longer configured
-        # 3. Start new services that were added
-        # 4. Restart services with changed configuration
+        configured_services = await self._service_repository.find_all()
+        configured_names = {s.name for s in configured_services}
+        current_names = {s.name for s in current_services}
 
-        logger.info("Service reconciliation completed",
-                   current_count=len(current_services))
+        # Stop services that were removed from configuration
+        removed = current_names - configured_names
+        for name in removed:
+            service = next((s for s in current_services if s.name == name), None)
+            if service and service.status == ServiceStatus.RUNNING:
+                logger.info("Stopping service removed from configuration", service_name=name)
+                await self._stop_service_safe(service)
+
+        logger.info(
+            "Service reconciliation completed",
+            current_count=len(current_services),
+            configured_count=len(configured_services),
+            removed_count=len(removed),
+        )
 
     @property
     def is_running(self) -> bool:
@@ -796,44 +834,125 @@ class DaemonManager:
             logger.error("Failed to apply configuration changes", error=str(e))
 
     async def _apply_service_changes(self, diff: ConfigurationDiff) -> None:
-        """Apply service configuration changes.
+        """Apply service configuration changes incrementally.
+
+        For each changed service in the diff:
+        - ADDED: start the new service
+        - REMOVED: stop and remove the service
+        - MODIFIED + requires_restart: stop then start
+        - MODIFIED + !requires_restart: update in-place (no restart)
 
         Args:
             diff: Configuration diff
         """
-        # Get services that need to be restarted
-        services_to_restart = diff.services_requiring_restart
+        from .configuration_differ import ChangeType
 
-        if not services_to_restart:
-            logger.debug("No services require restart")
-            return
+        for change in diff.service_changes:
+            if change.change_type == ChangeType.UNCHANGED:
+                continue
 
-        logger.info("Restarting services due to configuration changes",
-                   services=services_to_restart)
+            service_name = change.service_name
 
-        # Stop and restart affected services
-        for service_name in services_to_restart:
             try:
-                # Find the service
-                service = await self._service_repository.find_by_name(service_name)
-                if not service:
-                    logger.warning("Service not found for restart", service_name=service_name)
-                    continue
+                if change.change_type == ChangeType.ADDED:
+                    # --- New service: start it ---
+                    service = await self._service_repository.find_by_name(service_name)
+                    if service and getattr(service, "enabled", True):
+                        logger.info("Starting newly added service", service_name=service_name)
+                        await self._start_service_safe(service)
 
-                # Stop the service if it's running
-                if service.status == ServiceStatus.RUNNING:
-                    logger.info("Stopping service for configuration update", service_name=service_name)
-                    await self._stop_service_safe(service)
+                elif change.change_type == ChangeType.REMOVED:
+                    # --- Removed service: stop and clean up ---
+                    service = await self._service_repository.find_by_name(service_name)
+                    if service and service.status == ServiceStatus.RUNNING:
+                        logger.info("Stopping removed service", service_name=service_name)
+                        await self._stop_service_safe(service)
 
-                # Start the service if it's enabled
-                if getattr(service, 'enabled', True):
-                    logger.info("Starting service with new configuration", service_name=service_name)
-                    await self._start_service_safe(service)
+                elif change.change_type == ChangeType.MODIFIED:
+                    service = await self._service_repository.find_by_name(service_name)
+                    if not service:
+                        logger.warning("Modified service not found", service_name=service_name)
+                        continue
+
+                    if change.requires_restart:
+                        # Connection/port changes → full restart
+                        logger.info(
+                            "Restarting service (connection change)",
+                            service_name=service_name,
+                            changed_fields=list(change.changed_fields),
+                        )
+                        if service.status == ServiceStatus.RUNNING:
+                            await self._stop_service_safe(service)
+                        if getattr(service, "enabled", True):
+                            await self._start_service_safe(service)
+                    else:
+                        # Metadata-only changes → hot-apply without restart
+                        logger.info(
+                            "Applying in-place config update (no restart)",
+                            service_name=service_name,
+                            changed_fields=list(change.changed_fields),
+                        )
+                        await self._apply_in_place_update(service, change)
 
             except Exception as e:
-                logger.error("Error restarting service",
-                           service_name=service_name,
-                           error=str(e))
+                logger.error(
+                    "Error applying service change",
+                    service_name=service_name,
+                    change_type=change.change_type.value,
+                    error=str(e),
+                )
+
+    async def _apply_in_place_update(
+        self, service: Service, change
+    ) -> None:
+        """Apply non-restart configuration changes to a running service.
+
+        Updates service metadata (tags, health_check_config, restart_policy,
+        etc.) without stopping and restarting the forwarding process.
+
+        Args:
+            service: The service entity to update
+            change: ServiceChange with old/new config and changed_fields
+        """
+        new_config = change.new_config or {}
+
+        # Update tags
+        if "tags" in change.changed_fields:
+            new_tags = new_config.get("tags", [])
+            if hasattr(service, "tags"):
+                service.tags = new_tags
+            logger.debug("Updated tags in-place", service_name=service.name, tags=new_tags)
+
+        # Update health check configuration
+        if "health_check" in change.changed_fields:
+            new_hc = new_config.get("health_check")
+            if hasattr(service, "health_check_config"):
+                service.health_check_config = new_hc
+            logger.debug(
+                "Updated health_check_config in-place",
+                service_name=service.name,
+                health_check=new_hc,
+            )
+
+        # Update restart policy
+        if "restart_policy" in change.changed_fields:
+            new_rp = new_config.get("restart_policy")
+            if hasattr(service, "restart_policy"):
+                service.restart_policy = new_rp
+            logger.debug(
+                "Updated restart_policy in-place",
+                service_name=service.name,
+                restart_policy=new_rp,
+            )
+
+        # Persist the updated service
+        await self._service_repository.save(service)
+
+        logger.info(
+            "In-place configuration update applied",
+            service_name=service.name,
+            updated_fields=list(change.changed_fields),
+        )
 
     async def get_configuration_status(self) -> dict[str, Any]:
         """Get configuration management status.

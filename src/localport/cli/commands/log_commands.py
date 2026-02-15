@@ -7,16 +7,16 @@ from pathlib import Path
 
 import structlog
 import typer
-from rich.console import Console
 from rich.table import Table
 
 from ..formatters.format_router import FormatRouter
 from ..formatters.output_format import OutputFormat
+from ..utils.cli_context import LazyConsole, get_cli_context
 from ..utils.rich_utils import create_error_panel, create_info_panel
 from ...infrastructure.logging.service_log_manager import get_service_log_manager
 
 logger = structlog.get_logger()
-console = Console()
+console = LazyConsole()
 
 
 async def logs_command(
@@ -421,8 +421,8 @@ def logs_sync(
     • Use --service for service-specific diagnostics
     • Use default behavior for daemon/application logs
     """
-    # Get output format from context
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
+    cli_ctx = get_cli_context(ctx)
+    output_format = cli_ctx.output_format
     
     # Handle new service logging commands
     if list_services:
@@ -823,14 +823,14 @@ async def show_service_log_command(
 
 def list_service_logs_sync(ctx: typer.Context) -> None:
     """List all available service logs with metadata."""
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(list_service_logs_command(output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(list_service_logs_command(cli_ctx.output_format))
 
 
 def show_log_location_sync(ctx: typer.Context) -> None:
     """Show service log directory locations."""
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(show_log_location_command(output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(show_log_location_command(cli_ctx.output_format))
 
 
 def show_service_log_sync(
@@ -841,5 +841,5 @@ def show_service_log_sync(
     grep: str | None = typer.Option(None, "--grep", "-g", help="Filter logs by pattern (case-insensitive)")
 ) -> None:
     """Show logs for a specific service."""
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(show_service_log_command(service_name, lines, follow, grep, output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(show_service_log_command(service_name, lines, follow, grep, cli_ctx.output_format))

@@ -716,8 +716,12 @@ class SSHAdapter(PortForwardingAdapter):
                 # Check key file permissions (should be 600 or 400)
                 try:
                     stat_info = key_path.stat()
-                    if stat_info.st_mode & 0o077:
-                        errors.append(f"SSH key file has overly permissive permissions. Run: chmod 600 {key_path}")
+                    file_perms = stat_info.st_mode & 0o777
+                    if file_perms not in (0o600, 0o400):
+                        errors.append(
+                            f"SSH key file permissions must be 600 or 400 (currently {oct(file_perms)}). "
+                            f"Run: chmod 600 {key_path}"
+                        )
                 except Exception as e:
                     errors.append(f"Cannot check SSH key file permissions: {str(e)}")
 
