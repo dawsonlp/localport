@@ -23,6 +23,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced infrastructure layer to preserve error context through the application stack
 - Added comprehensive integration tests for error formatting behavior
 
+## [1.1.1] - 2025-02-16
+
+### Fixed
+- **Dependency Installation**: Fixed dependency resolution for clean installations from PyPI
+- **Version Reporting**: Fixed `localport --version` reporting incorrect version due to git tag divergence between development and release branches
+
+### Technical
+- Synchronized development branch with release tags to ensure `setuptools_scm` resolves versions correctly
+- Verified all declared dependencies (`structlog`, `aiohttp`, `psutil`, `watchdog`, etc.) are properly included in published wheel metadata
+
+## [1.1.0] - 2025-02-15
+
+### Fixed
+- **Service Entity**: Added `enabled` field to Service entity for proper service state management
+- **Evaluation Findings**: Resolved issues identified during comprehensive codebase evaluation
+
+### Documentation
+- Archived final evaluation report (39/39 expectations met)
+- Added evaluation review report for agent team
+
+## [1.0.0] - 2025-02-14
+
+### Added
+- **Configuration Management Enhancement**: Comprehensive configuration management system overhaul
+  - Enhanced configuration loading, validation, and management
+  - Improved configuration file handling and error reporting
+
+### Fixed
+- **SSH Process Health Monitoring**: Resolved SSH process health monitoring for accurate service status reporting
+
 ## [0.3.8] - 2025-01-08
 
 ### Added
@@ -193,33 +223,29 @@ This release enables LocalPort users to easily access internal infrastructure th
 
 ## Version Support
 
-- **Current**: 0.3.8 (Active development and support)
-- **Supported**: 0.3.7+ (Security updates and critical bug fixes)
-- **Legacy**: 0.3.6 and below (No longer supported)
+- **Current**: 1.1.1 (Active development and support)
+- **Supported**: 1.0.0+ (Security updates and critical bug fixes)
+- **Legacy**: 0.3.x and below (No longer supported)
 
 ## Upgrade Guide
+
+### From 1.1.0 to 1.1.1
+- **No Breaking Changes**: Patch release fixing dependency resolution and version reporting
+- Recommended upgrade for all users
+
+### From 1.0.0 to 1.1.0
+- **No Breaking Changes**: Added `enabled` field to Service entity
+- Evaluation fixes and documentation updates
+
+### From 0.3.8 to 1.0.0
+- **Configuration Management Enhancement**: Comprehensive configuration system overhaul
+- **SSH Health Monitoring Fix**: Accurate service status for SSH processes
+- No breaking configuration changes
 
 ### From 0.3.7 to 0.3.8
 - **New SSH Bastion Host Support**: Add `remote_host` parameter to SSH configurations for bastion scenarios
 - **No Breaking Changes**: All existing SSH configurations work unchanged
-- **Enhanced SSH Tunneling**: Improved SSH tunnel management and error handling
 - **Configuration Example**: See v0.3.8 release notes for bastion host configuration format
-
-### From 0.3.6 to 0.3.7
-- No breaking changes
-- New cluster health features are opt-in
-- Existing configurations work unchanged
-- Enhanced status command includes cluster health automatically
-
-### From 0.3.5 to 0.3.6
-- Configuration schema additions for cluster health
-- New health check options available
-- Service logging enabled by default
-
-### From 0.3.4 to 0.3.5
-- SSH configuration format changes
-- New tag-based service management
-- Enhanced validation requirements
 
 ## Contributing
 
