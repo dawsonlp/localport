@@ -5,11 +5,11 @@ from pathlib import Path
 
 import structlog
 import typer
-from rich.console import Console
 from rich.table import Table
 
 from ...infrastructure.adapters.ssh_adapter import SSHAdapter
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from ..utils.cli_context import LazyConsole, get_cli_context
 from ..utils.rich_utils import (
     create_error_panel,
     create_success_panel,
@@ -17,7 +17,7 @@ from ..utils.rich_utils import (
 )
 
 logger = structlog.get_logger()
-console = Console()
+console = LazyConsole()
 
 
 async def test_ssh_connectivity_command(
@@ -307,6 +307,7 @@ async def validate_ssh_config_command(
 
 # Sync wrappers for Typer
 def test_ssh_connectivity_sync(
+    ctx: typer.Context,
     service_name: str | None = typer.Argument(None, help="Service name to test (from config)"),
     host: str | None = typer.Option(None, "--host", "-h", help="SSH host to test"),
     user: str | None = typer.Option(None, "--user", "-u", help="SSH username"),
@@ -315,12 +316,19 @@ def test_ssh_connectivity_sync(
     config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path")
 ) -> None:
     """Test SSH connectivity for a service or connection details."""
-    asyncio.run(test_ssh_connectivity_command(service_name, host, user, port, key_file, config_file))
+    cli_ctx = get_cli_context(ctx)
+    # Use command-level --config if provided, otherwise fall back to global --config
+    effective_config = config_file or cli_ctx.config_file
+    asyncio.run(test_ssh_connectivity_command(service_name, host, user, port, key_file, effective_config))
 
 
 def validate_ssh_config_sync(
+    ctx: typer.Context,
     config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     service_name: str | None = typer.Option(None, "--service", "-s", help="Specific service to validate")
 ) -> None:
     """Validate SSH configuration in a config file."""
-    asyncio.run(validate_ssh_config_command(config_file, service_name))
+    cli_ctx = get_cli_context(ctx)
+    # Use command-level --config if provided, otherwise fall back to global --config
+    effective_config = config_file or cli_ctx.config_file
+    asyncio.run(validate_ssh_config_command(effective_config, service_name))

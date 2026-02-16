@@ -12,6 +12,7 @@ from localport.domain.entities.service import (
 )
 from localport.domain.repositories.config_repository import ConfigRepository
 from localport.domain.repositories.service_repository import ServiceRepository
+from localport.domain.value_objects.connection_info import ConnectionInfo
 
 
 class ServiceRepositoryContractTest(ABC):
@@ -32,12 +33,16 @@ class ServiceRepositoryContractTest(ABC):
     @pytest.fixture
     def sample_service(self) -> Service:
         """Create a sample service for testing."""
+        conn = ConnectionInfo.kubectl(
+            resource_name="test-service",
+            namespace="default"
+        )
         return Service.create(
             name="test-service",
             technology=ForwardingTechnology.KUBECTL,
             local_port=8080,
             remote_port=80,
-            connection_info={"resource_name": "test-service", "namespace": "default"},
+            connection_info=conn,
             tags=["test", "sample"],
             description="A test service"
         )
@@ -45,12 +50,16 @@ class ServiceRepositoryContractTest(ABC):
     @pytest.fixture
     def another_service(self) -> Service:
         """Create another sample service for testing."""
+        conn = ConnectionInfo.ssh(
+            host="example.com",
+            user="test"
+        )
         return Service.create(
             name="another-service",
             technology=ForwardingTechnology.SSH,
             local_port=9090,
             remote_port=90,
-            connection_info={"host": "example.com", "user": "test"},
+            connection_info=conn,
             tags=["test", "another"],
             description="Another test service"
         )
@@ -210,27 +219,30 @@ class ServiceRepositoryContractTest(ABC):
 
     @pytest.mark.asyncio
     async def test_name_uniqueness(self, repository: ServiceRepository, sample_service: Service):
-        """Test that service names should be unique."""
+        """Test that service names must be unique."""
+        from localport.domain.repositories.service_repository import DuplicateServiceError
+
         # Save the service
         await repository.save(sample_service)
 
         # Create another service with the same name but different ID
+        conn = ConnectionInfo.ssh(host="different.com")
         duplicate_name_service = Service.create(
             name=sample_service.name,  # Same name
             technology=ForwardingTechnology.SSH,
             local_port=9999,
             remote_port=99,
-            connection_info={"host": "different.com"}
+            connection_info=conn
         )
 
-        # Save the duplicate name service
-        await repository.save(duplicate_name_service)
+        # Repository enforces name uniqueness
+        with pytest.raises(DuplicateServiceError):
+            await repository.save(duplicate_name_service)
 
-        # When finding by name, should return the most recently saved one
+        # Original service should still be retrievable
         found_service = await repository.find_by_name(sample_service.name)
         assert found_service is not None
-        # The behavior here depends on implementation - some might overwrite,
-        # others might keep the first one. The contract just requires consistency.
+        assert found_service.id == sample_service.id
 
     @pytest.mark.asyncio
     async def test_concurrent_operations(self, repository: ServiceRepository, sample_service: Service, another_service: Service):
@@ -372,7 +384,10 @@ def create_test_service(
     **kwargs
 ) -> Service:
     """Create a test service with default values."""
-    connection_info = kwargs.pop("connection_info", {"resource_name": name})
+    connection_info = kwargs.pop(
+        "connection_info",
+        ConnectionInfo.kubectl(resource_name=name, namespace="default")
+    )
     return Service.create(
         name=name,
         technology=technology,

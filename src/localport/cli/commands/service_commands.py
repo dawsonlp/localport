@@ -5,7 +5,6 @@ from pathlib import Path
 
 import structlog
 import typer
-from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
@@ -22,6 +21,7 @@ from ...infrastructure.repositories.memory_service_repository import (
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
 from ..formatters.format_router import FormatRouter
 from ..formatters.output_format import OutputFormat
+from ..utils.cli_context import LazyConsole, get_cli_context
 from ..utils.rich_utils import (
     create_error_panel,
     create_success_panel,
@@ -32,7 +32,7 @@ from ..utils.rich_utils import (
 from ..utils.error_formatter import ErrorFormatter, VerbosityLevel
 
 logger = structlog.get_logger()
-console = Console()
+console = LazyConsole()
 
 
 async def _check_daemon_running() -> bool:
@@ -502,21 +502,8 @@ async def status_services_command(
             error_output = error_formatter._format_error("service_status_error", str(e))
             console.print(error_output)
         else:
-            # Use new error formatting system with verbosity from context
-            verbosity_level = VerbosityLevel.NORMAL
-            if output_format != OutputFormat.JSON:
-                # Get verbosity from CLI context if available
-                try:
-                    ctx_verbosity = ctx.obj.get('verbosity_level', 0) if hasattr(ctx, 'obj') and ctx.obj else 0
-                    if ctx_verbosity >= 2:
-                        verbosity_level = VerbosityLevel.DEBUG
-                    elif ctx_verbosity >= 1:
-                        verbosity_level = VerbosityLevel.VERBOSE
-                except:
-                    pass  # Fall back to normal verbosity
-            
             error_formatter = ErrorFormatter(console)
-            error_formatter.print_error(e, verbosity_level)
+            error_formatter.print_error(e, VerbosityLevel.NORMAL)
         raise typer.Exit(1)
 
 
@@ -529,11 +516,11 @@ def start_services_sync(
     force: bool = typer.Option(False, "--force", "-f", help="Force restart if already running")
 ) -> None:
     """Start port forwarding services."""
-    # Get config file, output format, and verbosity from context
-    config_file = ctx.obj.get('config_file')
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    verbosity_level = ctx.obj.get('verbosity_level', 0)
-    asyncio.run(start_services_command(services, all_services, tags, config_file, force, output_format, verbosity_level))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(start_services_command(
+        services, all_services, tags, cli_ctx.config_file, force,
+        cli_ctx.output_format, cli_ctx.verbosity_level
+    ))
 
 
 def stop_services_sync(
@@ -543,9 +530,8 @@ def stop_services_sync(
     force: bool = typer.Option(False, "--force", "-f", help="Force stop services")
 ) -> None:
     """Stop port forwarding services."""
-    # Get config file from context
-    config_file = ctx.obj.get('config_file')
-    asyncio.run(stop_services_command(services, all_services, force, config_file))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(stop_services_command(services, all_services, force, cli_ctx.config_file))
 
 
 def status_services_sync(
@@ -555,9 +541,8 @@ def status_services_sync(
     refresh_interval: int = typer.Option(5, "--interval", "-i", help="Refresh interval in seconds for watch mode")
 ) -> None:
     """Show service status."""
-    # Get output format from context
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(status_services_command(services, watch, refresh_interval, output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(status_services_command(services, watch, refresh_interval, cli_ctx.output_format))
 
 
 async def _get_cluster_health_for_status(config_repo: YamlConfigRepository | None) -> dict | None:

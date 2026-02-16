@@ -27,6 +27,7 @@ class Service:
     health_check_config: dict[str, Any] | None = None
     restart_policy: dict[str, Any] | None = None
     tags: list[str] = None
+    enabled: bool = True
     description: str | None = None
 
     def __post_init__(self) -> None:

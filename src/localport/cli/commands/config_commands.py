@@ -2,13 +2,13 @@
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import structlog
 import typer
 import yaml
-from rich.console import Console
 from rich.table import Table
 
 from ...application.dto.connection_dto import (
@@ -36,6 +36,7 @@ from ..formatters.connection_formatter import ConnectionFormatterFactory
 from ..formatters.output_format import OutputFormat
 from ..utils.connection_prompts import ConnectionPrompts
 from ..utils.error_formatter import ErrorFormatter
+from ..utils.cli_context import LazyConsole, get_cli_context
 from ..utils.rich_utils import (
     create_error_panel,
     create_info_panel,
@@ -43,7 +44,7 @@ from ..utils.rich_utils import (
 )
 
 logger = structlog.get_logger()
-console = Console()
+console = LazyConsole()
 
 
 async def export_config_command(
@@ -66,7 +67,7 @@ async def export_config_command(
         if not active_config or not active_config.exists:
             if output_format == OutputFormat.JSON:
                 error_data = {
-                    "timestamp": "2025-07-02T22:12:00.000000",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "command": "export",
                     "error": "No configuration file found",
                     "suggestion": "Create a configuration file first or specify --config"
@@ -119,7 +120,7 @@ async def export_config_command(
 
         # Add metadata
         export_data['_metadata'] = {
-            'exported_at': '2025-07-02T22:12:00.000000',
+            'exported_at': datetime.now(timezone.utc).isoformat(),
             'exported_by': 'localport export',
             'source_file': config_path,
             'total_services': len(filtered_services),
@@ -149,7 +150,7 @@ async def export_config_command(
 
             if output_format == OutputFormat.JSON:
                 result_data = {
-                    "timestamp": "2025-07-02T22:12:00.000000",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "command": "export",
                     "success": True,
                     "output_file": str(output_path),
@@ -168,7 +169,7 @@ async def export_config_command(
             if output_format == OutputFormat.JSON:
                 # For JSON output format, wrap the config in a response structure
                 result_data = {
-                    "timestamp": "2025-07-02T22:12:00.000000",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "command": "export",
                     "format": format,
                     "configuration": export_data
@@ -182,7 +183,7 @@ async def export_config_command(
         logger.exception("Error exporting configuration")
         if output_format == OutputFormat.JSON:
             error_data = {
-                "timestamp": "2025-07-02T22:12:00.000000",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "command": "export",
                 "error": str(e),
                 "success": False
@@ -217,7 +218,7 @@ async def validate_config_command(
         if not config_path:
             if output_format == OutputFormat.JSON:
                 error_data = {
-                    "timestamp": "2025-07-02T22:12:00.000000",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "command": "validate",
                     "error": "No configuration file found",
                     "valid": False
@@ -317,7 +318,7 @@ async def validate_config_command(
         # Output results
         if output_format == OutputFormat.JSON:
             result_data = {
-                "timestamp": "2025-07-02T22:12:00.000000",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "command": "validate",
                 "config_file": config_path,
                 "valid": len(errors) == 0,
@@ -360,7 +361,7 @@ async def validate_config_command(
         logger.exception("Error validating configuration")
         if output_format == OutputFormat.JSON:
             error_data = {
-                "timestamp": "2025-07-02T22:12:00.000000",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "command": "validate",
                 "error": str(e),
                 "valid": False
@@ -395,9 +396,8 @@ def export_config_sync(
         localport config export --tag database     # Export services with tag
         localport --output json config export      # JSON command output
     """
-    # Get output format from context
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(export_config_command(output_file, format, include_defaults, include_disabled, services, tags, output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(export_config_command(output_file, format, include_defaults, include_disabled, services, tags, cli_ctx.output_format))
 
 
 def validate_config_sync(
@@ -411,9 +411,9 @@ def validate_config_sync(
         localport config validate --config my.yaml # Validate specific file
         localport --output json config validate    # JSON validation output
     """
-    # Get output format from context
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(validate_config_command(config_file, output_format))
+    cli_ctx = get_cli_context(ctx)
+    effective_config = config_file or cli_ctx.config_file
+    asyncio.run(validate_config_command(effective_config, cli_ctx.output_format))
 
 
 # New Connection Management Commands
@@ -724,13 +724,12 @@ def add_connection_sync(
         localport config add --technology ssh --host server.com         # SSH connection
         localport --output json config add                     # JSON output format
     """
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    verbosity = ctx.obj.get('verbosity', 0)
+    cli_ctx = get_cli_context(ctx)
     
     asyncio.run(add_connection_command(
         service_name, technology, resource_name, namespace,
         local_port, remote_port, ssh_host, ssh_user, ssh_key, ssh_port,
-        output_format, verbosity
+        cli_ctx.output_format, cli_ctx.verbosity_level
     ))
 
 
@@ -746,10 +745,9 @@ def remove_connection_sync(
         localport config remove postgres --force    # Remove without confirmation
         localport --output json config remove postgres    # JSON output format
     """
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    verbosity = ctx.obj.get('verbosity', 0)
+    cli_ctx = get_cli_context(ctx)
     
-    asyncio.run(remove_connection_command(service_name, force, output_format, verbosity))
+    asyncio.run(remove_connection_command(service_name, force, cli_ctx.output_format, cli_ctx.verbosity_level))
 
 
 def list_connections_sync(
@@ -761,7 +759,6 @@ def list_connections_sync(
         localport config list                       # List all connections
         localport --output json config list        # JSON output format
     """
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    verbosity = ctx.obj.get('verbosity', 0)
+    cli_ctx = get_cli_context(ctx)
     
-    asyncio.run(list_connections_command(output_format, verbosity))
+    asyncio.run(list_connections_command(cli_ctx.output_format, cli_ctx.verbosity_level))

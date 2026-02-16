@@ -4,7 +4,7 @@ import asyncio
 
 import structlog
 import typer
-from rich.console import Console
+from ..utils.cli_context import LazyConsole
 from rich.table import Table
 
 from ...application.services.daemon_manager import DaemonManager
@@ -18,6 +18,7 @@ from ...infrastructure.repositories.memory_service_repository import (
     MemoryServiceRepository,
 )
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from ..utils.cli_context import get_cli_context
 from ..utils.progress_utils import EnhancedProgress, get_operation_messages
 from ..utils.rich_utils import (
     create_error_panel,
@@ -27,7 +28,7 @@ from ..utils.rich_utils import (
 )
 
 logger = structlog.get_logger()
-console = Console()
+console = LazyConsole()
 
 
 async def start_daemon_command(
@@ -477,39 +478,52 @@ async def reload_daemon_command() -> None:
 
 # Sync wrappers for Typer (since Typer doesn't support async directly)
 def start_daemon_sync(
+    ctx: typer.Context,
     config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     auto_start: bool = typer.Option(True, "--auto-start/--no-auto-start", help="Auto-start configured services"),
     foreground: bool = typer.Option(False, "--foreground", "-f", help="Run daemon in foreground (don't detach)")
 ) -> None:
     """Start the LocalPort daemon."""
+    cli_ctx = get_cli_context(ctx)
+    effective_config = config_file or cli_ctx.config_file
     # Invert the logic: default is detached (background), --foreground runs in foreground
     detach = not foreground
-    asyncio.run(start_daemon_command(config_file, auto_start, detach))
+    asyncio.run(start_daemon_command(effective_config, auto_start, detach))
 
 
 def stop_daemon_sync(
+    ctx: typer.Context,
     force: bool = typer.Option(False, "--force", "-f", help="Force stop daemon")
 ) -> None:
     """Stop the LocalPort daemon."""
+    _ = get_cli_context(ctx)  # Ensure global options are available
     asyncio.run(stop_daemon_command(force))
 
 
 def restart_daemon_sync(
+    ctx: typer.Context,
     config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     force: bool = typer.Option(False, "--force", "-f", help="Force restart daemon")
 ) -> None:
     """Restart the LocalPort daemon."""
-    asyncio.run(restart_daemon_command(config_file, force))
+    cli_ctx = get_cli_context(ctx)
+    effective_config = config_file or cli_ctx.config_file
+    asyncio.run(restart_daemon_command(effective_config, force))
 
 
 def status_daemon_sync(
+    ctx: typer.Context,
     watch: bool = typer.Option(False, "--watch", "-w", help="Watch mode - refresh periodically"),
     refresh_interval: int = typer.Option(5, "--interval", "-i", help="Refresh interval in seconds for watch mode")
 ) -> None:
     """Show daemon status."""
+    _ = get_cli_context(ctx)  # Ensure global options are available
     asyncio.run(status_daemon_command(watch, refresh_interval))
 
 
-def reload_daemon_sync() -> None:
+def reload_daemon_sync(
+    ctx: typer.Context,
+) -> None:
     """Reload daemon configuration."""
+    _ = get_cli_context(ctx)  # Ensure global options are available
     asyncio.run(reload_daemon_command())

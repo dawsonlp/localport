@@ -184,7 +184,7 @@ class TestKubectlAdapter:
         
         mock_process = AsyncMock()
         mock_process.returncode = 1
-        mock_process.stderr = AsyncMock()
+        mock_process.stderr = MagicMock()
         mock_process.stderr.read = AsyncMock(return_value=b'connection refused')
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process):
@@ -202,10 +202,10 @@ class TestKubectlAdapter:
             namespace='default',
             resource_type='service'
         )
-        
-        mock_process = MagicMock()
+
+        mock_process = AsyncMock()
         mock_process.returncode = 0
-        
+
         with patch('asyncio.create_subprocess_exec', return_value=mock_process):
             with patch('asyncio.wait_for', return_value=None):
                 success, message = await adapter.validate_resource_exists(connection_info)
@@ -221,10 +221,10 @@ class TestKubectlAdapter:
             namespace='default',
             resource_type='service'
         )
-        
-        mock_process = MagicMock()
+
+        mock_process = AsyncMock()
         mock_process.returncode = 1
-        
+
         with patch('asyncio.create_subprocess_exec', return_value=mock_process):
             with patch('asyncio.wait_for', return_value=None):
                 success, message = await adapter.validate_resource_exists(connection_info)
@@ -304,9 +304,12 @@ class TestKubectlAdapter:
         mock_psutil_process.is_running.return_value = True
         mock_psutil_process.status.return_value = 'running'
         
+        async def noop_sleep(_):
+            pass
+        
         with patch('subprocess.Popen', return_value=mock_process):
             with patch('psutil.Process', return_value=mock_psutil_process):
-                with patch('asyncio.sleep'):
+                with patch('asyncio.sleep', side_effect=noop_sleep):
                     pid = await adapter.start_port_forward(8080, 80, connection_info)
                     assert pid == 12345
 

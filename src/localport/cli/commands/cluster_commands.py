@@ -7,7 +7,7 @@ from typing import Any
 
 import structlog
 import typer
-from rich.console import Console
+from ..utils.cli_context import LazyConsole
 from rich.table import Table
 from rich.text import Text
 
@@ -15,13 +15,14 @@ from ...application.services.cluster_health_manager import ClusterHealthManager
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
 from ..formatters.format_router import FormatRouter
 from ..formatters.output_format import OutputFormat
+from ..utils.cli_context import get_cli_context
 from ..utils.rich_utils import (
     create_error_panel,
     create_success_panel,
 )
 
 logger = structlog.get_logger()
-console = Console()
+console = LazyConsole()
 
 
 async def _get_cluster_health_data() -> dict | None:
@@ -508,8 +509,8 @@ def cluster_status_sync(
     context: str | None = typer.Option(None, "--context", "-c", help="Specific cluster context to check")
 ) -> None:
     """Show detailed cluster health information."""
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(cluster_status_command(context, output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(cluster_status_command(context, cli_ctx.output_format))
 
 
 def cluster_events_sync(
@@ -519,8 +520,8 @@ def cluster_events_sync(
     limit: int = typer.Option(20, "--limit", "-l", help="Maximum number of events to show")
 ) -> None:
     """Show recent cluster events that might affect services."""
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(cluster_events_command(context, since, limit, output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(cluster_events_command(context, since, limit, cli_ctx.output_format))
 
 
 def cluster_pods_sync(
@@ -529,5 +530,5 @@ def cluster_pods_sync(
     namespace: str | None = typer.Option(None, "--namespace", "-n", help="Specific namespace to check")
 ) -> None:
     """Show pod status for resources used by active services."""
-    output_format = ctx.obj.get('output_format', OutputFormat.TABLE)
-    asyncio.run(cluster_pods_command(context, namespace, output_format))
+    cli_ctx = get_cli_context(ctx)
+    asyncio.run(cluster_pods_command(context, namespace, cli_ctx.output_format))

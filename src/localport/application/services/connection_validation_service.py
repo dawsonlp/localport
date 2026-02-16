@@ -3,6 +3,7 @@
 import asyncio
 import re
 import socket
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import structlog
@@ -15,6 +16,53 @@ from ...domain.exceptions import (
 from ...domain.repositories.config_repository import ConfigRepository
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class ConnectionValidationResult:
+    """Unified result of a full connection validation.
+    
+    Aggregates SSH connectivity, port availability, and Kubernetes
+    resource existence checks into a single result object.
+    """
+    valid: bool = True
+    service_name_errors: list[str] = field(default_factory=list)
+    port_errors: list[str] = field(default_factory=list)
+    ssh_connectivity_errors: list[str] = field(default_factory=list)
+    kubernetes_resource_errors: list[str] = field(default_factory=list)
+    configuration_errors: list[str] = field(default_factory=list)
+
+    @property
+    def all_errors(self) -> list[str]:
+        """Return all errors across all categories."""
+        return (
+            self.service_name_errors
+            + self.port_errors
+            + self.ssh_connectivity_errors
+            + self.kubernetes_resource_errors
+            + self.configuration_errors
+        )
+
+    @property
+    def error_count(self) -> int:
+        return len(self.all_errors)
+
+    @property
+    def summary(self) -> str:
+        if self.valid:
+            return "Connection validation passed"
+        parts = []
+        if self.service_name_errors:
+            parts.append(f"{len(self.service_name_errors)} name error(s)")
+        if self.port_errors:
+            parts.append(f"{len(self.port_errors)} port error(s)")
+        if self.ssh_connectivity_errors:
+            parts.append(f"{len(self.ssh_connectivity_errors)} SSH error(s)")
+        if self.kubernetes_resource_errors:
+            parts.append(f"{len(self.kubernetes_resource_errors)} K8s error(s)")
+        if self.configuration_errors:
+            parts.append(f"{len(self.configuration_errors)} config error(s)")
+        return f"Validation failed: {', '.join(parts)}"
 
 
 class ConnectionValidationService:
@@ -321,6 +369,133 @@ class ConnectionValidationService:
                 return False
         
         return True
+
+    async def validate_connection(
+        self,
+        service_config: dict[str, Any],
+        check_ssh_connectivity: bool = True,
+        check_port_availability: bool = True,
+        check_k8s_resource: bool = True,
+        ssh_adapter: Any = None,
+        kubectl_adapter: Any = None,
+    ) -> ConnectionValidationResult:
+        """Unified connection validation combining all checks.
+        
+        Provides a single interface to validate SSH connectivity,
+        port availability, and Kubernetes resource existence for
+        a service configuration.
+        
+        Args:
+            service_config: Service configuration dictionary
+            check_ssh_connectivity: Whether to test SSH host reachability
+            check_port_availability: Whether to test local port availability
+            check_k8s_resource: Whether to verify K8s resource exists
+            ssh_adapter: Optional SSHAdapter for SSH connectivity checks
+            kubectl_adapter: Optional KubectlAdapter for K8s resource checks
+            
+        Returns:
+            ConnectionValidationResult with categorised errors
+        """
+        result = ConnectionValidationResult()
+
+        # --- 1. Service name validation ---
+        name = service_config.get("name")
+        if name:
+            name_errors = await self.validate_service_name(name)
+            result.service_name_errors.extend(name_errors)
+        else:
+            result.configuration_errors.append("Service configuration missing 'name' field")
+
+        # --- 2. Required field validation ---
+        for required in ("technology", "local_port", "remote_port"):
+            if required not in service_config:
+                result.configuration_errors.append(
+                    f"Service configuration missing '{required}' field"
+                )
+
+        technology = service_config.get("technology")
+        connection_info = service_config.get("connection", {})
+
+        # --- 3. Port validation + availability ---
+        local_port = service_config.get("local_port")
+        if local_port is not None:
+            port_range_errors = await self.validate_port_range(local_port, "local port")
+            result.port_errors.extend(port_range_errors)
+
+            if not port_range_errors and check_port_availability:
+                availability_errors = await self.validate_port_availability(local_port)
+                result.port_errors.extend(availability_errors)
+
+        remote_port = service_config.get("remote_port")
+        if remote_port is not None:
+            result.port_errors.extend(
+                await self.validate_port_range(remote_port, "remote port")
+            )
+
+        # --- 4. SSH connectivity ---
+        if technology == "ssh":
+            host = connection_info.get("host")
+            if not host:
+                result.ssh_connectivity_errors.append("SSH connection missing 'host' field")
+            else:
+                ssh_port = connection_info.get("port", 22)
+                if check_ssh_connectivity:
+                    # Use the dedicated SSH adapter if available
+                    if ssh_adapter is not None:
+                        try:
+                            adapter_errors = await ssh_adapter.validate_connection_info(connection_info)
+                            result.ssh_connectivity_errors.extend(adapter_errors)
+                        except Exception as e:
+                            result.ssh_connectivity_errors.append(f"SSH validation error: {e}")
+                    else:
+                        # Fall back to basic TCP connectivity check
+                        host_errors = await self.validate_ssh_host(host, ssh_port)
+                        result.ssh_connectivity_errors.extend(host_errors)
+
+        # --- 5. Kubernetes resource existence ---
+        if technology == "kubectl":
+            resource_name = connection_info.get("resource_name")
+            if not resource_name:
+                result.kubernetes_resource_errors.append(
+                    "kubectl connection missing 'resource_name' field"
+                )
+            else:
+                fmt_errors = await self.validate_kubernetes_resource_name(resource_name)
+                result.kubernetes_resource_errors.extend(fmt_errors)
+
+                # Verify the resource actually exists in the cluster
+                if not fmt_errors and check_k8s_resource and kubectl_adapter is not None:
+                    try:
+                        namespace = connection_info.get("namespace", "default")
+                        exists = await kubectl_adapter.validate_resource_exists(
+                            resource_name, namespace
+                        )
+                        if not exists:
+                            result.kubernetes_resource_errors.append(
+                                f"Kubernetes resource '{resource_name}' not found "
+                                f"in namespace '{namespace}'"
+                            )
+                    except Exception as e:
+                        result.kubernetes_resource_errors.append(
+                            f"K8s resource check failed: {e}"
+                        )
+
+            namespace = connection_info.get("namespace")
+            if namespace:
+                ns_errors = await self.validate_kubernetes_namespace(namespace)
+                result.kubernetes_resource_errors.extend(ns_errors)
+
+        # --- Determine overall validity ---
+        result.valid = result.error_count == 0
+
+        logger.debug(
+            "Unified connection validation complete",
+            service=name,
+            valid=result.valid,
+            errors=result.error_count,
+        )
+
+        return result
 
     async def validate_service_configuration(self, service_config: dict[str, Any]) -> list[str]:
         """Validate a complete service configuration.

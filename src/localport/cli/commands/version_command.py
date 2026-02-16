@@ -1,11 +1,11 @@
 """Version command for LocalPort CLI."""
 
 import typer
-from rich.console import Console
+from ..utils.cli_context import LazyConsole
 
 from localport import __version__
 
-console = Console()
+console = LazyConsole()
 
 
 def version_callback(value: bool) -> None:
