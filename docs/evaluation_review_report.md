@@ -180,4 +180,35 @@ Item 2 mixed real and false claims. The agent correctly found the `--no-color` g
 | `ctx` scope bug fix | `service_commands.py` |
 | Stale checklist cleanup | 5 root files deleted |
 
+---
+
+## Round 2 Evaluation (2026-02-16)
+
+Re-evaluation reduced misses from 8 to 2. Assessment of the 2 remaining items:
+
+### Service entity missing `enabled` field
+**Eval claim**: Service entity lacks `enabled` property  
+**Verdict**: ✅ TRUE POSITIVE — fixed
+
+The `Service` dataclass had no `enabled` field. `DaemonManager` worked around this with `getattr(service, 'enabled', True)` in 3 places.
+
+**Fix applied**: Added `enabled: bool = True` to `Service` dataclass. Replaced all `getattr` workarounds with direct `service.enabled` access.
+
+### No `HealthMonitor` class
+**Eval claim**: No HealthMonitor class exists  
+**Verdict**: ❌ FALSE NEGATIVE
+
+`src/localport/application/services/health_monitor.py` contains `class HealthMonitor` with:
+- `start_monitoring()` / `stop_monitoring()` lifecycle
+- `_monitoring_loop()` for periodic checks
+- `check_service_health()` using `HealthCheckFactory`
+- `_attempt_restart()` with cooldown and max attempt limits
+- Failure tracking via `_failure_counts` and `_health_states`
+
+The agent was confused by the *additional* `HealthMonitorScheduler` class (cooperative task variant) and concluded the core `HealthMonitor` didn't exist.
+
+**Corrected total score**: 39/39 expectations met.
+
+---
+
 **Test results**: 178 passed, 0 failures, 0 errors.

@@ -350,7 +350,7 @@ class DaemonManager:
         """Automatically start configured services."""
         try:
             services = await self._service_repository.find_all()
-            enabled_services = [s for s in services if getattr(s, 'enabled', True)]
+            enabled_services = [s for s in services if s.enabled]
 
             if not enabled_services:
                 logger.info("No enabled services to start")
@@ -857,7 +857,7 @@ class DaemonManager:
                 if change.change_type == ChangeType.ADDED:
                     # --- New service: start it ---
                     service = await self._service_repository.find_by_name(service_name)
-                    if service and getattr(service, "enabled", True):
+                    if service and service.enabled:
                         logger.info("Starting newly added service", service_name=service_name)
                         await self._start_service_safe(service)
 
@@ -883,7 +883,7 @@ class DaemonManager:
                         )
                         if service.status == ServiceStatus.RUNNING:
                             await self._stop_service_safe(service)
-                        if getattr(service, "enabled", True):
+                        if service.enabled:
                             await self._start_service_safe(service)
                     else:
                         # Metadata-only changes → hot-apply without restart
