@@ -12,11 +12,7 @@ from rich.text import Text
 
 from ..config.config_path_manager import ConfigPathManager
 from ..config.settings import Settings
-from .commands.cluster_commands import (
-    cluster_events_sync,
-    cluster_pods_sync,
-    cluster_status_sync,
-)
+from .commands.cluster_commands import cluster_status_sync
 from .commands.config_commands import (
     add_connection_sync,
     export_config_sync,
@@ -310,8 +306,6 @@ cluster_app = typer.Typer(
 
 # Add cluster commands
 cluster_app.command(name="status")(cluster_status_sync)
-cluster_app.command(name="events")(cluster_events_sync)
-cluster_app.command(name="pods")(cluster_pods_sync)
 
 # Add cluster subcommand
 app.add_typer(cluster_app, name="cluster")

@@ -5,7 +5,6 @@ Cluster health provider domain service interface.
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from ..entities.cluster_event import ClusterEvent
 from ..entities.cluster_health import ClusterHealth
 from ..entities.cluster_info import ClusterInfo
 from ..entities.resource_status import ResourceStatus
@@ -84,27 +83,6 @@ class ClusterHealthProvider(ABC):
 
         Returns:
             ResourceStatus or None: Resource status if found
-
-        Raises:
-            ClusterNotFoundError: If the cluster context is not found
-            ClusterConnectionError: If unable to connect to the cluster
-        """
-        pass
-
-    @abstractmethod
-    async def get_cluster_events(
-        self, context: str, since: datetime | None = None, limit: int = 50
-    ) -> list[ClusterEvent]:
-        """
-        Get recent cluster events.
-
-        Args:
-            context: The cluster context name
-            since: Only return events after this timestamp (optional)
-            limit: Maximum number of events to return (default: 50)
-
-        Returns:
-            List[ClusterEvent]: List of cluster events
 
         Raises:
             ClusterNotFoundError: If the cluster context is not found

@@ -183,10 +183,10 @@ localport config validate          # User-friendly validation errors
 localport config add ssh-service   # Clear guidance for missing inputs
 ```
 
-### Cluster Commands  
+### Cluster Commands
 ```bash
 localport cluster status           # Clean network error messages
-localport cluster events --debug   # Full kubectl error details
+localport cluster status --debug   # Full kubectl error details
 ```
 
 ## Best Practices for Sharing Configurations

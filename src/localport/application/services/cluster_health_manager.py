@@ -6,7 +6,6 @@ import asyncio
 import logging
 from datetime import datetime
 
-from ...domain.entities.cluster_event import ClusterEvent
 from ...domain.entities.cluster_health import ClusterHealth
 from ...domain.entities.cluster_info import ClusterInfo
 from ...domain.entities.resource_status import ResourceStatus
@@ -170,16 +169,6 @@ class ClusterHealthManager(ClusterHealthProvider):
         return await monitor.get_resource_status(
             namespace, resource_name, resource_type
         )
-
-    async def get_cluster_events(
-        self, context: str, since: datetime | None = None, limit: int = 50
-    ) -> list[ClusterEvent]:
-        """Get recent cluster events."""
-        if context not in self._monitors:
-            raise ClusterNotFoundError(context)
-
-        monitor = self._monitors[context]
-        return await monitor.get_cluster_events(since, limit)
 
     async def get_last_check_time(self, context: str) -> datetime | None:
         """Get the timestamp of the last health check for a cluster."""

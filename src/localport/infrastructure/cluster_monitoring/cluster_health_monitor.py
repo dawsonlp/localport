@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from ...domain.entities.cluster_event import ClusterEvent
 from ...domain.entities.cluster_health import ClusterHealth
 from ...domain.entities.cluster_info import ClusterInfo
 from ...domain.entities.resource_status import ResourceStatus
@@ -189,36 +188,6 @@ class ClusterHealthMonitor:
                 f"Failed to get resource status for {resource_type}/{namespace}/{resource_name}: {e}"
             )
             return None
-
-    async def get_cluster_events(
-        self, since: datetime | None = None, limit: int = 50
-    ) -> list[ClusterEvent]:
-        """
-        Get recent cluster events.
-
-        Args:
-            since: Only return events after this timestamp (optional)
-            limit: Maximum number of events to return
-
-        Returns:
-            List[ClusterEvent]: List of cluster events
-        """
-        try:
-            events = await self.kubectl_client.get_cluster_events(self.context, limit)
-
-            if since:
-                # Filter events by timestamp
-                filtered_events = []
-                for event in events:
-                    if event.last_timestamp and event.last_timestamp >= since:
-                        filtered_events.append(event)
-                return filtered_events
-
-            return events
-
-        except Exception as e:
-            logger.error(f"Failed to get cluster events for {self.context}: {e}")
-            return []
 
     async def _monitoring_loop(self) -> None:
         """Main monitoring loop that runs periodically."""
