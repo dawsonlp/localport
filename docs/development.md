@@ -35,9 +35,11 @@ source .venv/bin/activate
 # Run tests
 uv run pytest
 
-# Check code quality
+# Check code quality (ruff + black are the enforced CI gates)
 uv run black --check .
 uv run ruff check .
+
+# Optional: static type checking — available locally, not enforced in CI
 uv run mypy src/
 
 # Install in development mode
@@ -120,9 +122,11 @@ uv run pytest tests/unit/infrastructure/test_new_adapter.py -v
 # Run all tests
 uv run pytest
 
-# Check code quality
+# Check code quality (ruff + black are the enforced CI gates)
 uv run black .
 uv run ruff check .
+
+# Optional: static type checking — available locally, not enforced in CI
 uv run mypy src/
 ```
 
