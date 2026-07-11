@@ -99,17 +99,19 @@ services:
     remote_port: 6379
     connection:
       host: redis.example.com     # Remote host
-      user: deploy               # SSH username
+      user: deploy               # SSH username (optional)
       port: 22                   # SSH port (optional, default: 22)
       key_file: ~/.ssh/id_rsa    # SSH private key file (optional)
+      remote_host: db.internal   # Bastion/jump-host target (optional)
       password: secret           # SSH password (optional, not recommended)
 ```
 
 **Connection Fields:**
 - `host` (required): Remote hostname or IP address
-- `user` (required): SSH username
+- `user` (optional): SSH username. Falls back to your SSH config / agent if omitted
 - `port` (optional): SSH port. Default: `22`
 - `key_file` (optional): Path to SSH private key file
+- `remote_host` (optional): Target host to tunnel to when `host` is a bastion/jump server
 - `password` (optional): SSH password. **Not recommended** - use key-based authentication
 
 ## Health Check Configuration

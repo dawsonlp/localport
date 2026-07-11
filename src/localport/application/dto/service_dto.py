@@ -100,33 +100,6 @@ class ServiceStatusInfo:
 
 
 @dataclass
-class HealthCheckInfo:
-    """Health check information."""
-
-    service_name: str
-    check_type: str
-    status: str
-    last_check: datetime | None = None
-    last_success: datetime | None = None
-    consecutive_failures: int = 0
-    failure_threshold: int = 3
-    response_time_ms: float | None = None
-    error_message: str | None = None
-
-    @property
-    def is_healthy(self) -> bool:
-        """Check if the health check is currently healthy."""
-        return self.status == "healthy"
-
-    @property
-    def failure_rate(self) -> float:
-        """Get the current failure rate as a percentage."""
-        if self.failure_threshold == 0:
-            return 0.0
-        return (self.consecutive_failures / self.failure_threshold) * 100
-
-
-@dataclass
 class ServiceSummary:
     """Summary of all services."""
 
@@ -184,34 +157,6 @@ class DaemonStatusInfo:
 
 
 @dataclass
-class ServiceMetrics:
-    """Service performance metrics."""
-
-    service_name: str
-    total_starts: int = 0
-    total_stops: int = 0
-    total_restarts: int = 0
-    total_failures: int = 0
-    average_startup_time_ms: float | None = None
-    average_response_time_ms: float | None = None
-    uptime_percentage: float = 0.0
-    last_failure: datetime | None = None
-    last_restart: datetime | None = None
-
-    @property
-    def reliability_score(self) -> float:
-        """Calculate a reliability score (0-100)."""
-        if self.total_starts == 0:
-            return 0.0
-
-        failure_rate = self.total_failures / self.total_starts
-        reliability = max(0.0, 1.0 - failure_rate) * 100
-
-        # Factor in uptime percentage
-        return (reliability + self.uptime_percentage) / 2
-
-
-@dataclass
 class BulkOperationResult:
     """Result of a bulk operation on multiple services."""
 
@@ -247,47 +192,6 @@ class BulkOperationResult:
     def is_complete_failure(self) -> bool:
         """Check if all operations failed."""
         return self.success_count == 0
-
-
-@dataclass
-class ConfigValidationResult:
-    """Result of configuration validation."""
-
-    is_valid: bool
-    errors: list[str]
-    warnings: list[str]
-    services_count: int = 0
-
-    @property
-    def has_errors(self) -> bool:
-        """Check if there are validation errors."""
-        return len(self.errors) > 0
-
-    @property
-    def has_warnings(self) -> bool:
-        """Check if there are validation warnings."""
-        return len(self.warnings) > 0
-
-    def add_error(self, error: str) -> None:
-        """Add a validation error."""
-        self.errors.append(error)
-        self.is_valid = False
-
-    def add_warning(self, warning: str) -> None:
-        """Add a validation warning."""
-        self.warnings.append(warning)
-
-
-@dataclass
-class ServiceMonitorResult:
-    """Result of service monitoring operation."""
-    service_name: str
-    is_healthy: bool
-    last_check: datetime
-    failure_count: int
-    restart_attempted: bool = False
-    restart_success: bool = False
-    error: str | None = None
 
 
 @dataclass

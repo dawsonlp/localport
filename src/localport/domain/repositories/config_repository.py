@@ -215,31 +215,3 @@ class ConfigRepository(ABC):
 class ConfigurationError(Exception):
     """Base exception for configuration errors."""
     pass
-
-
-class ConfigurationNotFoundError(ConfigurationError):
-    """Raised when configuration file is not found."""
-
-    def __init__(self, config_path: Path | None = None):
-        if config_path:
-            message = f"Configuration file not found: {config_path}"
-        else:
-            message = "No configuration file found in default locations"
-        super().__init__(message)
-        self.config_path = config_path
-
-
-class InvalidConfigurationError(ConfigurationError):
-    """Raised when configuration is invalid."""
-
-    def __init__(self, message: str, field: str | None = None):
-        super().__init__(message)
-        self.field = field
-
-
-class MissingEnvironmentVariableError(ConfigurationError):
-    """Raised when a required environment variable is missing."""
-
-    def __init__(self, variable_name: str):
-        super().__init__(f"Required environment variable not found: {variable_name}")
-        self.variable_name = variable_name

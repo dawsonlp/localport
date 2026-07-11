@@ -5,15 +5,8 @@ from typing import Any
 
 from ...domain.repositories.discovery_repository import (
     KubernetesDiscoveryRepository,
-    ResourceNotFoundError,
-    MultipleResourcesFoundError
 )
-from ...domain.value_objects.discovery import KubernetesResource, DiscoveredPort
-from ...domain.exceptions import (
-    KubernetesResourceNotFoundError,
-    MultipleNamespacesFoundError,
-    NoPortsAvailableError
-)
+from ...domain.value_objects.discovery import KubernetesResource
 from ..dto.connection_dto import DiscoveryResult
 
 logger = structlog.get_logger()

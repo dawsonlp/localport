@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 import threading
 import fcntl
-import errno
 
 import structlog
 

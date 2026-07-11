@@ -1,7 +1,5 @@
 # Getting Started with LocalPort
 
-> **🚧 ALPHA SOFTWARE**: LocalPort is currently in alpha testing. While core functionality works well, expect some rough edges and breaking changes. Please report issues and provide feedback!
-
 This guide will walk you through setting up LocalPort from scratch and getting your first port forwards running in under 10 minutes.
 
 ## Prerequisites

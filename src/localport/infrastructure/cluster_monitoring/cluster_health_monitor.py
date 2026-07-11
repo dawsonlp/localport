@@ -10,12 +10,9 @@ from dataclasses import dataclass
 
 from ...domain.entities.cluster_info import ClusterInfo
 from ...domain.entities.cluster_event import ClusterEvent
-from ...domain.entities.cluster_health import ClusterHealth, ClusterHealthStatus
+from ...domain.entities.cluster_health import ClusterHealth
 from ...domain.entities.resource_status import ResourceStatus
-from ...domain.services.cluster_health_provider import (
-    ClusterHealthProvider, ClusterNotFoundError, ClusterConnectionError
-)
-from .kubectl_client import KubectlClient, KubectlError
+from .kubectl_client import KubectlClient
 
 
 logger = logging.getLogger(__name__)

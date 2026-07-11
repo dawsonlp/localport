@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Hot reload crash**: Health monitoring registered each service loop with both the `TaskManager` and the `CooperativeTask`, running two loops per service and leaving a task name that was never released — so the second monitoring start (config hot reload) raised `ValueError: Task already exists`. The `CooperativeTask` now solely owns its loop; hot reload works and each service is health-checked once per interval.
+- **`enabled: false` ignored**: The YAML loader validated the `enabled` field but never propagated it to the `Service` entity, so disabled services were still auto-started. The flag is now honored.
+- **Dead kubectl forwards reported as running**: liveness used `psutil.pid_exists`, which is true for zombie processes; kubectl forwards (not reaped in the daemon) lingered as zombies and were reported healthy. Zombie/dead processes are now treated as not alive, consistent with SSH forwards.
+- **Daemon PID reuse**: daemon status/stop/reload trusted a bare PID from the PID file with no identity check, so a stale PID reused by another process could be signalled or killed. The PID is now verified to be a LocalPort daemon first.
+- **`statefulset` resource type**: the domain validator rejected `statefulset` at config load while the kubectl adapter accepted it; both now allow it.
+- **Repeated `daemon reload` dropped**: the signal handler's deduplication set was never cleared for recurring signals, so only the first `SIGUSR1` reload was delivered. Deduplication now applies only to one-shot shutdown signals; reload/status signals are re-deliverable.
+
+### Changed
+- **Single signal-handling subsystem**: the daemon ran two competing signal subsystems (`AsyncSignalHandler` plus `signal.signal` handlers installed by `DaemonManager`) that both grabbed SIGTERM/SIGUSR1. `DaemonManager` no longer installs OS signal handlers; the daemon process owns signals via `AsyncSignalHandler`/`ShutdownCoordinator`.
+- **Documentation reconciled with the shipped release**: removed stale "ALPHA/BETA 0.3.x" banners (README, CLI, getting-started), corrected SSH status everywhere (SSH and bastion hosts are shipped, not "planned for v0.4.0"), rewrote the CLI reference against the real command signatures, and fixed the documented Python minimum (3.11+).
+
+### Removed
+- **Dead code**: orphaned modules (`health_monitor.py`, `version_command.py`, `kubectl_capabilities.py`), unused DTOs/exceptions/shutdown helpers, and unused imports.
+- **Unused dependencies**: `tenacity` and the redundant explicit `click` (provided transitively by `typer`).
+- **Stale files**: superseded release notes, agent-evaluation reports, a design doc for an already-shipped feature, and stray root test configs.
+
 ### 🎯 Improved
 - **User-Friendly Error Messages**: Replaced verbose technical error messages with concise, actionable feedback
   - SSH key not found errors now show safe paths (`~/.ssh/key.pem`) instead of full system paths

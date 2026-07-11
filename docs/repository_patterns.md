@@ -174,7 +174,7 @@ found = await repo.find_by_name("test")
 - Thread-safe with asyncio
 - Suitable for testing and development
 
-### YamlConfigRepository (Planned)
+### YamlConfigRepository
 
 A file-based implementation for configuration management:
 

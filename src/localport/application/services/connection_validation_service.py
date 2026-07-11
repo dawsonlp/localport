@@ -4,15 +4,10 @@ import asyncio
 import re
 import socket
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
-from ...domain.exceptions import (
-    ValidationError,
-    ServiceAlreadyExistsError,
-    NetworkConnectionError
-)
 from ...domain.repositories.config_repository import ConfigRepository
 
 logger = structlog.get_logger()

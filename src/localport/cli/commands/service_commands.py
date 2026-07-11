@@ -9,7 +9,6 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ...application.services.service_manager import ServiceManager
-from ...application.services.cluster_health_manager import ClusterHealthManager
 from ...application.use_cases.monitor_services import MonitorServicesUseCase
 from ...application.use_cases.start_services import StartServicesUseCase
 from ...application.use_cases.stop_services import StopServicesUseCase
@@ -228,7 +227,7 @@ async def start_services_command(
             structured_errors = []
             for service_name, error_msg in result.errors.items():
                 # Check if this is an SSH key error (common shared config problem)
-                from ...domain.exceptions import SSHKeyNotFoundError, LocalPortError
+                from ...domain.exceptions import SSHKeyNotFoundError
                 
                 if "SSH key file not found" in str(error_msg) or "key file not found" in str(error_msg).lower():
                     # Extract key path from error message if possible
@@ -642,7 +641,6 @@ async def _get_cluster_health_for_status(config_repo: YamlConfigRepository | Non
 def _display_cluster_health_section(cluster_data: dict) -> None:
     """Display cluster health section in status output."""
     from datetime import datetime
-    from rich.panel import Panel
     
     # Create cluster health table
     table = Table(title="🏗️  Cluster Health", show_header=True, header_style="bold blue")

@@ -3,22 +3,17 @@
 import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 import structlog
 import typer
 from ..utils.cli_context import LazyConsole
 from rich.table import Table
-from rich.text import Text
 
-from ...application.services.cluster_health_manager import ClusterHealthManager
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
-from ..formatters.format_router import FormatRouter
 from ..formatters.output_format import OutputFormat
 from ..utils.cli_context import get_cli_context
 from ..utils.rich_utils import (
     create_error_panel,
-    create_success_panel,
 )
 
 logger = structlog.get_logger()

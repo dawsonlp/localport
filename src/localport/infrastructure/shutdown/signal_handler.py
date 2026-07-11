@@ -8,7 +8,7 @@ import asyncio
 import signal
 import sys
 import threading
-from typing import Callable, Dict, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set
 from enum import Enum
 
 import structlog
@@ -118,41 +118,46 @@ class AsyncSignalHandler:
 
     def _signal_handler(self, signum: int, frame) -> None:
         """Thread-safe signal handler for Windows.
-        
+
         This runs in signal context and must be thread-safe.
         """
-        with self._signal_lock:
-            if signum in self._received_signals:
-                # Deduplicate signals
-                logger.debug("Duplicate signal ignored", signal=signum)
-                return
-                
-            self._received_signals.add(signum)
-            
-        # Schedule async handling
         sig_type = self._signal_map.get(signum)
+
+        # Only shutdown is one-shot; reload/status are recurring and must not be
+        # permanently deduplicated.
+        if sig_type == SignalType.SHUTDOWN and not self._register_shutdown(signum):
+            return
+
+        # Schedule async handling
         if sig_type:
             self._loop.call_soon_threadsafe(
-                self._handle_signal_async, 
-                signum, 
+                self._handle_signal_async,
+                signum,
                 sig_type
             )
 
     def _async_signal_handler(self, signum: int, sig_type: SignalType) -> None:
         """Async signal handler for Unix (called by loop.add_signal_handler).
-        
+
         This runs in the event loop context and is safe for async operations.
         """
-        with self._signal_lock:
-            if signum in self._received_signals:
-                # Deduplicate signals
-                logger.debug("Duplicate signal ignored", signal=signum)
-                return
-                
-            self._received_signals.add(signum)
-            
+        # Only shutdown is one-shot; reload/status are recurring signals and must
+        # not be permanently deduplicated, otherwise a second `daemon reload` is
+        # silently dropped.
+        if sig_type == SignalType.SHUTDOWN and not self._register_shutdown(signum):
+            return
+
         # Handle signal in async context
         asyncio.create_task(self._handle_signal_async(signum, sig_type))
+
+    def _register_shutdown(self, signum: int) -> bool:
+        """Record a shutdown signal, returning False if it was already seen."""
+        with self._signal_lock:
+            if signum in self._received_signals:
+                logger.debug("Duplicate shutdown signal ignored", signal=signum)
+                return False
+            self._received_signals.add(signum)
+        return True
 
     async def _handle_signal_async(self, signum: int, sig_type: SignalType) -> None:
         """Handle signal in async context.

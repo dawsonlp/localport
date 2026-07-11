@@ -1,7 +1,6 @@
 """Centralized configuration path management for LocalPort."""
 
 import os
-import stat
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path

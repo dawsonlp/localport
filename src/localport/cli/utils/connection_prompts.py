@@ -1,6 +1,5 @@
 """Interactive prompts for connection management."""
 
-import asyncio
 from typing import List, Optional
 
 import typer

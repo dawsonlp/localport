@@ -7,7 +7,6 @@ from rich.table import Table
 
 from ..utils.rich_utils import (
     format_health_status,
-    format_port,
     format_service_name,
     format_technology,
     format_uptime,
@@ -225,7 +224,6 @@ class FormatRouter:
         """
         try:
             from pathlib import Path
-            import os
             
             # Get log directory path
             log_dir = Path.home() / ".local" / "share" / "localport" / "logs" / "services"

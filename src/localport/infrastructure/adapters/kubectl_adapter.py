@@ -1,7 +1,7 @@
 """Kubectl adapter for port forwarding operations."""
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 import psutil
 import structlog
@@ -100,7 +100,6 @@ class KubectlAdapter(PortForwardingAdapter):
 
         try:
             import subprocess
-            import os
             
             # Open log file for writing
             log_file_handle = open(log_file, 'a', encoding='utf-8', buffering=1)  # Line buffered
@@ -221,7 +220,6 @@ class KubectlAdapter(PortForwardingAdapter):
         try:
             # Start the process completely detached using subprocess.Popen
             import subprocess
-            import os
             
             logger.info("Starting kubectl subprocess", command=cmd)
             

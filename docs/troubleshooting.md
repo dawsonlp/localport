@@ -219,7 +219,7 @@ health_check:
 
 ```bash
 # Validate configuration with detailed output
-localport config validate --strict
+localport config validate
 
 # Check environment variables
 echo $VARIABLE_NAME
