@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead kubectl forwards reported as running**: liveness used `psutil.pid_exists`, which is true for zombie processes; kubectl forwards (not reaped in the daemon) lingered as zombies and were reported healthy. Zombie/dead processes are now treated as not alive, consistent with SSH forwards.
 - **Daemon PID reuse**: daemon status/stop/reload trusted a bare PID from the PID file with no identity check, so a stale PID reused by another process could be signalled or killed. The PID is now verified to be a LocalPort daemon first.
 - **`statefulset` resource type**: the domain validator rejected `statefulset` at config load while the kubectl adapter accepted it; both now allow it.
+- **Repeated `daemon reload` dropped**: the signal handler's deduplication set was never cleared for recurring signals, so only the first `SIGUSR1` reload was delivered. Deduplication now applies only to one-shot shutdown signals; reload/status signals are re-deliverable.
 
 ### Changed
+- **Single signal-handling subsystem**: the daemon ran two competing signal subsystems (`AsyncSignalHandler` plus `signal.signal` handlers installed by `DaemonManager`) that both grabbed SIGTERM/SIGUSR1. `DaemonManager` no longer installs OS signal handlers; the daemon process owns signals via `AsyncSignalHandler`/`ShutdownCoordinator`.
 - **Documentation reconciled with the shipped release**: removed stale "ALPHA/BETA 0.3.x" banners (README, CLI, getting-started), corrected SSH status everywhere (SSH and bastion hosts are shipped, not "planned for v0.4.0"), rewrote the CLI reference against the real command signatures, and fixed the documented Python minimum (3.11+).
 
 ### Removed

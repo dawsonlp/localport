@@ -1,8 +1,6 @@
 """Daemon manager for background processing capabilities."""
 
 import asyncio
-import signal
-import sys
 from datetime import datetime
 from typing import Any
 
@@ -69,9 +67,6 @@ class DaemonManager:
         self._hot_reload_enabled = True
         self._graceful_shutdown_timeout = 30  # seconds
 
-        # Signal handlers
-        self._original_handlers: dict[int, any] = {}
-
     async def start_daemon(self, auto_start_services: bool = True) -> None:
         """Start the daemon manager.
 
@@ -89,8 +84,8 @@ class DaemonManager:
         self._auto_start_services = auto_start_services
 
         try:
-            # Setup signal handlers
-            self._setup_signal_handlers()
+            # Signal handling is owned by the daemon process (AsyncSignalHandler);
+            # the daemon manager does not install its own OS signal handlers.
 
             # Load configuration
             await self._load_configuration()
@@ -149,9 +144,6 @@ class DaemonManager:
             # Cancel background tasks
             await self._cancel_background_tasks(timeout)
 
-            # Restore signal handlers
-            self._restore_signal_handlers()
-
             logger.info("Daemon manager stopped - services continue running independently")
 
         except Exception as e:
@@ -177,7 +169,6 @@ class DaemonManager:
         try:
             # Capture old configuration before reloading
             old_config = await self._config_repository.load_configuration()
-            old_services = await self._service_repository.find_all()
 
             # Load new configuration into the repository
             await self._load_configuration()
@@ -270,41 +261,6 @@ class DaemonManager:
             raise
         finally:
             await self.stop_daemon()
-
-    def _setup_signal_handlers(self) -> None:
-        """Setup signal handlers for daemon control."""
-        if sys.platform == "win32":
-            # Windows doesn't support UNIX signals
-            return
-
-        def handle_shutdown(signum, frame):
-            """Handle shutdown signals."""
-            logger.info("Received shutdown signal", signal=signum)
-            asyncio.create_task(self.stop_daemon())
-
-        def handle_reload(signum, frame):
-            """Handle reload signal."""
-            logger.info("Received reload signal", signal=signum)
-            if self._config_reload_enabled:
-                asyncio.create_task(self.reload_configuration())
-
-        # Store original handlers
-        self._original_handlers[signal.SIGTERM] = signal.signal(signal.SIGTERM, handle_shutdown)
-        self._original_handlers[signal.SIGINT] = signal.signal(signal.SIGINT, handle_shutdown)
-        self._original_handlers[signal.SIGUSR1] = signal.signal(signal.SIGUSR1, handle_reload)
-
-        logger.debug("Signal handlers configured")
-
-    def _restore_signal_handlers(self) -> None:
-        """Restore original signal handlers."""
-        if sys.platform == "win32":
-            return
-
-        for signum, handler in self._original_handlers.items():
-            signal.signal(signum, handler)
-
-        self._original_handlers.clear()
-        logger.debug("Signal handlers restored")
 
     async def _load_configuration(self) -> None:
         """Load configuration from repository."""

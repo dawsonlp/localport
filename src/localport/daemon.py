@@ -132,15 +132,9 @@ class LocalPortDaemon:
                 self._stop_daemon_manager
             )
             
-            # Register configuration reload handler
+            # Monitor for reload signals (SIGUSR1) and apply configuration reloads.
             if self._signal_handler:
-                # Handle reload signals
-                async def handle_reload():
-                    if self.daemon_manager:
-                        await self.daemon_manager.reload_configuration()
-                
-                # Check for reload signals periodically
-                reload_task = self._task_manager.register_task(
+                self._task_manager.register_task(
                     "reload_signal_monitor",
                     self._monitor_reload_signals(),
                     group="daemon_management",
