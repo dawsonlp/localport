@@ -122,28 +122,21 @@ class HealthMonitorScheduler:
         health_config = service.health_check_config
         check_interval = health_config.get('interval', 30)
         
-        # Create cooperative task for this service
+        # Create cooperative task for this service. The CooperativeTask owns its
+        # own asyncio task via start()/stop(); we do not also register the loop
+        # with the TaskManager, which would run a duplicate loop and leave a
+        # never-released task name that breaks the next start (hot reload).
         cooperative_task = ServiceHealthMonitorTask(
             service=service,
             health_scheduler=self,
             check_interval=check_interval
         )
-        
-        # Register with task manager
-        task_name = f"health_monitor_{service.name}"
-        self._task_manager.register_task(
-            task_name,
-            cooperative_task._run_loop(),
-            group="health_monitoring",
-            priority=5,
-            resource_tags={"service_id", "health_monitoring"}
-        )
-        
+
         # Store cooperative task
         self._cooperative_tasks[service.id] = cooperative_task
         self._failure_counts[service.id] = 0
-        
-        # Start the cooperative task
+
+        # Start the cooperative task (single owner of the monitoring loop)
         await cooperative_task.start()
 
         logger.info("Started cooperative health monitoring for service",

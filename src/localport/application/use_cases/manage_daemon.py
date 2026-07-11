@@ -308,17 +308,38 @@ class ManageDaemonUseCase:
         try:
             import os
 
-            import psutil
-
             if not os.path.exists(self._daemon_pid_file):
                 return False
 
             with open(self._daemon_pid_file) as f:
                 pid = int(f.read().strip())
 
-            return psutil.pid_exists(pid)
+            return self._pid_is_localport_daemon(pid)
 
         except (FileNotFoundError, ValueError, OSError):
+            return False
+
+    @staticmethod
+    def _pid_is_localport_daemon(pid: int) -> bool:
+        """Return True only if ``pid`` is a live LocalPort daemon process.
+
+        A bare ``pid_exists`` check is unsafe: a stale PID file (left behind by a
+        crashed daemon) can point at a PID the OS has since reused for an
+        unrelated process, which we must never terminate or signal. Verify the
+        process's command line actually looks like the LocalPort daemon
+        (``python -m localport.daemon``).
+        """
+        import psutil
+
+        try:
+            proc = psutil.Process(pid)
+            if proc.status() in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD):
+                return False
+            cmdline = ' '.join(proc.cmdline())
+            return 'localport' in cmdline and 'daemon' in cmdline
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+        except Exception:
             return False
 
     async def _get_daemon_pid(self) -> int | None:
@@ -405,6 +426,11 @@ class ManageDaemonUseCase:
         if not pid:
             return
 
+        # Guard against PID reuse: never terminate a process that isn't our daemon.
+        if not self._pid_is_localport_daemon(pid):
+            logger.warning("Stale PID file does not point at a LocalPort daemon; skipping stop", pid=pid)
+            return
+
         try:
             process = psutil.Process(pid)
 
@@ -489,6 +515,10 @@ class ManageDaemonUseCase:
         """
         import os
         import signal
+
+        # Guard against PID reuse: never signal a process that isn't our daemon.
+        if not self._pid_is_localport_daemon(pid):
+            raise RuntimeError("Stale PID file does not point at a LocalPort daemon; refusing to send reload signal")
 
         try:
             os.kill(pid, signal.SIGUSR1)  # Use SIGUSR1 for reload

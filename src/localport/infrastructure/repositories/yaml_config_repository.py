@@ -644,7 +644,8 @@ class YamlConfigRepository(ConfigRepository):
                     tags=service_config.get('tags', []),
                     description=service_config.get('description'),
                     health_check_config=service_config.get('health_check'),
-                    restart_policy=service_config.get('restart_policy')
+                    restart_policy=service_config.get('restart_policy'),
+                    enabled=service_config.get('enabled', True)
                 )
                 services.append(service)
             except SSHKeyNotFoundError as e:

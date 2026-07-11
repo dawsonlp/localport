@@ -18,13 +18,24 @@ class PortForward:
     restart_count: int = 0
 
     def is_process_alive(self) -> bool:
-        """Check if the underlying process is still alive."""
+        """Check if the underlying process is still alive.
+
+        A zombie/defunct process still owns a PID, so ``psutil.pid_exists`` would
+        report it as alive. kubectl forwards are launched via ``subprocess`` and
+        are not reaped inside the long-running daemon, so a dead kubectl forward
+        lingers as a zombie; treat that (and any dead state) as not alive so
+        status/health logic can restart it. This keeps kubectl consistent with
+        SSH forwards, which asyncio's child watcher reaps.
+        """
         if not self.process_id:
             return False
 
         try:
             import psutil
-            return psutil.pid_exists(self.process_id)
+            process = psutil.Process(self.process_id)
+            return process.status() not in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD)
+        except psutil.NoSuchProcess:
+            return False
         except Exception:
             return False
 

@@ -42,7 +42,7 @@ class ConnectionInfo:
             raise ValueError("kubectl namespace cannot be empty if provided. Use a valid namespace like 'default' or 'production', or remove the field")
 
         if "resource_type" in self.config:
-            valid_types = ["service", "pod", "deployment"]
+            valid_types = ["service", "pod", "deployment", "statefulset"]
             if self.config["resource_type"] not in valid_types:
                 raise ValueError(f"kubectl resource_type '{self.config['resource_type']}' is invalid. Valid options: {', '.join(valid_types)}")
 
