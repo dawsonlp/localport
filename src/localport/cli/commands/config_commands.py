@@ -15,9 +15,6 @@ from ...application.dto.connection_dto import (
     ListConnectionsRequest,
     RemoveConnectionRequest,
 )
-from ...application.services.connection_discovery_service import (
-    ConnectionDiscoveryService,
-)
 from ...application.services.connection_validation_service import (
     ConnectionValidationService,
 )
@@ -588,7 +585,6 @@ async def _handle_kubectl_connection(
     """Handle kubectl connection setup."""
     # Initialize discovery services
     discovery_adapter = KubernetesDiscoveryAdapter()
-    discovery_service = ConnectionDiscoveryService(discovery_adapter)
     add_use_case = AddConnectionUseCase(config_repo, discovery_adapter)
 
     # Get resource name if not provided

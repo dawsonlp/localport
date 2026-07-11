@@ -127,7 +127,6 @@ class ListConnectionsUseCase:
         if technology == "kubectl":
             resource_name = connection.get("resource_name", "unknown")
             namespace = connection.get("namespace", "default")
-            resource_type = connection.get("resource_type", "service")
 
             if namespace == "default":
                 return f"{resource_name}:{remote_port}"

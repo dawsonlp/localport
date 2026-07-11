@@ -771,12 +771,10 @@ def _display_cluster_health_section(cluster_data: dict) -> None:
 
             # Format cluster info (cluster_info is a ClusterInfo object)
             if cluster_info:
-                api_server = cluster_info.api_server_url or "Unknown"
                 # Use health_data for node/pod counts since ClusterInfo doesn't have them
                 node_count = str(health_data.total_nodes if health_data else 0)
                 pod_count = str(health_data.total_pods if health_data else 0)
             else:
-                api_server = "Unknown"
                 node_count = "0"
                 pod_count = "0"
 

@@ -283,8 +283,8 @@ class GracefulShutdownMixin(ABC):
         """
         pass
 
-    async def _perform_class_cleanup(self) -> None:
-        """Perform class-specific cleanup operations.
+    async def _perform_class_cleanup(self) -> None:  # noqa: B027
+        """Perform class-specific cleanup operations (optional override hook).
 
         This method can be overridden by subclasses to define
         their specific cleanup behavior.

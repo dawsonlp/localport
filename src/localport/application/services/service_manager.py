@@ -752,7 +752,7 @@ class ServiceManager:
 
                         # Check if this is a LocalPort-managed process
                         is_managed = False
-                        for service_id, port_forward in self._active_forwards.items():
+                        for _service_id, port_forward in self._active_forwards.items():
                             if (
                                 port_forward.process_id == proc.info["pid"]
                                 and port_forward.local_port == port

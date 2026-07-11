@@ -277,6 +277,21 @@ async def cluster_status_command(
         raise typer.Exit(1)
 
 
+async def _load_cluster_health_manager() -> None:
+    """Return a live cluster health manager, or None if unavailable.
+
+    Cluster event and pod history is accumulated in memory by the long-running
+    daemon's per-context monitors. A standalone CLI invocation is a separate
+    process and cannot reach that state, so this returns None and the
+    `cluster events` / `cluster pods` commands report the limitation.
+
+    `cluster status` does work standalone because it queries kubectl directly
+    (see ``_get_cluster_health_data``). Exposing the daemon's cluster data to the
+    CLI (e.g. via IPC) is tracked as future work.
+    """
+    return None
+
+
 async def cluster_events_command(
     context: str | None = None,
     since: str = "1h",
@@ -290,9 +305,11 @@ async def cluster_events_command(
         if not cluster_health_manager:
             console.print(
                 create_error_panel(
-                    "Cluster Health Monitoring Unavailable",
-                    "Cluster health monitoring is not enabled or no kubectl services configured.",
-                    "Enable cluster health monitoring in your configuration.",
+                    "Cluster Data Unavailable From CLI",
+                    "Cluster event and pod history lives in the running daemon and "
+                    "cannot be read from a standalone command.",
+                    "Use 'localport cluster status' for current cluster health, or "
+                    "inspect events directly with kubectl.",
                 )
             )
             raise typer.Exit(1)
@@ -429,9 +446,11 @@ async def cluster_pods_command(
         if not cluster_health_manager:
             console.print(
                 create_error_panel(
-                    "Cluster Health Monitoring Unavailable",
-                    "Cluster health monitoring is not enabled or no kubectl services configured.",
-                    "Enable cluster health monitoring in your configuration.",
+                    "Cluster Data Unavailable From CLI",
+                    "Cluster event and pod history lives in the running daemon and "
+                    "cannot be read from a standalone command.",
+                    "Use 'localport cluster status' for current cluster health, or "
+                    "inspect events directly with kubectl.",
                 )
             )
             raise typer.Exit(1)

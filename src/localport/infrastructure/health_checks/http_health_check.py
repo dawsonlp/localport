@@ -33,7 +33,7 @@ class HTTPHealthCheck(HealthChecker):
 
         url = merged_config.get("url")
         if not url:
-            return HealthCheckResult.error(
+            return HealthCheckResult.errored(
                 "HTTP health check missing required 'url' field"
             )
 
@@ -163,7 +163,7 @@ class HTTPHealthCheck(HealthChecker):
             logger.error(
                 "HTTP health check failed - unexpected error", url=url, error=str(e)
             )
-            return HealthCheckResult.error(
+            return HealthCheckResult.errored(
                 error=f"Unexpected error during HTTP health check: {e}"
             )
 
@@ -274,7 +274,7 @@ class HTTPHealthCheck(HealthChecker):
 
             # Validate optional timeout
             timeout = config.get("timeout", 5.0)
-            if not isinstance(timeout, (int, float)) or timeout <= 0:
+            if not isinstance(timeout, int | float) or timeout <= 0:
                 logger.error("HTTP health check invalid timeout", timeout=timeout)
                 return False
 

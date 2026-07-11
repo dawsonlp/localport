@@ -37,12 +37,11 @@ class KafkaHealthCheck(HealthChecker):
         start_time = datetime.now()
 
         try:
-            # Import kafka-python here to make it optional
-            try:
-                from kafka import KafkaConsumer
-                from kafka.errors import KafkaError, NoBrokersAvailable
-            except ImportError:
-                return HealthCheckResult.error(
+            # kafka-python is an optional dependency.
+            import importlib.util
+
+            if importlib.util.find_spec("kafka") is None:
+                return HealthCheckResult.errored(
                     "kafka-python not installed. Install with: pip install kafka-python"
                 )
 
@@ -72,7 +71,7 @@ class KafkaHealthCheck(HealthChecker):
                 bootstrap_servers=bootstrap_servers,
                 error=str(e),
             )
-            return HealthCheckResult.error(f"Kafka health check exception: {str(e)}")
+            return HealthCheckResult.errored(f"Kafka health check exception: {str(e)}")
 
     def _check_kafka_sync(self, bootstrap_servers: str, timeout: float) -> bool:
         """Synchronous Kafka connectivity check.
@@ -146,11 +145,10 @@ class KafkaHealthCheck(HealthChecker):
         timeout = config.get("timeout", 10.0)
 
         try:
-            # Import kafka-python here to make it optional
-            try:
-                from kafka import KafkaConsumer
-                from kafka.errors import KafkaError, NoBrokersAvailable
-            except ImportError:
+            # kafka-python is an optional dependency.
+            import importlib.util
+
+            if importlib.util.find_spec("kafka") is None:
                 logger.error(
                     "kafka-python not installed. Install with: pip install kafka-python"
                 )
@@ -328,7 +326,7 @@ class KafkaHealthCheck(HealthChecker):
 
             # Validate optional timeout
             timeout = config.get("timeout", 10.0)
-            if not isinstance(timeout, (int, float)) or timeout <= 0:
+            if not isinstance(timeout, int | float) or timeout <= 0:
                 logger.error("Kafka health check invalid timeout", timeout=timeout)
                 return False
 

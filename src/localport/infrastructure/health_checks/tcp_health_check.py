@@ -115,7 +115,7 @@ class TCPHealthCheck(HealthChecker):
                 "TCP health check unexpected error", host=host, port=port, error=str(e)
             )
 
-            return HealthCheckResult.error(
+            return HealthCheckResult.errored(
                 error=f"Unexpected error during TCP health check: {e}"
             )
 

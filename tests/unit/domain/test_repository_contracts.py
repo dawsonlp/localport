@@ -15,7 +15,7 @@ from localport.domain.repositories.service_repository import ServiceRepository
 from localport.domain.value_objects.connection_info import ConnectionInfo
 
 
-class ServiceRepositoryContractTest(ABC):
+class ServiceRepositoryContractTest(ABC):  # noqa: B024  # shared contract-test base
     """Abstract base class for testing ServiceRepository implementations.
 
     Any concrete ServiceRepository implementation should inherit from this
@@ -294,7 +294,7 @@ class ServiceRepositoryContractTest(ABC):
         assert len(all_services) == 2
 
 
-class ConfigRepositoryContractTest(ABC):
+class ConfigRepositoryContractTest(ABC):  # noqa: B024  # shared contract-test base
     """Abstract base class for testing ConfigRepository implementations.
 
     Any concrete ConfigRepository implementation should inherit from this

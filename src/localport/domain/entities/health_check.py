@@ -60,8 +60,13 @@ class HealthCheckResult:
         )
 
     @classmethod
-    def error(cls, error: str) -> "HealthCheckResult":
-        """Create an error result."""
+    def errored(cls, error: str) -> "HealthCheckResult":
+        """Create an error result.
+
+        Named ``errored`` rather than ``error`` so it does not shadow the
+        ``error`` field (a classmethod named ``error`` would replace the field's
+        default, leaving ``self.error`` bound to the method on non-error results).
+        """
         return cls(
             status=HealthCheckStatus.ERROR, timestamp=datetime.now(), error=error
         )

@@ -1,6 +1,7 @@
 """Log viewing and filtering commands for LocalPort CLI."""
 
 import asyncio
+import json
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -303,7 +304,6 @@ def _display_logs(
     """Display log entries in the specified format."""
     if output_format == OutputFormat.JSON:
         # JSON format
-        import json
 
         from ..formatters.json_formatter import JSONEncoder
 
@@ -492,7 +492,6 @@ def logs_sync(
 
                 if not matching_logs:
                     if output_format == OutputFormat.JSON:
-                        import json
 
                         error_data = {"error": "service_not_found", "service": service}
                         console.print(json.dumps(error_data))
@@ -513,7 +512,6 @@ def logs_sync(
                 target_log = max(matching_logs, key=lambda x: x["modified"])
 
                 if output_format == OutputFormat.JSON:
-                    import json
 
                     path_data = {
                         "service_name": target_log["service_name"],
@@ -526,7 +524,6 @@ def logs_sync(
 
             except Exception as e:
                 if output_format == OutputFormat.JSON:
-                    import json
 
                     error_data = {"error": "path_lookup_error", "message": str(e)}
                     console.print(json.dumps(error_data))
@@ -564,7 +561,6 @@ async def list_service_logs_command(
         service_logs = service_log_manager.list_service_logs()
 
         if output_format == OutputFormat.JSON:
-            import json
 
             from ..formatters.json_formatter import JSONEncoder
 
@@ -684,7 +680,6 @@ async def show_log_location_command(
         daemon_log_dir = log_directory.parent
 
         if output_format == OutputFormat.JSON:
-            import json
 
             location_data = {
                 "timestamp": datetime.now().isoformat(),
@@ -847,7 +842,6 @@ async def show_service_log_command(
 
         # Display logs
         if output_format == OutputFormat.JSON:
-            import json
 
             log_data = {
                 "timestamp": datetime.now().isoformat(),

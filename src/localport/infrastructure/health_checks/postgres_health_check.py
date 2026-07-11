@@ -39,7 +39,7 @@ class PostgreSQLHealthCheck(HealthChecker):
                 import psycopg
                 from psycopg import DatabaseError, OperationalError
             except ImportError:
-                return HealthCheckResult.error(
+                return HealthCheckResult.errored(
                     "psycopg not installed. Install with: pip install psycopg[binary]"
                 )
 
@@ -97,7 +97,7 @@ class PostgreSQLHealthCheck(HealthChecker):
                 database=merged_config.get("database", "postgres"),
                 error=str(e),
             )
-            return HealthCheckResult.error(
+            return HealthCheckResult.errored(
                 f"PostgreSQL health check exception: {str(e)}"
             )
 
@@ -507,7 +507,7 @@ class PostgreSQLHealthCheck(HealthChecker):
 
             # Validate optional timeout
             timeout = config.get("timeout", 10.0)
-            if not isinstance(timeout, (int, float)) or timeout <= 0:
+            if not isinstance(timeout, int | float) or timeout <= 0:
                 logger.error("PostgreSQL health check invalid timeout", timeout=timeout)
                 return False
 

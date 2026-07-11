@@ -44,7 +44,6 @@ class TestKubectlAdapter:
     @pytest.mark.asyncio
     async def test_validate_connection_info_missing_resource_name(self):
         """Test validate_connection_info with missing resource_name."""
-        adapter = KubectlAdapter()
         # Test that ConnectionInfo validation catches empty resource_name at creation
         with pytest.raises(ValueError, match="resource_name cannot be empty"):
             ConnectionInfo(
@@ -55,7 +54,6 @@ class TestKubectlAdapter:
     @pytest.mark.asyncio
     async def test_validate_connection_info_invalid_resource_type(self):
         """Test validate_connection_info with invalid resource_type."""
-        adapter = KubectlAdapter()
         # Test that ConnectionInfo validation catches invalid resource_type at creation
         with pytest.raises(ValueError, match="resource_type.*invalid"):
             ConnectionInfo(

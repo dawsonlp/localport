@@ -137,7 +137,7 @@ class TestErrorFormatting:
             ("C:\\Users\\bob\\.ssh\\key.pem", "~\\.ssh\\key.pem"),  # Windows path
         ]
 
-        for full_path, expected_safe_path in test_cases:
+        for full_path, _expected_safe_path in test_cases:
             safe_path = SSHKeyNotFoundError._make_safe_path(full_path)
             # The exact conversion may depend on the current system, but it should not expose the full path
             assert len(safe_path) <= len(full_path)

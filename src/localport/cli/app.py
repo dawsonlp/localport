@@ -12,6 +12,35 @@ from rich.text import Text
 
 from ..config.config_path_manager import ConfigPathManager
 from ..config.settings import Settings
+from .commands.cluster_commands import (
+    cluster_events_sync,
+    cluster_pods_sync,
+    cluster_status_sync,
+)
+from .commands.config_commands import (
+    add_connection_sync,
+    export_config_sync,
+    list_connections_sync,
+    remove_connection_sync,
+    validate_config_sync,
+)
+from .commands.daemon_commands import (
+    reload_daemon_sync,
+    restart_daemon_sync,
+    start_daemon_sync,
+    status_daemon_sync,
+    stop_daemon_sync,
+)
+from .commands.log_commands import logs_sync
+from .commands.service_commands import (
+    start_services_sync,
+    status_services_sync,
+    stop_services_sync,
+)
+from .commands.ssh_commands import (
+    test_ssh_connectivity_sync,
+    validate_ssh_config_sync,
+)
 from .formatters.output_format import OutputFormat
 from .utils.rich_utils import setup_rich_logging
 
@@ -222,38 +251,7 @@ def main(
         raise typer.Exit(1)
 
 
-# Import command implementations
-from .commands.cluster_commands import (
-    cluster_events_sync,
-    cluster_pods_sync,
-    cluster_status_sync,
-)
-from .commands.config_commands import (
-    add_connection_sync,
-    export_config_sync,
-    list_connections_sync,
-    remove_connection_sync,
-    validate_config_sync,
-)
-from .commands.daemon_commands import (
-    reload_daemon_sync,
-    restart_daemon_sync,
-    start_daemon_sync,
-    status_daemon_sync,
-    stop_daemon_sync,
-)
-from .commands.log_commands import (
-    logs_sync,
-)
-from .commands.service_commands import (
-    start_services_sync,
-    status_services_sync,
-    stop_services_sync,
-)
-from .commands.ssh_commands import (
-    test_ssh_connectivity_sync,
-    validate_ssh_config_sync,
-)
+# Register command implementations
 
 # Service management commands
 app.command(name="start")(start_services_sync)
@@ -350,7 +348,7 @@ def cli_main():
 
 [bold]Commands:[/bold]
   [cyan]start[/cyan]    Start port forwarding services
-  [cyan]stop[/cyan]     Stop port forwarding services  
+  [cyan]stop[/cyan]     Stop port forwarding services
   [cyan]status[/cyan]   Show service status
   [cyan]logs[/cyan]     View service logs
   [cyan]daemon[/cyan]   Daemon management commands

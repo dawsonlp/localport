@@ -10,7 +10,11 @@ from ...application.services.daemon_manager import DaemonManager
 from ...application.services.health_monitor_scheduler import HealthMonitorScheduler
 from ...application.services.restart_manager import RestartManager
 from ...application.services.service_manager import ServiceManager
-from ...application.use_cases.manage_daemon import ManageDaemonUseCase
+from ...application.use_cases.manage_daemon import (
+    DaemonCommand,
+    ManageDaemonCommand,
+    ManageDaemonUseCase,
+)
 from ...infrastructure.adapters.adapter_factory import AdapterFactory
 from ...infrastructure.health_checks.health_check_factory import HealthCheckFactory
 from ...infrastructure.repositories.memory_service_repository import (
@@ -62,11 +66,6 @@ async def start_daemon_command(
         messages = get_operation_messages("start")
 
         async def start_operation():
-            from ...application.use_cases.manage_daemon import (
-                DaemonCommand,
-                ManageDaemonCommand,
-            )
-
             command = ManageDaemonCommand(
                 command=DaemonCommand.START, config_file=config_file
             )
@@ -187,11 +186,6 @@ async def stop_daemon_command(force: bool = False) -> None:
         messages = get_operation_messages("stop")
 
         async def stop_operation():
-            from ...application.use_cases.manage_daemon import (
-                DaemonCommand,
-                ManageDaemonCommand,
-            )
-
             command = ManageDaemonCommand(command=DaemonCommand.STOP, force=force)
             return await daemon_use_case.execute(command)
 
@@ -263,11 +257,6 @@ async def restart_daemon_command(
         messages = get_operation_messages("restart")
 
         async def restart_operation():
-            from ...application.use_cases.manage_daemon import (
-                DaemonCommand,
-                ManageDaemonCommand,
-            )
-
             command = ManageDaemonCommand(
                 command=DaemonCommand.RESTART, config_file=config_file, force=force
             )
@@ -337,11 +326,6 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
 
         async def show_status():
             """Show current daemon status."""
-            from ...application.use_cases.manage_daemon import (
-                DaemonCommand,
-                ManageDaemonCommand,
-            )
-
             command = ManageDaemonCommand(command=DaemonCommand.STATUS)
             result = await daemon_use_case.execute(command)
 
@@ -453,11 +437,6 @@ async def reload_daemon_command() -> None:
         messages = get_operation_messages("reload")
 
         async def reload_operation():
-            from ...application.use_cases.manage_daemon import (
-                DaemonCommand,
-                ManageDaemonCommand,
-            )
-
             command = ManageDaemonCommand(command=DaemonCommand.RELOAD)
             return await daemon_use_case.execute(command)
 
