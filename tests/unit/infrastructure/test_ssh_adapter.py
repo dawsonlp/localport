@@ -1,14 +1,11 @@
 """Tests for SSH adapter."""
 
-import asyncio
 import os
-import stat
 import tempfile
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from localport.domain.enums import ForwardingTechnology
 from localport.domain.value_objects.connection_info import ConnectionInfo
 from localport.infrastructure.adapters.ssh_adapter import SSHAdapter
 
@@ -24,8 +21,10 @@ class TestSSHAdapter:
     @pytest.fixture
     def valid_ssh_key(self):
         """Create a temporary SSH key file with correct permissions."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
-            f.write("-----BEGIN RSA PRIVATE KEY-----\nfake-key-content\n-----END RSA PRIVATE KEY-----")
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
+            f.write(
+                "-----BEGIN RSA PRIVATE KEY-----\nfake-key-content\n-----END RSA PRIVATE KEY-----"
+            )
             f.flush()
             os.chmod(f.name, 0o600)
             yield f.name
@@ -35,10 +34,7 @@ class TestSSHAdapter:
     async def test_validate_connection_info_valid(self, adapter, valid_ssh_key):
         """Test validation with a valid SSH connection."""
         conn = ConnectionInfo.ssh(
-            host="example.com",
-            user="admin",
-            port=22,
-            key_file=valid_ssh_key
+            host="example.com", user="admin", port=22, key_file=valid_ssh_key
         )
         errors = await adapter.validate_connection_info(conn)
         assert errors == []
@@ -46,7 +42,9 @@ class TestSSHAdapter:
     @pytest.mark.asyncio
     async def test_validate_connection_info_missing_host(self, adapter, valid_ssh_key):
         """Test validation with valid config returns no errors."""
-        conn = ConnectionInfo.ssh(host="valid.com", user="admin", key_file=valid_ssh_key)
+        conn = ConnectionInfo.ssh(
+            host="valid.com", user="admin", key_file=valid_ssh_key
+        )
         errors = await adapter.validate_connection_info(conn)
         assert errors == []
 
@@ -67,7 +65,9 @@ class TestSSHAdapter:
     async def test_validate_connection_info_invalid_port(self, adapter, valid_ssh_key):
         """Test validation catches invalid port."""
         try:
-            conn = ConnectionInfo.ssh(host="example.com", port=99999, key_file=valid_ssh_key)
+            conn = ConnectionInfo.ssh(
+                host="example.com", port=99999, key_file=valid_ssh_key
+            )
             errors = await adapter.validate_connection_info(conn)
             assert any("port" in e.lower() for e in errors)
         except (ValueError, TypeError):
@@ -78,11 +78,12 @@ class TestSSHAdapter:
     async def test_validate_connection_info_missing_key_file(self, adapter):
         """Test that ConnectionInfo.ssh rejects non-existent key file at construction."""
         from localport.domain.exceptions import SSHKeyNotFoundError
+
         with pytest.raises(SSHKeyNotFoundError):
             ConnectionInfo.ssh(
                 host="example.com",
                 user="admin",
-                key_file="/nonexistent/path/to/key.pem"
+                key_file="/nonexistent/path/to/key.pem",
             )
 
     @pytest.mark.asyncio
@@ -90,25 +91,32 @@ class TestSSHAdapter:
         """Test validation catches no authentication method."""
         conn = ConnectionInfo.ssh(host="example.com", user="admin")
         errors = await adapter.validate_connection_info(conn)
-        assert any("authentication" in e.lower() or "key_file" in e.lower() or "password" in e.lower() for e in errors)
+        assert any(
+            "authentication" in e.lower()
+            or "key_file" in e.lower()
+            or "password" in e.lower()
+            for e in errors
+        )
 
     @pytest.mark.asyncio
     async def test_validate_connection_info_password_auth(self, adapter):
         """Test validation passes with password authentication."""
-        conn = ConnectionInfo.ssh(
-            host="example.com",
-            user="admin",
-            password="secret"
-        )
+        conn = ConnectionInfo.ssh(host="example.com", user="admin", password="secret")
         errors = await adapter.validate_connection_info(conn)
         # May have sshpass warning but shouldn't have auth error
-        auth_errors = [e for e in errors if "authentication" in e.lower() and "requires" in e.lower() and "key_file" in e.lower()]
+        auth_errors = [
+            e
+            for e in errors
+            if "authentication" in e.lower()
+            and "requires" in e.lower()
+            and "key_file" in e.lower()
+        ]
         assert len(auth_errors) == 0
 
     @pytest.mark.asyncio
     async def test_validate_connection_info_key_permissions(self, adapter):
         """Test validation catches overly permissive key file permissions."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             f.flush()
             os.chmod(f.name, 0o644)  # Too permissive
@@ -116,19 +124,19 @@ class TestSSHAdapter:
 
         try:
             conn = ConnectionInfo.ssh(
-                host="example.com",
-                user="admin",
-                key_file=key_path
+                host="example.com", user="admin", key_file=key_path
             )
             errors = await adapter.validate_connection_info(conn)
-            assert any("permission" in e.lower() or "600" in e or "400" in e for e in errors)
+            assert any(
+                "permission" in e.lower() or "600" in e or "400" in e for e in errors
+            )
         finally:
             os.unlink(key_path)
 
     @pytest.mark.asyncio
     async def test_validate_connection_info_key_permissions_strict(self, adapter):
         """Test that only 600 and 400 permissions pass validation."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             f.flush()
             key_path = f.name
@@ -136,7 +144,9 @@ class TestSSHAdapter:
         try:
             # 700 should fail (owner execute)
             os.chmod(key_path, 0o700)
-            conn = ConnectionInfo.ssh(host="example.com", user="admin", key_file=key_path)
+            conn = ConnectionInfo.ssh(
+                host="example.com", user="admin", key_file=key_path
+            )
             errors = await adapter.validate_connection_info(conn)
             assert any("permission" in e.lower() for e in errors)
 
@@ -159,11 +169,11 @@ class TestSSHAdapter:
     async def test_start_port_forward_missing_ssh(self, adapter, valid_ssh_key):
         """Test that missing ssh command raises error."""
         conn = ConnectionInfo.ssh(
-            host="example.com",
-            user="admin",
-            key_file=valid_ssh_key
+            host="example.com", user="admin", key_file=valid_ssh_key
         )
-        with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError("ssh")):
+        with patch(
+            "asyncio.create_subprocess_exec", side_effect=FileNotFoundError("ssh")
+        ):
             with pytest.raises((RuntimeError, FileNotFoundError)):
                 await adapter.start_port_forward(5433, 5432, conn)
 
@@ -171,11 +181,10 @@ class TestSSHAdapter:
     async def test_start_port_forward_invalid_key_file(self, adapter):
         """Test that non-existent key file is rejected at ConnectionInfo construction."""
         from localport.domain.exceptions import SSHKeyNotFoundError
+
         with pytest.raises(SSHKeyNotFoundError):
             ConnectionInfo.ssh(
-                host="example.com",
-                user="admin",
-                key_file="/nonexistent/key.pem"
+                host="example.com", user="admin", key_file="/nonexistent/key.pem"
             )
 
     @pytest.mark.asyncio

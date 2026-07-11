@@ -15,7 +15,7 @@ from localport.domain.repositories.service_repository import ServiceRepository
 from localport.domain.value_objects.connection_info import ConnectionInfo
 
 
-class ServiceRepositoryContractTest(ABC):
+class ServiceRepositoryContractTest(ABC):  # noqa: B024  # shared contract-test base
     """Abstract base class for testing ServiceRepository implementations.
 
     Any concrete ServiceRepository implementation should inherit from this
@@ -33,10 +33,7 @@ class ServiceRepositoryContractTest(ABC):
     @pytest.fixture
     def sample_service(self) -> Service:
         """Create a sample service for testing."""
-        conn = ConnectionInfo.kubectl(
-            resource_name="test-service",
-            namespace="default"
-        )
+        conn = ConnectionInfo.kubectl(resource_name="test-service", namespace="default")
         return Service.create(
             name="test-service",
             technology=ForwardingTechnology.KUBECTL,
@@ -44,16 +41,13 @@ class ServiceRepositoryContractTest(ABC):
             remote_port=80,
             connection_info=conn,
             tags=["test", "sample"],
-            description="A test service"
+            description="A test service",
         )
 
     @pytest.fixture
     def another_service(self) -> Service:
         """Create another sample service for testing."""
-        conn = ConnectionInfo.ssh(
-            host="example.com",
-            user="test"
-        )
+        conn = ConnectionInfo.ssh(host="example.com", user="test")
         return Service.create(
             name="another-service",
             technology=ForwardingTechnology.SSH,
@@ -61,11 +55,13 @@ class ServiceRepositoryContractTest(ABC):
             remote_port=90,
             connection_info=conn,
             tags=["test", "another"],
-            description="Another test service"
+            description="Another test service",
         )
 
     @pytest.mark.asyncio
-    async def test_save_and_find_by_id(self, repository: ServiceRepository, sample_service: Service):
+    async def test_save_and_find_by_id(
+        self, repository: ServiceRepository, sample_service: Service
+    ):
         """Test saving a service and finding it by ID."""
         # Save the service
         await repository.save(sample_service)
@@ -91,7 +87,9 @@ class ServiceRepositoryContractTest(ABC):
         assert found_service is None
 
     @pytest.mark.asyncio
-    async def test_save_and_find_by_name(self, repository: ServiceRepository, sample_service: Service):
+    async def test_save_and_find_by_name(
+        self, repository: ServiceRepository, sample_service: Service
+    ):
         """Test saving a service and finding it by name."""
         # Save the service
         await repository.save(sample_service)
@@ -116,7 +114,12 @@ class ServiceRepositoryContractTest(ABC):
         assert services == []
 
     @pytest.mark.asyncio
-    async def test_save_and_find_all(self, repository: ServiceRepository, sample_service: Service, another_service: Service):
+    async def test_save_and_find_all(
+        self,
+        repository: ServiceRepository,
+        sample_service: Service,
+        another_service: Service,
+    ):
         """Test saving multiple services and finding all."""
         # Save services
         await repository.save(sample_service)
@@ -131,7 +134,12 @@ class ServiceRepositoryContractTest(ABC):
         assert another_service.name in service_names
 
     @pytest.mark.asyncio
-    async def test_find_by_tags(self, repository: ServiceRepository, sample_service: Service, another_service: Service):
+    async def test_find_by_tags(
+        self,
+        repository: ServiceRepository,
+        sample_service: Service,
+        another_service: Service,
+    ):
         """Test finding services by tags."""
         # Save services
         await repository.save(sample_service)
@@ -156,7 +164,12 @@ class ServiceRepositoryContractTest(ABC):
         assert len(services) == 0
 
     @pytest.mark.asyncio
-    async def test_find_by_multiple_tags(self, repository: ServiceRepository, sample_service: Service, another_service: Service):
+    async def test_find_by_multiple_tags(
+        self,
+        repository: ServiceRepository,
+        sample_service: Service,
+        another_service: Service,
+    ):
         """Test finding services by multiple tags."""
         # Save services
         await repository.save(sample_service)
@@ -172,7 +185,9 @@ class ServiceRepositoryContractTest(ABC):
         assert services[0].name == sample_service.name
 
     @pytest.mark.asyncio
-    async def test_update_service(self, repository: ServiceRepository, sample_service: Service):
+    async def test_update_service(
+        self, repository: ServiceRepository, sample_service: Service
+    ):
         """Test updating a service."""
         # Save the service
         await repository.save(sample_service)
@@ -189,7 +204,9 @@ class ServiceRepositoryContractTest(ABC):
         assert found_service.description == "Updated description"
 
     @pytest.mark.asyncio
-    async def test_delete_service(self, repository: ServiceRepository, sample_service: Service):
+    async def test_delete_service(
+        self, repository: ServiceRepository, sample_service: Service
+    ):
         """Test deleting a service."""
         # Save the service
         await repository.save(sample_service)
@@ -218,9 +235,13 @@ class ServiceRepositoryContractTest(ABC):
         await repository.delete(non_existent_id)
 
     @pytest.mark.asyncio
-    async def test_name_uniqueness(self, repository: ServiceRepository, sample_service: Service):
+    async def test_name_uniqueness(
+        self, repository: ServiceRepository, sample_service: Service
+    ):
         """Test that service names must be unique."""
-        from localport.domain.repositories.service_repository import DuplicateServiceError
+        from localport.domain.repositories.service_repository import (
+            DuplicateServiceError,
+        )
 
         # Save the service
         await repository.save(sample_service)
@@ -232,7 +253,7 @@ class ServiceRepositoryContractTest(ABC):
             technology=ForwardingTechnology.SSH,
             local_port=9999,
             remote_port=99,
-            connection_info=conn
+            connection_info=conn,
         )
 
         # Repository enforces name uniqueness
@@ -245,21 +266,25 @@ class ServiceRepositoryContractTest(ABC):
         assert found_service.id == sample_service.id
 
     @pytest.mark.asyncio
-    async def test_concurrent_operations(self, repository: ServiceRepository, sample_service: Service, another_service: Service):
+    async def test_concurrent_operations(
+        self,
+        repository: ServiceRepository,
+        sample_service: Service,
+        another_service: Service,
+    ):
         """Test concurrent repository operations."""
         import asyncio
 
         # Save services concurrently
         await asyncio.gather(
-            repository.save(sample_service),
-            repository.save(another_service)
+            repository.save(sample_service), repository.save(another_service)
         )
 
         # Find services concurrently
         results = await asyncio.gather(
             repository.find_by_id(sample_service.id),
             repository.find_by_id(another_service.id),
-            repository.find_all()
+            repository.find_all(),
         )
 
         found_sample, found_another, all_services = results
@@ -269,7 +294,7 @@ class ServiceRepositoryContractTest(ABC):
         assert len(all_services) == 2
 
 
-class ConfigRepositoryContractTest(ABC):
+class ConfigRepositoryContractTest(ABC):  # noqa: B024  # shared contract-test base
     """Abstract base class for testing ConfigRepository implementations.
 
     Any concrete ConfigRepository implementation should inherit from this
@@ -297,20 +322,17 @@ class ConfigRepositoryContractTest(ABC):
                     "remote_port": 80,
                     "connection": {
                         "resource_name": "test-service",
-                        "namespace": "default"
-                    }
+                        "namespace": "default",
+                    },
                 }
             ],
-            "defaults": {
-                "health_check": {
-                    "type": "tcp",
-                    "timeout": 5.0
-                }
-            }
+            "defaults": {"health_check": {"type": "tcp", "timeout": 5.0}},
         }
 
     @pytest.mark.asyncio
-    async def test_load_configuration(self, repository: ConfigRepository, sample_config: dict):
+    async def test_load_configuration(
+        self, repository: ConfigRepository, sample_config: dict
+    ):
         """Test loading configuration."""
         # This test depends on the specific implementation
         # Some repositories might load from files, others from memory
@@ -319,7 +341,9 @@ class ConfigRepositoryContractTest(ABC):
         assert isinstance(config, dict)
 
     @pytest.mark.asyncio
-    async def test_save_configuration(self, repository: ConfigRepository, sample_config: dict):
+    async def test_save_configuration(
+        self, repository: ConfigRepository, sample_config: dict
+    ):
         """Test saving configuration."""
         # Save configuration
         await repository.save_configuration(sample_config)
@@ -331,7 +355,9 @@ class ConfigRepositoryContractTest(ABC):
         assert isinstance(loaded_config, dict)
 
     @pytest.mark.asyncio
-    async def test_validate_configuration(self, repository: ConfigRepository, sample_config: dict):
+    async def test_validate_configuration(
+        self, repository: ConfigRepository, sample_config: dict
+    ):
         """Test configuration validation."""
         # Valid configuration should pass
         errors = await repository.validate_configuration(sample_config)
@@ -344,7 +370,7 @@ class ConfigRepositoryContractTest(ABC):
         invalid_config = {
             "version": "invalid",
             "services": "not a list",
-            "invalid_field": True
+            "invalid_field": True,
         }
 
         errors = await repository.validate_configuration(invalid_config)
@@ -371,22 +397,24 @@ class TestMemoryServiceRepositoryContract(ServiceRepositoryContractTest):
         from localport.infrastructure.repositories.memory_service_repository import (
             MemoryServiceRepository,
         )
+
         return MemoryServiceRepository()
 
 
 # Helper functions for repository testing
+
 
 def create_test_service(
     name: str = "test-service",
     technology: ForwardingTechnology = ForwardingTechnology.KUBECTL,
     local_port: int = 8080,
     remote_port: int = 80,
-    **kwargs
+    **kwargs,
 ) -> Service:
     """Create a test service with default values."""
     connection_info = kwargs.pop(
         "connection_info",
-        ConnectionInfo.kubectl(resource_name=name, namespace="default")
+        ConnectionInfo.kubectl(resource_name=name, namespace="default"),
     )
     return Service.create(
         name=name,
@@ -394,17 +422,28 @@ def create_test_service(
         local_port=local_port,
         remote_port=remote_port,
         connection_info=connection_info,
-        **kwargs
+        **kwargs,
     )
 
 
-async def populate_repository_with_test_data(repository: ServiceRepository) -> list[Service]:
+async def populate_repository_with_test_data(
+    repository: ServiceRepository,
+) -> list[Service]:
     """Populate a repository with test data and return the services."""
     services = [
-        create_test_service("postgres", local_port=5432, remote_port=5432, tags=["database", "essential"]),
+        create_test_service(
+            "postgres",
+            local_port=5432,
+            remote_port=5432,
+            tags=["database", "essential"],
+        ),
         create_test_service("redis", local_port=6379, remote_port=6379, tags=["cache"]),
-        create_test_service("kafka", local_port=9092, remote_port=9092, tags=["messaging", "essential"]),
-        create_test_service("api", local_port=8080, remote_port=80, tags=["web", "api"]),
+        create_test_service(
+            "kafka", local_port=9092, remote_port=9092, tags=["messaging", "essential"]
+        ),
+        create_test_service(
+            "api", local_port=8080, remote_port=80, tags=["web", "api"]
+        ),
     ]
 
     for service in services:
@@ -432,12 +471,16 @@ class RepositoryTestHelper:
         assert actual.description == expected.description
 
     @staticmethod
-    async def assert_services_contain(services: list[Service], expected_service: Service):
+    async def assert_services_contain(
+        services: list[Service], expected_service: Service
+    ):
         """Assert that a list of services contains the expected service."""
         found = False
         for service in services:
             if service.id == expected_service.id:
-                await RepositoryTestHelper.assert_service_equals(service, expected_service)
+                await RepositoryTestHelper.assert_service_equals(
+                    service, expected_service
+                )
                 found = True
                 break
         assert found, f"Service {expected_service.name} not found in services list"

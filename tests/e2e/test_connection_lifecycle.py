@@ -1,17 +1,17 @@
 """End-to-end tests for connection lifecycle."""
 
-import asyncio
-import tempfile
 import os
+import tempfile
 
 import pytest
 import yaml
 
 from localport.domain.entities.service import Service
 from localport.domain.enums import ForwardingTechnology
-from localport.domain.value_objects.connection_info import ConnectionInfo
 from localport.domain.value_objects.discovery import DiscoveredPort, KubernetesResource
-from localport.infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from localport.infrastructure.repositories.yaml_config_repository import (
+    YamlConfigRepository,
+)
 
 
 class TestConnectionLifecycleE2E:
@@ -20,13 +20,8 @@ class TestConnectionLifecycleE2E:
     @pytest.fixture
     def config_file(self):
         """Create a temporary config file for e2e tests."""
-        config = {
-            "version": "1.0",
-            "services": []
-        }
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.yaml', delete=False
-        ) as f:
+        config = {"version": "1.0", "services": []}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
             yield f.name
         os.unlink(f.name)
@@ -39,7 +34,7 @@ class TestConnectionLifecycleE2E:
             namespace="default",
             local_port=5433,
             remote_port=5432,
-            service_name="postgres"
+            service_name="postgres",
         )
         assert service.name == "postgres"
         assert service.technology == ForwardingTechnology.KUBECTL
@@ -53,8 +48,8 @@ class TestConnectionLifecycleE2E:
             "connection": {
                 "resource_name": "postgres",
                 "namespace": "default",
-                "resource_type": "service"
-            }
+                "resource_type": "service",
+            },
         }
         await repo.add_service_config(service_config)
 
@@ -70,7 +65,7 @@ class TestConnectionLifecycleE2E:
     @pytest.mark.asyncio
     async def test_complete_ssh_service_lifecycle(self, config_file):
         """Test complete SSH lifecycle: create → add → validate → remove."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             os.chmod(f.name, 0o600)
             key_path = f.name
@@ -83,7 +78,7 @@ class TestConnectionLifecycleE2E:
                 key_file=key_path,
                 local_port=5433,
                 remote_port=5432,
-                remote_host="internal-db.rds.amazonaws.com"
+                remote_host="internal-db.rds.amazonaws.com",
             )
             assert service.name == "rds-tunnel"
             assert service.technology == ForwardingTechnology.SSH
@@ -99,8 +94,8 @@ class TestConnectionLifecycleE2E:
                     "user": "ec2-user",
                     "key_file": key_path,
                     "port": 22,
-                    "remote_host": "internal-db.rds.amazonaws.com"
-                }
+                    "remote_host": "internal-db.rds.amazonaws.com",
+                },
             }
             await repo.add_service_config(service_config)
 
@@ -129,7 +124,7 @@ class TestConnectionLifecycleE2E:
             resource_type="service",
             available_ports=[
                 DiscoveredPort(port=5432, protocol="tcp", name="postgresql"),
-            ]
+            ],
         )
         assert resource.name == "postgres"
         assert len(resource.available_ports) == 1

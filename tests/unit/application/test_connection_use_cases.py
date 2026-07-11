@@ -1,16 +1,13 @@
 """Tests for connection management use cases."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-
 from localport.application.dto.connection_dto import (
     AddConnectionRequest,
-    RemoveConnectionRequest,
     ListConnectionsRequest,
+    RemoveConnectionRequest,
 )
 from localport.application.use_cases.add_connection import AddConnectionUseCase
-from localport.application.use_cases.remove_connection import RemoveConnectionUseCase
 from localport.application.use_cases.list_connections import ListConnectionsUseCase
+from localport.application.use_cases.remove_connection import RemoveConnectionUseCase
 from localport.domain.enums import ForwardingTechnology
 
 
@@ -26,11 +23,8 @@ class TestAddConnectionUseCase:
         request = AddConnectionRequest(
             service_name="postgres",
             technology=ForwardingTechnology.KUBECTL,
-            connection_params={
-                "resource_name": "postgres",
-                "namespace": "default"
-            },
-            options={"local_port": 5433, "remote_port": 5432}
+            connection_params={"resource_name": "postgres", "namespace": "default"},
+            options={"local_port": 5433, "remote_port": 5432},
         )
         assert request.service_name == "postgres"
         assert request.technology == ForwardingTechnology.KUBECTL

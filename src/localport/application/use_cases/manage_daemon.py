@@ -14,6 +14,7 @@ logger = structlog.get_logger()
 
 class DaemonCommand(str, Enum):
     """Available daemon commands."""
+
     START = "start"
     STOP = "stop"
     RESTART = "restart"
@@ -24,6 +25,7 @@ class DaemonCommand(str, Enum):
 @dataclass
 class ManageDaemonCommand:
     """Command to manage daemon operations."""
+
     command: DaemonCommand
     config_file: str | None = None
     force: bool = False
@@ -34,9 +36,7 @@ class ManageDaemonUseCase:
     """Use case for managing LocalPort daemon operations."""
 
     def __init__(
-        self,
-        service_repository: ServiceRepository,
-        service_manager: ServiceManager
+        self, service_repository: ServiceRepository, service_manager: ServiceManager
     ):
         """Initialize the manage daemon use case.
 
@@ -57,10 +57,12 @@ class ManageDaemonUseCase:
         Returns:
             Result of the daemon operation
         """
-        logger.info("Executing daemon command",
-                   command=command.command.value,
-                   config_file=command.config_file,
-                   force=command.force)
+        logger.info(
+            "Executing daemon command",
+            command=command.command.value,
+            config_file=command.config_file,
+            force=command.force,
+        )
 
         try:
             if command.command == DaemonCommand.START:
@@ -77,16 +79,16 @@ class ManageDaemonUseCase:
                 raise ValueError(f"Unknown daemon command: {command.command}")
 
         except Exception as e:
-            logger.error("Daemon command failed",
-                        command=command.command.value,
-                        error=str(e))
+            logger.error(
+                "Daemon command failed", command=command.command.value, error=str(e)
+            )
             return DaemonOperationResult(
-                command=command.command.value,
-                success=False,
-                error=str(e)
+                command=command.command.value, success=False, error=str(e)
             )
 
-    async def _start_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
+    async def _start_daemon(
+        self, command: ManageDaemonCommand
+    ) -> DaemonOperationResult:
         """Start the LocalPort daemon.
 
         Args:
@@ -101,7 +103,7 @@ class ManageDaemonUseCase:
                 return DaemonOperationResult(
                     command=command.command.value,
                     success=False,
-                    error="Daemon is already running. Use --force to restart."
+                    error="Daemon is already running. Use --force to restart.",
                 )
             else:
                 # Force restart
@@ -121,7 +123,7 @@ class ManageDaemonUseCase:
                 command=command.command.value,
                 success=True,
                 pid=pid,
-                message=f"Daemon started with PID {pid}"
+                message=f"Daemon started with PID {pid}",
             )
 
         except Exception as e:
@@ -129,7 +131,7 @@ class ManageDaemonUseCase:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error=f"Failed to start daemon: {str(e)}"
+                error=f"Failed to start daemon: {str(e)}",
             )
 
     async def _stop_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
@@ -145,7 +147,7 @@ class ManageDaemonUseCase:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error="Daemon is not running"
+                error="Daemon is not running",
             )
 
         try:
@@ -164,7 +166,7 @@ class ManageDaemonUseCase:
                 command=command.command.value,
                 success=True,
                 pid=pid,
-                message=f"Daemon stopped (was PID {pid})"
+                message=f"Daemon stopped (was PID {pid})",
             )
 
         except Exception as e:
@@ -172,10 +174,12 @@ class ManageDaemonUseCase:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error=f"Failed to stop daemon: {str(e)}"
+                error=f"Failed to stop daemon: {str(e)}",
             )
 
-    async def _restart_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
+    async def _restart_daemon(
+        self, command: ManageDaemonCommand
+    ) -> DaemonOperationResult:
         """Restart the LocalPort daemon.
 
         Args:
@@ -195,7 +199,7 @@ class ManageDaemonUseCase:
                 return DaemonOperationResult(
                     command=command.command.value,
                     success=False,
-                    error=f"Failed to stop daemon during restart: {stop_result.error}"
+                    error=f"Failed to stop daemon during restart: {stop_result.error}",
                 )
 
         # Start daemon
@@ -208,16 +212,18 @@ class ManageDaemonUseCase:
                 command=command.command.value,
                 success=True,
                 pid=start_result.pid,
-                message=f"Daemon restarted with PID {start_result.pid}"
+                message=f"Daemon restarted with PID {start_result.pid}",
             )
         else:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error=f"Failed to start daemon during restart: {start_result.error}"
+                error=f"Failed to start daemon during restart: {start_result.error}",
             )
 
-    async def _get_daemon_status(self, command: ManageDaemonCommand) -> DaemonOperationResult:
+    async def _get_daemon_status(
+        self, command: ManageDaemonCommand
+    ) -> DaemonOperationResult:
         """Get the status of the LocalPort daemon.
 
         Args:
@@ -238,10 +244,12 @@ class ManageDaemonUseCase:
                     running=True,
                     pid=pid,
                     uptime_seconds=uptime,
-                    active_services=active_services
+                    active_services=active_services,
                 )
 
-                message = f"Daemon is running (PID {pid}, {active_services} active services)"
+                message = (
+                    f"Daemon is running (PID {pid}, {active_services} active services)"
+                )
             else:
                 status = DaemonStatusResult(running=False)
                 message = "Daemon is not running"
@@ -250,7 +258,7 @@ class ManageDaemonUseCase:
                 command=command.command.value,
                 success=True,
                 message=message,
-                status=status
+                status=status,
             )
 
         except Exception as e:
@@ -258,10 +266,12 @@ class ManageDaemonUseCase:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error=f"Failed to get daemon status: {str(e)}"
+                error=f"Failed to get daemon status: {str(e)}",
             )
 
-    async def _reload_daemon(self, command: ManageDaemonCommand) -> DaemonOperationResult:
+    async def _reload_daemon(
+        self, command: ManageDaemonCommand
+    ) -> DaemonOperationResult:
         """Reload the daemon configuration.
 
         Args:
@@ -274,7 +284,7 @@ class ManageDaemonUseCase:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error="Daemon is not running"
+                error="Daemon is not running",
             )
 
         try:
@@ -288,7 +298,7 @@ class ManageDaemonUseCase:
                 command=command.command.value,
                 success=True,
                 pid=pid,
-                message=f"Daemon configuration reloaded (PID {pid})"
+                message=f"Daemon configuration reloaded (PID {pid})",
             )
 
         except Exception as e:
@@ -296,7 +306,7 @@ class ManageDaemonUseCase:
             return DaemonOperationResult(
                 command=command.command.value,
                 success=False,
-                error=f"Failed to reload daemon: {str(e)}"
+                error=f"Failed to reload daemon: {str(e)}",
             )
 
     async def _is_daemon_running(self) -> bool:
@@ -335,8 +345,8 @@ class ManageDaemonUseCase:
             proc = psutil.Process(pid)
             if proc.status() in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD):
                 return False
-            cmdline = ' '.join(proc.cmdline())
-            return 'localport' in cmdline and 'daemon' in cmdline
+            cmdline = " ".join(proc.cmdline())
+            return "localport" in cmdline and "daemon" in cmdline
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             return False
         except Exception:
@@ -387,7 +397,7 @@ class ManageDaemonUseCase:
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
             stdin=asyncio.subprocess.DEVNULL,
-            start_new_session=True  # Detach from parent
+            start_new_session=True,  # Detach from parent
         )
 
         # Wait for daemon to write PID file and become ready
@@ -403,12 +413,18 @@ class ManageDaemonUseCase:
             if await self._is_daemon_running():
                 daemon_pid = await self._get_daemon_pid()
                 if daemon_pid:
-                    logger.info("Daemon startup verified", pid=daemon_pid, startup_time=elapsed_time)
+                    logger.info(
+                        "Daemon startup verified",
+                        pid=daemon_pid,
+                        startup_time=elapsed_time,
+                    )
                     return daemon_pid
 
             # Check if the initial process failed early
             if process.returncode is not None:
-                raise RuntimeError(f"Daemon process failed to start (exit code: {process.returncode})")
+                raise RuntimeError(
+                    f"Daemon process failed to start (exit code: {process.returncode})"
+                )
 
         # If we get here, daemon didn't start within timeout
         raise RuntimeError(f"Daemon failed to start within {max_wait_time} seconds")
@@ -428,7 +444,10 @@ class ManageDaemonUseCase:
 
         # Guard against PID reuse: never terminate a process that isn't our daemon.
         if not self._pid_is_localport_daemon(pid):
-            logger.warning("Stale PID file does not point at a LocalPort daemon; skipping stop", pid=pid)
+            logger.warning(
+                "Stale PID file does not point at a LocalPort daemon; skipping stop",
+                pid=pid,
+            )
             return
 
         try:
@@ -442,7 +461,9 @@ class ManageDaemonUseCase:
                 process.wait(timeout=timeout)
             except psutil.TimeoutExpired:
                 # Force kill if it doesn't terminate gracefully
-                logger.warning("Daemon did not terminate gracefully, forcing kill", pid=pid)
+                logger.warning(
+                    "Daemon did not terminate gracefully, forcing kill", pid=pid
+                )
                 process.kill()
                 process.wait()
 
@@ -461,7 +482,7 @@ class ManageDaemonUseCase:
         # Ensure directory exists
         os.makedirs(os.path.dirname(self._daemon_pid_file), exist_ok=True)
 
-        with open(self._daemon_pid_file, 'w') as f:
+        with open(self._daemon_pid_file, "w") as f:
             f.write(str(pid))
 
     async def _remove_pid_file(self) -> None:
@@ -518,9 +539,11 @@ class ManageDaemonUseCase:
 
         # Guard against PID reuse: never signal a process that isn't our daemon.
         if not self._pid_is_localport_daemon(pid):
-            raise RuntimeError("Stale PID file does not point at a LocalPort daemon; refusing to send reload signal")
+            raise RuntimeError(
+                "Stale PID file does not point at a LocalPort daemon; refusing to send reload signal"
+            )
 
         try:
             os.kill(pid, signal.SIGUSR1)  # Use SIGUSR1 for reload
         except OSError as e:
-            raise RuntimeError(f"Failed to send reload signal: {e}")
+            raise RuntimeError(f"Failed to send reload signal: {e}") from e

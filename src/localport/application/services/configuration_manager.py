@@ -23,7 +23,7 @@ class ConfigurationManager:
         config_repository: ConfigRepository,
         service_repository: ServiceRepository,
         use_polling: bool = False,
-        poll_interval: float = 2.0
+        poll_interval: float = 2.0,
     ):
         """Initialize the configuration manager.
 
@@ -43,7 +43,7 @@ class ConfigurationManager:
         else:
             self._watcher = ConfigurationWatcher()
             # Fallback to polling if watchdog not available
-            if not getattr(self._watcher, 'watchdog_available', True):
+            if not getattr(self._watcher, "watchdog_available", True):
                 logger.info("Falling back to polling configuration watcher")
                 self._watcher = PollingConfigurationWatcher(poll_interval)
 
@@ -59,7 +59,7 @@ class ConfigurationManager:
     async def start_hot_reloading(
         self,
         config_path: Path | None = None,
-        reload_callback: Callable[[ConfigurationDiff], None] | None = None
+        reload_callback: Callable[[ConfigurationDiff], None] | None = None,
     ) -> bool:
         """Start hot reloading for configuration changes.
 
@@ -93,15 +93,16 @@ class ConfigurationManager:
 
             # Start watching for changes
             success = await self._watcher.start_watching(
-                config_path,
-                self._handle_config_change
+                config_path, self._handle_config_change
             )
 
             if success:
                 self._is_watching = True
-                logger.info("Configuration hot reloading started",
-                          config_path=str(config_path),
-                          watcher_type=type(self._watcher).__name__)
+                logger.info(
+                    "Configuration hot reloading started",
+                    config_path=str(config_path),
+                    watcher_type=type(self._watcher).__name__,
+                )
                 return True
             else:
                 logger.error("Failed to start configuration watching")
@@ -125,7 +126,9 @@ class ConfigurationManager:
         except Exception as e:
             logger.error("Error stopping configuration hot reloading", error=str(e))
 
-    def add_reload_callback(self, callback: Callable[[ConfigurationDiff], None]) -> None:
+    def add_reload_callback(
+        self, callback: Callable[[ConfigurationDiff], None]
+    ) -> None:
         """Add a callback to be called when configuration reloads.
 
         Args:
@@ -135,7 +138,9 @@ class ConfigurationManager:
             self._reload_callbacks.append(callback)
             logger.debug("Added configuration reload callback")
 
-    def remove_reload_callback(self, callback: Callable[[ConfigurationDiff], None]) -> None:
+    def remove_reload_callback(
+        self, callback: Callable[[ConfigurationDiff], None]
+    ) -> None:
         """Remove a reload callback.
 
         Args:
@@ -145,7 +150,9 @@ class ConfigurationManager:
             self._reload_callbacks.remove(callback)
             logger.debug("Removed configuration reload callback")
 
-    async def reload_configuration(self, force: bool = False) -> ConfigurationDiff | None:
+    async def reload_configuration(
+        self, force: bool = False
+    ) -> ConfigurationDiff | None:
         """Manually reload configuration.
 
         Args:
@@ -177,7 +184,9 @@ class ConfigurationManager:
         # Schedule async reload
         asyncio.create_task(self._reload_config_internal())
 
-    async def _reload_config_internal(self, force: bool = False) -> ConfigurationDiff | None:
+    async def _reload_config_internal(
+        self, force: bool = False
+    ) -> ConfigurationDiff | None:
         """Internal method to reload configuration.
 
         Args:
@@ -194,14 +203,15 @@ class ConfigurationManager:
             if self._current_config is None or force:
                 # First load or forced reload
                 self._current_config = new_config
-                logger.info("Configuration loaded",
-                          services_count=len(new_config.get('services', [])))
+                logger.info(
+                    "Configuration loaded",
+                    services_count=len(new_config.get("services", [])),
+                )
                 return None
 
             # Compare configurations
             diff = await self._differ.compare_configurations(
-                self._current_config,
-                new_config
+                self._current_config, new_config
             )
 
             if not diff.has_changes and not force:
@@ -210,13 +220,18 @@ class ConfigurationManager:
 
             # Validate new configuration if enabled
             if self._validation_enabled:
-                validation_errors = await self._config_repository.validate_configuration(new_config)
+                validation_errors = (
+                    await self._config_repository.validate_configuration(new_config)
+                )
                 if validation_errors:
-                    logger.error("Configuration validation failed",
-                               errors=validation_errors)
+                    logger.error(
+                        "Configuration validation failed", errors=validation_errors
+                    )
 
                     if self._auto_rollback:
-                        logger.info("Auto-rollback enabled, keeping current configuration")
+                        logger.info(
+                            "Auto-rollback enabled, keeping current configuration"
+                        )
                         return None
                     else:
                         # Continue with invalid configuration (risky)
@@ -252,7 +267,9 @@ class ConfigurationManager:
                     self._current_config = self._backup_config
                     logger.info("Configuration rollback successful")
                 except Exception as rollback_error:
-                    logger.error("Configuration rollback failed", error=str(rollback_error))
+                    logger.error(
+                        "Configuration rollback failed", error=str(rollback_error)
+                    )
 
             return None
 
@@ -260,8 +277,10 @@ class ConfigurationManager:
         """Load initial configuration."""
         try:
             self._current_config = await self._config_repository.load_configuration()
-            logger.info("Initial configuration loaded",
-                       services_count=len(self._current_config.get('services', [])))
+            logger.info(
+                "Initial configuration loaded",
+                services_count=len(self._current_config.get("services", [])),
+            )
 
         except Exception as e:
             logger.error("Failed to load initial configuration", error=str(e))
@@ -276,8 +295,10 @@ class ConfigurationManager:
         if not self._reload_callbacks:
             return
 
-        logger.debug("Notifying configuration reload callbacks",
-                    callback_count=len(self._reload_callbacks))
+        logger.debug(
+            "Notifying configuration reload callbacks",
+            callback_count=len(self._reload_callbacks),
+        )
 
         for callback in self._reload_callbacks:
             try:
@@ -305,9 +326,13 @@ class ConfigurationManager:
         if not self._current_config:
             return ["No configuration loaded"]
 
-        return await self._config_repository.validate_configuration(self._current_config)
+        return await self._config_repository.validate_configuration(
+            self._current_config
+        )
 
-    async def backup_current_configuration(self, backup_path: str | None = None) -> str | None:
+    async def backup_current_configuration(
+        self, backup_path: str | None = None
+    ) -> str | None:
         """Create a backup of the current configuration.
 
         Args:
@@ -321,7 +346,9 @@ class ConfigurationManager:
             return None
 
         try:
-            backup_file = await self._config_repository.backup_configuration(backup_path)
+            backup_file = await self._config_repository.backup_configuration(
+                backup_path
+            )
             logger.info("Configuration backup created", backup_file=backup_file)
             return backup_file
 
@@ -365,7 +392,7 @@ class ConfigurationManager:
     @property
     def watched_files(self) -> set:
         """Get set of currently watched configuration files."""
-        return getattr(self._watcher, 'watched_files', set())
+        return getattr(self._watcher, "watched_files", set())
 
     async def get_configuration_status(self) -> dict[str, Any]:
         """Get comprehensive configuration management status.
@@ -374,19 +401,19 @@ class ConfigurationManager:
             Status information dictionary
         """
         status = {
-            'hot_reloading_active': self._is_watching,
-            'config_path': str(self._config_path) if self._config_path else None,
-            'watcher_type': self.watcher_type,
-            'watched_files': [str(f) for f in self.watched_files],
-            'validation_enabled': self._validation_enabled,
-            'auto_rollback_enabled': self._auto_rollback,
-            'callback_count': len(self._reload_callbacks),
-            'has_current_config': self._current_config is not None,
-            'has_backup_config': self._backup_config is not None
+            "hot_reloading_active": self._is_watching,
+            "config_path": str(self._config_path) if self._config_path else None,
+            "watcher_type": self.watcher_type,
+            "watched_files": [str(f) for f in self.watched_files],
+            "validation_enabled": self._validation_enabled,
+            "auto_rollback_enabled": self._auto_rollback,
+            "callback_count": len(self._reload_callbacks),
+            "has_current_config": self._current_config is not None,
+            "has_backup_config": self._backup_config is not None,
         }
 
         if self._current_config:
-            status['services_count'] = len(self._current_config.get('services', []))
-            status['config_version'] = self._current_config.get('version')
+            status["services_count"] = len(self._current_config.get("services", []))
+            status["config_version"] = self._current_config.get("version")
 
         return status

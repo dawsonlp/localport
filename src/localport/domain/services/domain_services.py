@@ -30,7 +30,9 @@ class PortConflictResolver(ABC):
         pass
 
     @abstractmethod
-    async def find_alternative_port(self, preferred_port: Port, range_start: int = 8000, range_end: int = 9000) -> Port | None:
+    async def find_alternative_port(
+        self, preferred_port: Port, range_start: int = 8000, range_end: int = 9000
+    ) -> Port | None:
         """Find an alternative port if the preferred one is not available.
 
         Args:
@@ -72,7 +74,9 @@ class ServiceValidationService(ABC):
         pass
 
     @abstractmethod
-    async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
+    async def validate_connection_info(
+        self, connection_info: ConnectionInfo
+    ) -> list[str]:
         """Validate connection information.
 
         Args:
@@ -84,7 +88,9 @@ class ServiceValidationService(ABC):
         pass
 
     @abstractmethod
-    async def validate_service_dependencies(self, services: list[Service]) -> dict[str, list[str]]:
+    async def validate_service_dependencies(
+        self, services: list[Service]
+    ) -> dict[str, list[str]]:
         """Validate dependencies between services.
 
         Args:
@@ -164,7 +170,9 @@ class HealthCheckOrchestrator(ABC):
     """Domain service for orchestrating health checks across services."""
 
     @abstractmethod
-    async def schedule_health_checks(self, services: list[Service]) -> dict[UUID, HealthCheck]:
+    async def schedule_health_checks(
+        self, services: list[Service]
+    ) -> dict[UUID, HealthCheck]:
         """Schedule health checks for multiple services.
 
         Args:
@@ -176,7 +184,9 @@ class HealthCheckOrchestrator(ABC):
         pass
 
     @abstractmethod
-    async def evaluate_service_health(self, service: Service, health_check: HealthCheck) -> bool:
+    async def evaluate_service_health(
+        self, service: Service, health_check: HealthCheck
+    ) -> bool:
         """Evaluate the health of a service.
 
         Args:
@@ -189,7 +199,9 @@ class HealthCheckOrchestrator(ABC):
         pass
 
     @abstractmethod
-    async def determine_restart_strategy(self, service: Service, failure_count: int) -> dict[str, Any] | None:
+    async def determine_restart_strategy(
+        self, service: Service, failure_count: int
+    ) -> dict[str, Any] | None:
         """Determine restart strategy for a failed service.
 
         Args:
@@ -218,7 +230,9 @@ class ServiceDiscoveryService(ABC):
         pass
 
     @abstractmethod
-    async def find_dependent_services(self, service_name: str, all_services: list[Service]) -> list[Service]:
+    async def find_dependent_services(
+        self, service_name: str, all_services: list[Service]
+    ) -> list[Service]:
         """Find services that depend on the given service.
 
         Args:
@@ -231,7 +245,9 @@ class ServiceDiscoveryService(ABC):
         pass
 
     @abstractmethod
-    async def build_dependency_graph(self, services: list[Service]) -> dict[str, list[str]]:
+    async def build_dependency_graph(
+        self, services: list[Service]
+    ) -> dict[str, list[str]]:
         """Build a dependency graph for services.
 
         Args:
@@ -243,7 +259,9 @@ class ServiceDiscoveryService(ABC):
         pass
 
     @abstractmethod
-    async def detect_circular_dependencies(self, services: list[Service]) -> list[list[str]]:
+    async def detect_circular_dependencies(
+        self, services: list[Service]
+    ) -> list[list[str]]:
         """Detect circular dependencies in service configuration.
 
         Args:
@@ -259,7 +277,9 @@ class ServiceMetricsService(ABC):
     """Domain service for collecting and analyzing service metrics."""
 
     @abstractmethod
-    async def calculate_service_reliability(self, service: Service, time_window_hours: int = 24) -> float:
+    async def calculate_service_reliability(
+        self, service: Service, time_window_hours: int = 24
+    ) -> float:
         """Calculate service reliability score.
 
         Args:
@@ -272,7 +292,9 @@ class ServiceMetricsService(ABC):
         pass
 
     @abstractmethod
-    async def calculate_average_startup_time(self, service: Service, sample_size: int = 10) -> float:
+    async def calculate_average_startup_time(
+        self, service: Service, sample_size: int = 10
+    ) -> float:
         """Calculate average startup time for a service.
 
         Args:
@@ -297,7 +319,9 @@ class ServiceMetricsService(ABC):
         pass
 
     @abstractmethod
-    async def identify_performance_bottlenecks(self, services: list[Service]) -> dict[str, list[str]]:
+    async def identify_performance_bottlenecks(
+        self, services: list[Service]
+    ) -> dict[str, list[str]]:
         """Identify performance bottlenecks across services.
 
         Args:
@@ -313,7 +337,9 @@ class ServiceConfigurationService(ABC):
     """Domain service for managing service configurations."""
 
     @abstractmethod
-    async def merge_configurations(self, base_config: dict[str, Any], override_config: dict[str, Any]) -> dict[str, Any]:
+    async def merge_configurations(
+        self, base_config: dict[str, Any], override_config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Merge service configurations with proper precedence.
 
         Args:
@@ -326,7 +352,9 @@ class ServiceConfigurationService(ABC):
         pass
 
     @abstractmethod
-    async def validate_configuration_schema(self, config: dict[str, Any], schema_version: str) -> list[str]:
+    async def validate_configuration_schema(
+        self, config: dict[str, Any], schema_version: str
+    ) -> list[str]:
         """Validate configuration against schema.
 
         Args:
@@ -339,7 +367,9 @@ class ServiceConfigurationService(ABC):
         pass
 
     @abstractmethod
-    async def migrate_configuration(self, config: dict[str, Any], from_version: str, to_version: str) -> dict[str, Any]:
+    async def migrate_configuration(
+        self, config: dict[str, Any], from_version: str, to_version: str
+    ) -> dict[str, Any]:
         """Migrate configuration between versions.
 
         Args:
@@ -353,7 +383,9 @@ class ServiceConfigurationService(ABC):
         pass
 
     @abstractmethod
-    async def extract_environment_variables(self, config: dict[str, Any]) -> dict[str, str]:
+    async def extract_environment_variables(
+        self, config: dict[str, Any]
+    ) -> dict[str, str]:
         """Extract environment variables from configuration.
 
         Args:
@@ -367,20 +399,24 @@ class ServiceConfigurationService(ABC):
 
 # Concrete implementations for basic domain services
 
+
 class DefaultPortConflictResolver(PortConflictResolver):
     """Default implementation of port conflict resolver."""
 
     async def check_port_availability(self, port: Port) -> bool:
         """Check if a port is available using socket binding."""
         import socket
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', port.value))
+                s.bind(("localhost", port.value))
                 return True
         except OSError:
             return False
 
-    async def find_alternative_port(self, preferred_port: Port, range_start: int = 8000, range_end: int = 9000) -> Port | None:
+    async def find_alternative_port(
+        self, preferred_port: Port, range_start: int = 8000, range_end: int = 9000
+    ) -> Port | None:
         """Find an alternative port in the specified range."""
         for port_num in range(range_start, range_end + 1):
             if port_num == preferred_port.value:
@@ -388,9 +424,11 @@ class DefaultPortConflictResolver(PortConflictResolver):
 
             candidate_port = Port(port_num)
             if await self.check_port_availability(candidate_port):
-                logger.info("Found alternative port",
-                           preferred=preferred_port.value,
-                           alternative=port_num)
+                logger.info(
+                    "Found alternative port",
+                    preferred=preferred_port.value,
+                    alternative=port_num,
+                )
                 return candidate_port
 
         return None
@@ -403,17 +441,16 @@ class DefaultPortConflictResolver(PortConflictResolver):
         for service in services:
             port = service.local_port
             if port in port_usage:
-                conflicts.append({
-                    'port': port,
-                    'services': [port_usage[port], service.name]
-                })
+                conflicts.append(
+                    {"port": port, "services": [port_usage[port], service.name]}
+                )
             else:
                 port_usage[port] = service.name
 
         return {
-            'conflicts': conflicts,
-            'total_services': len(services),
-            'conflicted_ports': len(conflicts)
+            "conflicts": conflicts,
+            "total_services": len(services),
+            "conflicted_ports": len(conflicts),
         }
 
 
@@ -430,10 +467,14 @@ class DefaultServiceValidationService(ServiceValidationService):
 
         # Validate ports
         if not (1 <= service.local_port <= 65535):
-            errors.append(f"Local port {service.local_port} is not valid (must be 1-65535)")
+            errors.append(
+                f"Local port {service.local_port} is not valid (must be 1-65535)"
+            )
 
         if not (1 <= service.remote_port <= 65535):
-            errors.append(f"Remote port {service.remote_port} is not valid (must be 1-65535)")
+            errors.append(
+                f"Remote port {service.remote_port} is not valid (must be 1-65535)"
+            )
 
         # Validate connection info
         if not service.connection_info:
@@ -441,7 +482,9 @@ class DefaultServiceValidationService(ServiceValidationService):
 
         return errors
 
-    async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
+    async def validate_connection_info(
+        self, connection_info: ConnectionInfo
+    ) -> list[str]:
         """Validate connection information."""
         errors = []
 
@@ -451,7 +494,9 @@ class DefaultServiceValidationService(ServiceValidationService):
 
         return errors
 
-    async def validate_service_dependencies(self, services: list[Service]) -> dict[str, list[str]]:
+    async def validate_service_dependencies(
+        self, services: list[Service]
+    ) -> dict[str, list[str]]:
         """Validate dependencies between services."""
         # Basic implementation - can be extended with actual dependency logic
         return {}
@@ -475,8 +520,8 @@ class DefaultServiceLifecycleService(ServiceLifecycleService):
     async def determine_startup_order(self, services: list[Service]) -> list[Service]:
         """Determine startup order based on tags and priorities."""
         # Simple implementation: essential services first, then others
-        essential = [s for s in services if 'essential' in s.tags]
-        others = [s for s in services if 'essential' not in s.tags]
+        essential = [s for s in services if "essential" in s.tags]
+        others = [s for s in services if "essential" not in s.tags]
 
         return essential + others
 

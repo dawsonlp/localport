@@ -11,7 +11,9 @@ class ConfigRepository(ABC):
     """Repository interface for configuration management."""
 
     @abstractmethod
-    async def load_configuration(self, config_path: Path | None = None) -> dict[str, Any]:
+    async def load_configuration(
+        self, config_path: Path | None = None
+    ) -> dict[str, Any]:
         """Load configuration from file or default locations.
 
         Args:
@@ -26,7 +28,9 @@ class ConfigRepository(ABC):
         pass
 
     @abstractmethod
-    async def save_configuration(self, config: dict[str, Any], config_path: Path) -> None:
+    async def save_configuration(
+        self, config: dict[str, Any], config_path: Path
+    ) -> None:
         """Save configuration to file.
 
         Args:
@@ -87,7 +91,9 @@ class ConfigRepository(ABC):
         pass
 
     @abstractmethod
-    async def substitute_environment_variables(self, config: dict[str, Any]) -> dict[str, Any]:
+    async def substitute_environment_variables(
+        self, config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Substitute environment variables in configuration.
 
         Args:
@@ -104,10 +110,10 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def add_service_config(self, service: dict[str, Any]) -> None:
         """Add a new service configuration to the configuration file.
-        
+
         Args:
             service: Service configuration dictionary to add
-            
+
         Raises:
             ConfigurationError: If service cannot be added or configuration is invalid
             ServiceAlreadyExistsError: If a service with the same name already exists
@@ -117,13 +123,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def remove_service_config(self, service_name: str) -> bool:
         """Remove a service configuration from the configuration file.
-        
+
         Args:
             service_name: Name of the service to remove
-            
+
         Returns:
             True if service was removed, False if service was not found
-            
+
         Raises:
             ConfigurationError: If there's an error updating the configuration
         """
@@ -132,10 +138,10 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def get_service_names(self) -> list[str]:
         """Get the names of all configured services.
-        
+
         Returns:
             List of service names from the configuration
-            
+
         Raises:
             ConfigurationError: If configuration cannot be loaded
         """
@@ -144,13 +150,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def service_exists(self, service_name: str) -> bool:
         """Check if a service with the given name exists in the configuration.
-        
+
         Args:
             service_name: Name of the service to check
-            
+
         Returns:
             True if service exists, False otherwise
-            
+
         Raises:
             ConfigurationError: If configuration cannot be loaded
         """
@@ -159,29 +165,31 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def get_service_config(self, service_name: str) -> dict[str, Any] | None:
         """Get the configuration for a specific service.
-        
+
         Args:
             service_name: Name of the service to get configuration for
-            
+
         Returns:
             Service configuration dictionary, or None if service not found
-            
+
         Raises:
             ConfigurationError: If configuration cannot be loaded
         """
         pass
 
     @abstractmethod
-    async def update_service_config(self, service_name: str, service: dict[str, Any]) -> bool:
+    async def update_service_config(
+        self, service_name: str, service: dict[str, Any]
+    ) -> bool:
         """Update an existing service configuration.
-        
+
         Args:
             service_name: Name of the service to update
             service: Updated service configuration dictionary
-            
+
         Returns:
             True if service was updated, False if service was not found
-            
+
         Raises:
             ConfigurationError: If there's an error updating the configuration
         """
@@ -190,13 +198,13 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def backup_configuration(self, backup_path: str | None = None) -> str:
         """Create a backup of the current configuration file.
-        
+
         Args:
             backup_path: Optional path for backup file (auto-generated if None)
-            
+
         Returns:
             Path to the created backup file
-            
+
         Raises:
             ConfigurationError: If backup cannot be created
         """
@@ -205,7 +213,7 @@ class ConfigRepository(ABC):
     @abstractmethod
     async def get_configuration_path(self) -> Path:
         """Get the path to the currently active configuration file.
-        
+
         Returns:
             Path to the configuration file being used
         """
@@ -214,4 +222,5 @@ class ConfigRepository(ABC):
 
 class ConfigurationError(Exception):
     """Base exception for configuration errors."""
+
     pass

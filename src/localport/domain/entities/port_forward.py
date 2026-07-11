@@ -32,6 +32,7 @@ class PortForward:
 
         try:
             import psutil
+
             process = psutil.Process(self.process_id)
             return process.status() not in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD)
         except psutil.NoSuchProcess:

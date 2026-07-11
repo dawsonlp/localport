@@ -15,6 +15,7 @@ logger = structlog.get_logger()
 @dataclass
 class MonitorServicesCommand:
     """Command to monitor services."""
+
     service_names: list[str] | None = None
     tags: list[str] | None = None
     all_services: bool = True
@@ -26,9 +27,7 @@ class MonitorServicesUseCase:
     """Use case for monitoring port forwarding services."""
 
     def __init__(
-        self,
-        service_repository: ServiceRepository,
-        service_manager: ServiceManager
+        self, service_repository: ServiceRepository, service_manager: ServiceManager
     ):
         self._service_repository = service_repository
         self._service_manager = service_manager
@@ -57,27 +56,33 @@ class MonitorServicesUseCase:
                     failed_services=0,
                     healthy_services=0,
                     unhealthy_services=0,
-                    services=[]
+                    services=[],
                 )
 
-            logger.debug("Resolved services to monitor",
-                        count=len(services),
-                        service_names=[s.name for s in services])
+            logger.debug(
+                "Resolved services to monitor",
+                count=len(services),
+                service_names=[s.name for s in services],
+            )
 
             # Get status for all services
-            service_statuses = await self._service_manager.get_all_service_status(services)
+            service_statuses = await self._service_manager.get_all_service_status(
+                services
+            )
 
             # Calculate summary statistics
             summary = self._calculate_summary(service_statuses)
 
-            logger.info("Monitor services use case completed",
-                       total=summary.total_services,
-                       running=summary.running_services,
-                       stopped=summary.stopped_services,
-                       failed=summary.failed_services,
-                       healthy=summary.healthy_services,
-                       success_rate=summary.success_rate,
-                       health_rate=summary.health_rate)
+            logger.info(
+                "Monitor services use case completed",
+                total=summary.total_services,
+                running=summary.running_services,
+                stopped=summary.stopped_services,
+                failed=summary.failed_services,
+                healthy=summary.healthy_services,
+                success_rate=summary.success_rate,
+                health_rate=summary.health_rate,
+            )
 
             return summary
 
@@ -119,7 +124,9 @@ class MonitorServicesUseCase:
             logger.debug("No service selection criteria provided, defaulting to all")
             return await self._service_repository.find_all()
 
-    def _calculate_summary(self, service_statuses: list[ServiceStatusInfo]) -> ServiceSummary:
+    def _calculate_summary(
+        self, service_statuses: list[ServiceStatusInfo]
+    ) -> ServiceSummary:
         """Calculate summary statistics from service statuses.
 
         Args:
@@ -157,7 +164,7 @@ class MonitorServicesUseCase:
             failed_services=failed_services,
             healthy_services=healthy_services,
             unhealthy_services=unhealthy_services,
-            services=service_statuses
+            services=service_statuses,
         )
 
     async def get_service_status(self, service_name: str) -> ServiceStatusInfo | None:
@@ -178,9 +185,9 @@ class MonitorServicesUseCase:
             return await self._service_manager.get_service_status(service)
 
         except Exception as e:
-            logger.error("Error getting service status",
-                        service_name=service_name,
-                        error=str(e))
+            logger.error(
+                "Error getting service status", service_name=service_name, error=str(e)
+            )
             return None
 
     async def get_running_services(self) -> list[ServiceStatusInfo]:
@@ -195,7 +202,8 @@ class MonitorServicesUseCase:
 
             # Filter for running services
             running_statuses = [
-                status for status in all_statuses
+                status
+                for status in all_statuses
                 if status.status == ServiceStatus.RUNNING
             ]
 
@@ -218,7 +226,8 @@ class MonitorServicesUseCase:
 
             # Filter for failed services
             failed_statuses = [
-                status for status in all_statuses
+                status
+                for status in all_statuses
                 if status.status == ServiceStatus.FAILED
             ]
 
@@ -241,8 +250,7 @@ class MonitorServicesUseCase:
 
             # Filter for unhealthy services
             unhealthy_statuses = [
-                status for status in all_statuses
-                if not status.is_healthy
+                status for status in all_statuses if not status.is_healthy
             ]
 
             logger.debug("Found unhealthy services", count=len(unhealthy_statuses))
@@ -305,8 +313,8 @@ class MonitorServicesUseCase:
                 "port_ranges": {
                     "privileged": 0,  # 1-1023
                     "registered": 0,  # 1024-49151
-                    "ephemeral": 0    # 49152-65535
-                }
+                    "ephemeral": 0,  # 49152-65535
+                },
             }
 
             used_ports = set()
@@ -334,10 +342,12 @@ class MonitorServicesUseCase:
                 elif 49152 <= port <= 65535:
                     port_usage["port_ranges"]["ephemeral"] += 1
 
-            logger.debug("Generated port usage summary",
-                        total_ports=port_usage["total_ports"],
-                        active_ports=len(port_usage["active_ports"]),
-                        conflicts=len(port_usage["port_conflicts"]))
+            logger.debug(
+                "Generated port usage summary",
+                total_ports=port_usage["total_ports"],
+                active_ports=len(port_usage["active_ports"]),
+                conflicts=len(port_usage["port_conflicts"]),
+            )
 
             return port_usage
 
@@ -362,7 +372,7 @@ class MonitorServicesUseCase:
                 "healthy": summary.healthy_services,
                 "success_rate": round(summary.success_rate, 1),
                 "health_rate": round(summary.health_rate, 1),
-                "active_forwards": self._service_manager.get_active_forwards_count()
+                "active_forwards": self._service_manager.get_active_forwards_count(),
             }
 
         except Exception as e:
@@ -376,5 +386,5 @@ class MonitorServicesUseCase:
                 "healthy": 0,
                 "success_rate": 0.0,
                 "health_rate": 0.0,
-                "active_forwards": 0
+                "active_forwards": 0,
             }

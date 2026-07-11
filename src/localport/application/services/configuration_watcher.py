@@ -9,13 +9,16 @@ import structlog
 try:
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
+
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
+
     # Create a dummy base class when watchdog is not available
     class FileSystemEventHandler:
         def __init__(self):
             pass
+
 
 logger = structlog.get_logger()
 
@@ -62,8 +65,11 @@ class ConfigurationFileHandler(FileSystemEventHandler):
             try:
                 self.callback(path)
             except Exception as e:
-                logger.error("Error in configuration change callback",
-                           path=str(path), error=str(e))
+                logger.error(
+                    "Error in configuration change callback",
+                    path=str(path),
+                    error=str(e),
+                )
 
 
 class ConfigurationWatcher:
@@ -76,8 +82,9 @@ class ConfigurationWatcher:
         self._handlers: dict[Path, ConfigurationFileHandler] = {}
         self._is_watching = False
 
-
-    async def start_watching(self, config_path: Path, callback: Callable[[Path], None]) -> bool:
+    async def start_watching(
+        self, config_path: Path, callback: Callable[[Path], None]
+    ) -> bool:
         """Start watching a configuration file for changes.
 
         Args:
@@ -88,12 +95,15 @@ class ConfigurationWatcher:
             True if watching started successfully, False otherwise
         """
         if not WATCHDOG_AVAILABLE:
-            logger.warning("Cannot start configuration watching - watchdog not available")
+            logger.warning(
+                "Cannot start configuration watching - watchdog not available"
+            )
             return False
 
         if not config_path.exists():
-            logger.warning("Configuration file does not exist, cannot watch",
-                         path=str(config_path))
+            logger.warning(
+                "Configuration file does not exist, cannot watch", path=str(config_path)
+            )
             return False
 
         config_path = config_path.resolve()
@@ -123,8 +133,11 @@ class ConfigurationWatcher:
             return True
 
         except Exception as e:
-            logger.error("Failed to start configuration watching",
-                        path=str(config_path), error=str(e))
+            logger.error(
+                "Failed to start configuration watching",
+                path=str(config_path),
+                error=str(e),
+            )
             return False
 
     async def stop_watching(self, config_path: Path | None = None) -> None:
@@ -144,7 +157,9 @@ class ConfigurationWatcher:
                     self._watched_paths.remove(config_path)
                     if config_path in self._handlers:
                         del self._handlers[config_path]
-                    logger.info("Stopped watching configuration file", path=str(config_path))
+                    logger.info(
+                        "Stopped watching configuration file", path=str(config_path)
+                    )
             else:
                 # Stop watching all files
                 self._watched_paths.clear()
@@ -203,7 +218,9 @@ class PollingConfigurationWatcher:
         self._polling_task: asyncio.Task | None = None
         self._is_watching = False
 
-    async def start_watching(self, config_path: Path, callback: Callable[[Path], None]) -> bool:
+    async def start_watching(
+        self, config_path: Path, callback: Callable[[Path], None]
+    ) -> bool:
         """Start watching a configuration file using polling.
 
         Args:
@@ -214,8 +231,9 @@ class PollingConfigurationWatcher:
             True if watching started successfully
         """
         if not config_path.exists():
-            logger.warning("Configuration file does not exist, cannot watch",
-                         path=str(config_path))
+            logger.warning(
+                "Configuration file does not exist, cannot watch", path=str(config_path)
+            )
             return False
 
         config_path = config_path.resolve()
@@ -229,15 +247,20 @@ class PollingConfigurationWatcher:
             if not self._is_watching:
                 self._polling_task = asyncio.create_task(self._polling_loop())
                 self._is_watching = True
-                logger.info("Polling configuration watcher started",
-                          interval=self._poll_interval)
+                logger.info(
+                    "Polling configuration watcher started",
+                    interval=self._poll_interval,
+                )
 
             logger.info("Started polling configuration file", path=str(config_path))
             return True
 
         except Exception as e:
-            logger.error("Failed to start polling configuration file",
-                        path=str(config_path), error=str(e))
+            logger.error(
+                "Failed to start polling configuration file",
+                path=str(config_path),
+                error=str(e),
+            )
             return False
 
     async def stop_watching(self, config_path: Path | None = None) -> None:
@@ -252,7 +275,9 @@ class PollingConfigurationWatcher:
                 config_path = config_path.resolve()
                 if config_path in self._watched_files:
                     del self._watched_files[config_path]
-                    logger.info("Stopped polling configuration file", path=str(config_path))
+                    logger.info(
+                        "Stopped polling configuration file", path=str(config_path)
+                    )
             else:
                 # Stop watching all files
                 self._watched_files.clear()
@@ -280,20 +305,26 @@ class PollingConfigurationWatcher:
                 await asyncio.sleep(self._poll_interval)
 
                 # Check each watched file
-                for config_path, (last_mtime, callback) in list(self._watched_files.items()):
+                for config_path, (last_mtime, callback) in list(
+                    self._watched_files.items()
+                ):
                     try:
                         if not config_path.exists():
-                            logger.warning("Watched configuration file no longer exists",
-                                         path=str(config_path))
+                            logger.warning(
+                                "Watched configuration file no longer exists",
+                                path=str(config_path),
+                            )
                             continue
 
                         current_mtime = config_path.stat().st_mtime
 
                         if current_mtime > last_mtime:
-                            logger.debug("Configuration file changed",
-                                       path=str(config_path),
-                                       old_mtime=last_mtime,
-                                       new_mtime=current_mtime)
+                            logger.debug(
+                                "Configuration file changed",
+                                path=str(config_path),
+                                old_mtime=last_mtime,
+                                new_mtime=current_mtime,
+                            )
 
                             # Update stored modification time
                             self._watched_files[config_path] = (current_mtime, callback)
@@ -302,12 +333,18 @@ class PollingConfigurationWatcher:
                             try:
                                 callback(config_path)
                             except Exception as e:
-                                logger.error("Error in configuration change callback",
-                                           path=str(config_path), error=str(e))
+                                logger.error(
+                                    "Error in configuration change callback",
+                                    path=str(config_path),
+                                    error=str(e),
+                                )
 
                     except Exception as e:
-                        logger.error("Error checking configuration file",
-                                   path=str(config_path), error=str(e))
+                        logger.error(
+                            "Error checking configuration file",
+                            path=str(config_path),
+                            error=str(e),
+                        )
 
         except asyncio.CancelledError:
             logger.debug("Configuration polling loop cancelled")

@@ -8,7 +8,7 @@ from uuid import UUID
 @dataclass
 class HealthCheckResult:
     """Result of a health check operation."""
-    
+
     service_id: UUID
     service_name: str
     check_type: str
@@ -27,17 +27,17 @@ class HealthCheckResult:
         service_name: str,
         check_type: str,
         cluster_context: str,
-        cluster_error: str
+        cluster_error: str,
     ) -> "HealthCheckResult":
         """Create a health check result indicating cluster is unhealthy.
-        
+
         Args:
             service_id: Service ID
             service_name: Service name
             check_type: Type of health check
             cluster_context: Cluster context name
             cluster_error: Cluster error description
-            
+
         Returns:
             HealthCheckResult indicating cluster issues
         """
@@ -51,19 +51,19 @@ class HealthCheckResult:
             error=f"Cluster unhealthy: {cluster_error}",
             cluster_context=cluster_context,
             cluster_healthy=False,
-            skip_restart_due_to_cluster=True
+            skip_restart_due_to_cluster=True,
         )
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
-            'service_id': str(self.service_id),
-            'service_name': self.service_name,
-            'check_type': self.check_type,
-            'is_healthy': self.is_healthy,
-            'checked_at': self.checked_at.isoformat(),
-            'response_time': self.response_time,
-            'error': self.error
+            "service_id": str(self.service_id),
+            "service_name": self.service_name,
+            "check_type": self.check_type,
+            "is_healthy": self.is_healthy,
+            "checked_at": self.checked_at.isoformat(),
+            "response_time": self.response_time,
+            "error": self.error,
         }
 
 
@@ -83,12 +83,12 @@ class RestartAttempt:
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
-            'service_id': str(self.service_id),
-            'service_name': self.service_name,
-            'attempt_number': self.attempt_number,
-            'triggered_at': self.triggered_at.isoformat(),
-            'trigger_reason': self.trigger_reason,
-            'success': self.success,
-            'error': self.error,
-            'delay_before_attempt': self.delay_before_attempt
+            "service_id": str(self.service_id),
+            "service_name": self.service_name,
+            "attempt_number": self.attempt_number,
+            "triggered_at": self.triggered_at.isoformat(),
+            "trigger_reason": self.trigger_reason,
+            "success": self.success,
+            "error": self.error,
+            "delay_before_attempt": self.delay_before_attempt,
         }

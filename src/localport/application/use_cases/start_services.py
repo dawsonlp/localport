@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class StartServicesCommand:
     """Command to start services."""
+
     service_names: list[str] | None = None
     tags: list[str] | None = None
     all_services: bool = False
@@ -30,9 +31,7 @@ class StartServicesUseCase:
     """Use case for starting port forwarding services."""
 
     def __init__(
-        self,
-        service_repository: ServiceRepository,
-        service_manager: ServiceManager
+        self, service_repository: ServiceRepository, service_manager: ServiceManager
     ):
         self._service_repository = service_repository
         self._service_manager = service_manager
@@ -59,12 +58,14 @@ class StartServicesUseCase:
                     total_services=0,
                     successful_services=[],
                     failed_services=[],
-                    errors={}
+                    errors={},
                 )
 
-            logger.info("Resolved services to start",
-                       count=len(services),
-                       service_names=[s.name for s in services])
+            logger.info(
+                "Resolved services to start",
+                count=len(services),
+                service_names=[s.name for s in services],
+            )
 
             # Start each service
             successful_services = []
@@ -77,23 +78,29 @@ class StartServicesUseCase:
 
                     if result.success:
                         successful_services.append(service.name)
-                        logger.info("Service started successfully",
-                                   service_name=service.name,
-                                   process_id=result.process_id)
+                        logger.info(
+                            "Service started successfully",
+                            service_name=service.name,
+                            process_id=result.process_id,
+                        )
                     else:
                         failed_services.append(service.name)
                         errors[service.name] = result.error or "Unknown error"
-                        logger.error("Service failed to start",
-                                    service_name=service.name,
-                                    error=result.error)
+                        logger.error(
+                            "Service failed to start",
+                            service_name=service.name,
+                            error=result.error,
+                        )
 
                 except Exception as e:
                     failed_services.append(service.name)
                     error_msg = str(e)
                     errors[service.name] = error_msg
-                    logger.error("Unexpected error starting service",
-                                service_name=service.name,
-                                error=error_msg)
+                    logger.error(
+                        "Unexpected error starting service",
+                        service_name=service.name,
+                        error=error_msg,
+                    )
 
             # Create result
             result = BulkOperationResult(
@@ -101,14 +108,16 @@ class StartServicesUseCase:
                 total_services=len(services),
                 successful_services=successful_services,
                 failed_services=failed_services,
-                errors=errors
+                errors=errors,
             )
 
-            logger.info("Start services use case completed",
-                       total=result.total_services,
-                       successful=result.success_count,
-                       failed=result.failure_count,
-                       success_rate=result.success_rate)
+            logger.info(
+                "Start services use case completed",
+                total=result.total_services,
+                successful=result.success_count,
+                failed=result.failure_count,
+                success_rate=result.success_rate,
+            )
 
             return result
 
@@ -155,9 +164,7 @@ class StartServicesUseCase:
             return []
 
     async def _start_single_service(
-        self,
-        service: Service,
-        command: StartServicesCommand
+        self, service: Service, command: StartServicesCommand
     ) -> ServiceStartResult:
         """Start a single service.
 
@@ -176,7 +183,7 @@ class StartServicesUseCase:
                 logger.info("Service already running", service_name=service.name)
                 return ServiceStartResult.success_result(
                     service_name=service.name,
-                    process_id=0  # Placeholder for already running
+                    process_id=0,  # Placeholder for already running
                 )
 
             # Stop service if force restart is requested
@@ -190,24 +197,24 @@ class StartServicesUseCase:
             # Wait for health check if requested
             if command.wait_for_health and result.success:
                 health_result = await self._wait_for_health(
-                    service,
-                    command.health_timeout
+                    service, command.health_timeout
                 )
 
                 if not health_result:
-                    logger.warning("Service started but health check failed",
-                                  service_name=service.name)
+                    logger.warning(
+                        "Service started but health check failed",
+                        service_name=service.name,
+                    )
                     # Don't fail the start operation, just log the warning
 
             return result
 
         except Exception as e:
-            logger.error("Error starting single service",
-                        service_name=service.name,
-                        error=str(e))
+            logger.error(
+                "Error starting single service", service_name=service.name, error=str(e)
+            )
             return ServiceStartResult.failure_result(
-                service_name=service.name,
-                error=str(e)
+                service_name=service.name, error=str(e)
             )
 
     async def _wait_for_health(self, service: Service, timeout: float) -> bool:
@@ -222,9 +229,9 @@ class StartServicesUseCase:
         """
         import asyncio
 
-        logger.debug("Waiting for service health",
-                    service_name=service.name,
-                    timeout=timeout)
+        logger.debug(
+            "Waiting for service health", service_name=service.name, timeout=timeout
+        )
 
         try:
             # Simple implementation - in a real system this would use the health monitor
@@ -241,14 +248,14 @@ class StartServicesUseCase:
                 return False
 
         except TimeoutError:
-            logger.warning("Health check timed out",
-                          service_name=service.name,
-                          timeout=timeout)
+            logger.warning(
+                "Health check timed out", service_name=service.name, timeout=timeout
+            )
             return False
         except Exception as e:
-            logger.error("Error during health check",
-                        service_name=service.name,
-                        error=str(e))
+            logger.error(
+                "Error during health check", service_name=service.name, error=str(e)
+            )
             return False
 
     async def start_service_by_name(self, service_name: str) -> ServiceStartResult:
@@ -266,13 +273,12 @@ class StartServicesUseCase:
         if result.success_count > 0:
             return ServiceStartResult.success_result(
                 service_name=service_name,
-                process_id=0  # Would need to track this properly
+                process_id=0,  # Would need to track this properly
             )
         else:
             error = result.errors.get(service_name, "Unknown error")
             return ServiceStartResult.failure_result(
-                service_name=service_name,
-                error=error
+                service_name=service_name, error=error
             )
 
     async def start_all_services(self) -> BulkOperationResult:

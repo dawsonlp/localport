@@ -15,7 +15,7 @@ class TestConnectionInfoValueObject:
             resource_name="postgres",
             namespace="default",
             resource_type="service",
-            context="my-cluster"
+            context="my-cluster",
         )
         assert conn.technology == ForwardingTechnology.KUBECTL
         assert conn.get_kubectl_resource_name() == "postgres"
@@ -24,17 +24,16 @@ class TestConnectionInfoValueObject:
 
     def test_ssh_connection_info_creation(self):
         """Test creating SSH ConnectionInfo via factory."""
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        import os
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             os.chmod(f.name, 0o600)
             key_path = f.name
         try:
             conn = ConnectionInfo.ssh(
-                host="example.com",
-                user="admin",
-                port=22,
-                key_file=key_path
+                host="example.com", user="admin", port=22, key_file=key_path
             )
             assert conn.technology == ForwardingTechnology.SSH
             assert conn.get_ssh_host() == "example.com"
@@ -52,8 +51,10 @@ class TestConnectionInfoValueObject:
 
     def test_ssh_connection_info_with_bastion(self):
         """Test SSH ConnectionInfo with bastion/remote_host."""
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        import os
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             os.chmod(f.name, 0o600)
             key_path = f.name
@@ -62,7 +63,7 @@ class TestConnectionInfoValueObject:
                 host="bastion.example.com",
                 user="ec2-user",
                 key_file=key_path,
-                remote_host="internal-db.rds.amazonaws.com"
+                remote_host="internal-db.rds.amazonaws.com",
             )
             assert conn.get_ssh_host() == "bastion.example.com"
             assert conn.get_ssh_remote_host() == "internal-db.rds.amazonaws.com"
@@ -72,18 +73,13 @@ class TestConnectionInfoValueObject:
     def test_kubectl_validation_missing_resource_name(self):
         """Test that kubectl connection requires resource_name."""
         with pytest.raises((ValueError, KeyError)):
-            ConnectionInfo.kubectl(
-                resource_name="",
-                namespace="default"
-            )
+            ConnectionInfo.kubectl(resource_name="", namespace="default")
 
     def test_kubectl_validation_invalid_resource_type(self):
         """Test that kubectl validates resource_type."""
         # Should accept valid resource types
         conn = ConnectionInfo.kubectl(
-            resource_name="postgres",
-            namespace="default",
-            resource_type="deployment"
+            resource_name="postgres", namespace="default", resource_type="deployment"
         )
         assert conn.get_kubectl_resource_type() == "deployment"
 
@@ -105,10 +101,7 @@ class TestConnectionInfoValueObject:
 
     def test_ssh_has_password(self):
         """Test SSH password detection."""
-        conn_with_pw = ConnectionInfo.ssh(
-            host="example.com",
-            password="secret"
-        )
+        conn_with_pw = ConnectionInfo.ssh(host="example.com", password="secret")
         assert conn_with_pw.has_ssh_password() is True
 
         conn_no_pw = ConnectionInfo.ssh(host="example.com")

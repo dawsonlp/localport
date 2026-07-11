@@ -10,7 +10,9 @@ import tempfile
 import pytest
 import yaml
 
-from localport.infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from localport.infrastructure.repositories.yaml_config_repository import (
+    YamlConfigRepository,
+)
 
 
 def _write_config(services: list[dict]) -> str:
@@ -55,7 +57,7 @@ async def test_enabled_flag_loaded_from_config():
         services = await repo.load_services()
         by_name = {s.name: s for s in services}
 
-        assert by_name["on-svc"].enabled is True   # default when omitted
+        assert by_name["on-svc"].enabled is True  # default when omitted
         assert by_name["off-svc"].enabled is False  # regression: was silently True
     finally:
         os.unlink(path)

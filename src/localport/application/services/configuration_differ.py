@@ -11,6 +11,7 @@ logger = structlog.get_logger()
 
 class ChangeType(Enum):
     """Types of configuration changes."""
+
     ADDED = "added"
     REMOVED = "removed"
     MODIFIED = "modified"
@@ -20,6 +21,7 @@ class ChangeType(Enum):
 @dataclass
 class ServiceChange:
     """Represents a change to a service configuration."""
+
     service_name: str
     change_type: ChangeType
     old_config: dict[str, Any] | None = None
@@ -38,8 +40,11 @@ class ServiceChange:
 
         # Fields that require restart when changed
         restart_required_fields = {
-            'technology', 'local_port', 'remote_port', 'connection',
-            'enabled'  # Enabling/disabling requires restart
+            "technology",
+            "local_port",
+            "remote_port",
+            "connection",
+            "enabled",  # Enabling/disabling requires restart
         }
 
         return bool(self.changed_fields.intersection(restart_required_fields))
@@ -51,9 +56,7 @@ class ServiceChange:
             return True
 
         # Fields that affect health monitoring
-        health_monitor_fields = {
-            'health_check', 'restart_policy'
-        }
+        health_monitor_fields = {"health_check", "restart_policy"}
 
         return bool(self.changed_fields.intersection(health_monitor_fields))
 
@@ -61,6 +64,7 @@ class ServiceChange:
 @dataclass
 class ConfigurationDiff:
     """Represents differences between two configurations."""
+
     service_changes: list[ServiceChange]
     defaults_changed: bool = False
     version_changed: bool = False
@@ -71,9 +75,9 @@ class ConfigurationDiff:
     def has_changes(self) -> bool:
         """Check if there are any changes."""
         return (
-            len(self.service_changes) > 0 or
-            self.defaults_changed or
-            self.version_changed
+            len(self.service_changes) > 0
+            or self.defaults_changed
+            or self.version_changed
         )
 
     @property
@@ -88,15 +92,19 @@ class ConfigurationDiff:
     @property
     def requires_health_monitor_restart(self) -> bool:
         """Check if health monitor needs to be restarted."""
-        return any(
-            change.requires_health_monitor_restart
-            for change in self.service_changes
-        ) or self.defaults_changed
+        return (
+            any(
+                change.requires_health_monitor_restart
+                for change in self.service_changes
+            )
+            or self.defaults_changed
+        )
 
     def get_changes_by_type(self, change_type: ChangeType) -> list[ServiceChange]:
         """Get changes of a specific type."""
         return [
-            change for change in self.service_changes
+            change
+            for change in self.service_changes
             if change.change_type == change_type
         ]
 
@@ -118,9 +126,7 @@ class ConfigurationDiffer:
         pass
 
     async def compare_configurations(
-        self,
-        old_config: dict[str, Any],
-        new_config: dict[str, Any]
+        self, old_config: dict[str, Any], new_config: dict[str, Any]
     ) -> ConfigurationDiff:
         """Compare two configurations and return differences.
 
@@ -134,19 +140,18 @@ class ConfigurationDiffer:
         logger.debug("Comparing configurations")
 
         # Check version changes
-        old_version = old_config.get('version')
-        new_version = new_config.get('version')
+        old_version = old_config.get("version")
+        new_version = new_config.get("version")
         version_changed = old_version != new_version
 
         # Check defaults changes
-        old_defaults = old_config.get('defaults', {})
-        new_defaults = new_config.get('defaults', {})
+        old_defaults = old_config.get("defaults", {})
+        new_defaults = new_config.get("defaults", {})
         defaults_changed = old_defaults != new_defaults
 
         # Compare services
         service_changes = await self._compare_services(
-            old_config.get('services', []),
-            new_config.get('services', [])
+            old_config.get("services", []), new_config.get("services", [])
         )
 
         diff = ConfigurationDiff(
@@ -154,21 +159,21 @@ class ConfigurationDiffer:
             defaults_changed=defaults_changed,
             version_changed=version_changed,
             old_version=old_version,
-            new_version=new_version
+            new_version=new_version,
         )
 
-        logger.info("Configuration comparison completed",
-                   total_changes=len(service_changes),
-                   defaults_changed=defaults_changed,
-                   version_changed=version_changed,
-                   services_requiring_restart=len(diff.services_requiring_restart))
+        logger.info(
+            "Configuration comparison completed",
+            total_changes=len(service_changes),
+            defaults_changed=defaults_changed,
+            version_changed=version_changed,
+            services_requiring_restart=len(diff.services_requiring_restart),
+        )
 
         return diff
 
     async def _compare_services(
-        self,
-        old_services: list[dict[str, Any]],
-        new_services: list[dict[str, Any]]
+        self, old_services: list[dict[str, Any]], new_services: list[dict[str, Any]]
     ) -> list[ServiceChange]:
         """Compare service configurations.
 
@@ -182,8 +187,12 @@ class ConfigurationDiffer:
         changes = []
 
         # Create lookup maps by service name
-        old_services_map = {svc.get('name'): svc for svc in old_services if svc.get('name')}
-        new_services_map = {svc.get('name'): svc for svc in new_services if svc.get('name')}
+        old_services_map = {
+            svc.get("name"): svc for svc in old_services if svc.get("name")
+        }
+        new_services_map = {
+            svc.get("name"): svc for svc in new_services if svc.get("name")
+        }
 
         # Find all service names
         all_service_names = set(old_services_map.keys()) | set(new_services_map.keys())
@@ -194,46 +203,52 @@ class ConfigurationDiffer:
 
             if old_service is None:
                 # Service was added
-                changes.append(ServiceChange(
-                    service_name=service_name,
-                    change_type=ChangeType.ADDED,
-                    new_config=new_service
-                ))
+                changes.append(
+                    ServiceChange(
+                        service_name=service_name,
+                        change_type=ChangeType.ADDED,
+                        new_config=new_service,
+                    )
+                )
 
             elif new_service is None:
                 # Service was removed
-                changes.append(ServiceChange(
-                    service_name=service_name,
-                    change_type=ChangeType.REMOVED,
-                    old_config=old_service
-                ))
+                changes.append(
+                    ServiceChange(
+                        service_name=service_name,
+                        change_type=ChangeType.REMOVED,
+                        old_config=old_service,
+                    )
+                )
 
             else:
                 # Service exists in both - check for changes
                 changed_fields = self._find_changed_fields(old_service, new_service)
 
                 if changed_fields:
-                    changes.append(ServiceChange(
-                        service_name=service_name,
-                        change_type=ChangeType.MODIFIED,
-                        old_config=old_service,
-                        new_config=new_service,
-                        changed_fields=changed_fields
-                    ))
+                    changes.append(
+                        ServiceChange(
+                            service_name=service_name,
+                            change_type=ChangeType.MODIFIED,
+                            old_config=old_service,
+                            new_config=new_service,
+                            changed_fields=changed_fields,
+                        )
+                    )
                 else:
-                    changes.append(ServiceChange(
-                        service_name=service_name,
-                        change_type=ChangeType.UNCHANGED,
-                        old_config=old_service,
-                        new_config=new_service
-                    ))
+                    changes.append(
+                        ServiceChange(
+                            service_name=service_name,
+                            change_type=ChangeType.UNCHANGED,
+                            old_config=old_service,
+                            new_config=new_service,
+                        )
+                    )
 
         return changes
 
     def _find_changed_fields(
-        self,
-        old_service: dict[str, Any],
-        new_service: dict[str, Any]
+        self, old_service: dict[str, Any], new_service: dict[str, Any]
     ) -> set[str]:
         """Find which fields changed between two service configurations.
 
@@ -275,7 +290,9 @@ class ConfigurationDiffer:
             return False
 
         # Handle different types
-        if not isinstance(old_value, type(new_value)) and not isinstance(new_value, type(old_value)):
+        if not isinstance(old_value, type(new_value)) and not isinstance(
+            new_value, type(old_value)
+        ):
             return False
 
         # Handle dictionaries recursively
@@ -321,9 +338,7 @@ class ConfigurationDiffer:
         return affected_services
 
     async def requires_service_restart(
-        self,
-        service_name: str,
-        diff: ConfigurationDiff
+        self, service_name: str, diff: ConfigurationDiff
     ) -> bool:
         """Check if a specific service requires restart.
 

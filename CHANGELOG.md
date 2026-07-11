@@ -14,8 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Daemon PID reuse**: daemon status/stop/reload trusted a bare PID from the PID file with no identity check, so a stale PID reused by another process could be signalled or killed. The PID is now verified to be a LocalPort daemon first.
 - **`statefulset` resource type**: the domain validator rejected `statefulset` at config load while the kubectl adapter accepted it; both now allow it.
 - **Repeated `daemon reload` dropped**: the signal handler's deduplication set was never cleared for recurring signals, so only the first `SIGUSR1` reload was delivered. Deduplication now applies only to one-shot shutdown signals; reload/status signals are re-deliverable.
+- **`localport logs` JSON output crashed**: three JSON error paths referenced `json` without importing it (`NameError`); `json` is now imported once at module level.
+- **`HealthCheckResult.error`**: a classmethod named `error` shadowed the `error` field, so a healthy result's `.error` returned a bound method instead of `None` (making `if result.error:` wrongly truthy). The factory is renamed `errored()`.
 
 ### Changed
+- **Linting/formatting enforced, mypy dropped from CI**: the codebase is now formatted with `black` and clean under `ruff` (CI had been red for ~a year on ~2,800 findings). `ruff` + `black` are the enforced CI gates; `mypy` is kept as an optional local tool (`uv run mypy src/`) but is no longer run in CI, where it produced release friction without surfacing real bugs.
 - **Single signal-handling subsystem**: the daemon ran two competing signal subsystems (`AsyncSignalHandler` plus `signal.signal` handlers installed by `DaemonManager`) that both grabbed SIGTERM/SIGUSR1. `DaemonManager` no longer installs OS signal handlers; the daemon process owns signals via `AsyncSignalHandler`/`ShutdownCoordinator`.
 - **Documentation reconciled with the shipped release**: removed stale "ALPHA/BETA 0.3.x" banners (README, CLI, getting-started), corrected SSH status everywhere (SSH and bastion hosts are shipped, not "planned for v0.4.0"), rewrote the CLI reference against the real command signatures, and fixed the documented Python minimum (3.11+).
 

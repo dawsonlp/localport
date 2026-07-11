@@ -10,7 +10,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from localport.application.services.health_monitor_scheduler import HealthMonitorScheduler
+from localport.application.services.health_monitor_scheduler import (
+    HealthMonitorScheduler,
+)
 from localport.domain.entities.service import Service
 from localport.domain.enums import ForwardingTechnology, ServiceStatus
 from localport.domain.value_objects.connection_info import ConnectionInfo
@@ -36,7 +38,9 @@ def _scheduler() -> HealthMonitorScheduler:
     )
     # Never perform a real health check; report healthy each iteration so no
     # restart is triggered and the loop stays cheap.
-    sched._perform_health_check = AsyncMock(return_value=SimpleNamespace(is_healthy=True))
+    sched._perform_health_check = AsyncMock(
+        return_value=SimpleNamespace(is_healthy=True)
+    )
     return sched
 
 

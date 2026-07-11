@@ -37,39 +37,38 @@ class HealthCheckResult:
 
     @classmethod
     def healthy(
-        cls,
-        message: str | None = None,
-        response_time_ms: float | None = None
+        cls, message: str | None = None, response_time_ms: float | None = None
     ) -> "HealthCheckResult":
         """Create a healthy result."""
         return cls(
             status=HealthCheckStatus.HEALTHY,
             timestamp=datetime.now(),
             message=message,
-            response_time_ms=response_time_ms
+            response_time_ms=response_time_ms,
         )
 
     @classmethod
     def unhealthy(
-        cls,
-        message: str | None = None,
-        error: str | None = None
+        cls, message: str | None = None, error: str | None = None
     ) -> "HealthCheckResult":
         """Create an unhealthy result."""
         return cls(
             status=HealthCheckStatus.UNHEALTHY,
             timestamp=datetime.now(),
             message=message,
-            error=error
+            error=error,
         )
 
     @classmethod
-    def error(cls, error: str) -> "HealthCheckResult":
-        """Create an error result."""
+    def errored(cls, error: str) -> "HealthCheckResult":
+        """Create an error result.
+
+        Named ``errored`` rather than ``error`` so it does not shadow the
+        ``error`` field (a classmethod named ``error`` would replace the field's
+        default, leaving ``self.error`` bound to the method on non-error results).
+        """
         return cls(
-            status=HealthCheckStatus.ERROR,
-            timestamp=datetime.now(),
-            error=error
+            status=HealthCheckStatus.ERROR, timestamp=datetime.now(), error=error
         )
 
 

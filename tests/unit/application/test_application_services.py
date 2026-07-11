@@ -1,7 +1,6 @@
 """Tests for application services."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from localport.domain.entities.service import Service
 from localport.domain.enums import ForwardingTechnology
@@ -14,21 +13,14 @@ class TestHealthMonitor:
     @pytest.fixture
     def sample_service(self):
         """Create a sample service for testing."""
-        conn = ConnectionInfo.kubectl(
-            resource_name="postgres",
-            namespace="default"
-        )
+        conn = ConnectionInfo.kubectl(resource_name="postgres", namespace="default")
         return Service.create(
             name="postgres",
             technology=ForwardingTechnology.KUBECTL,
             local_port=5433,
             remote_port=5432,
             connection_info=conn,
-            health_check_config={
-                "type": "tcp",
-                "interval": 30,
-                "timeout": 5.0
-            }
+            health_check_config={"type": "tcp", "interval": 30, "timeout": 5.0},
         )
 
     def test_service_has_health_config(self, sample_service):
@@ -49,9 +41,13 @@ class TestDaemonManager:
     def test_daemon_manager_import(self):
         """Test that DaemonManager can be imported."""
         from localport.application.services.daemon_manager import DaemonManager
+
         assert DaemonManager is not None
 
     def test_health_monitor_scheduler_import(self):
         """Test that HealthMonitorScheduler can be imported."""
-        from localport.application.services.health_monitor_scheduler import HealthMonitorScheduler
+        from localport.application.services.health_monitor_scheduler import (
+            HealthMonitorScheduler,
+        )
+
         assert HealthMonitorScheduler is not None
