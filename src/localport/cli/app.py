@@ -206,7 +206,7 @@ def main(
         console.print(
             f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: table, json, text"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Setup logging with verbosity level
     setup_rich_logging(verbosity_level=verbosity_level, console=console)
@@ -248,7 +248,7 @@ def main(
         console.print(f"[red]Error initializing LocalPort:[/red] {e}")
         if verbose:
             console.print_exception()
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Register command implementations

@@ -546,4 +546,4 @@ class ManageDaemonUseCase:
         try:
             os.kill(pid, signal.SIGUSR1)  # Use SIGUSR1 for reload
         except OSError as e:
-            raise RuntimeError(f"Failed to send reload signal: {e}")
+            raise RuntimeError(f"Failed to send reload signal: {e}") from e

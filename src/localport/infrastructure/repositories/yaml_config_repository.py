@@ -731,14 +731,14 @@ class YamlConfigRepository(ConfigRepository):
                     key_path=e.context.get("safe_path", e.context["key_path"]),
                     config_source=str(self.config_path),
                 )
-                raise enriched_error
+                raise enriched_error from e
             except Exception as e:
                 logger.error(
                     "Failed to create service from config",
                     service_name=service_config.get("name", "unknown"),
                     error=str(e),
                 )
-                raise ConfigurationError(f"Invalid service configuration: {e}")
+                raise ConfigurationError(f"Invalid service configuration: {e}") from e
 
         return services
 
@@ -825,7 +825,7 @@ class YamlConfigRepository(ConfigRepository):
         except json.JSONDecodeError as e:
             raise ConfigurationError(
                 f"Failed to parse configuration after environment variable substitution: {e}"
-            )
+            ) from e
 
     # Service Management Methods
 
@@ -996,7 +996,7 @@ class YamlConfigRepository(ConfigRepository):
 
         except Exception as e:
             logger.error("Failed to get service names", error=str(e))
-            raise ConfigurationError(f"Failed to load configuration: {e}")
+            raise ConfigurationError(f"Failed to load configuration: {e}") from e
 
     async def service_exists(self, service_name: str) -> bool:
         """Check if a service with the given name exists in the configuration.
@@ -1029,7 +1029,7 @@ class YamlConfigRepository(ConfigRepository):
                 service_name=service_name,
                 error=str(e),
             )
-            raise ConfigurationError(f"Failed to check service existence: {e}")
+            raise ConfigurationError(f"Failed to check service existence: {e}") from e
 
     async def get_service_config(self, service_name: str) -> dict[str, Any] | None:
         """Get the configuration for a specific service.
@@ -1065,7 +1065,7 @@ class YamlConfigRepository(ConfigRepository):
                 service_name=service_name,
                 error=str(e),
             )
-            raise ConfigurationError(f"Failed to load configuration: {e}")
+            raise ConfigurationError(f"Failed to load configuration: {e}") from e
 
     async def update_service_config(
         self, service_name: str, service: dict[str, Any]

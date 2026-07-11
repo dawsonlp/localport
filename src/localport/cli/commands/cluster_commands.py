@@ -274,7 +274,7 @@ async def cluster_status_command(
                 "Unexpected Error", str(e), "Check the logs for more details."
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def _load_cluster_health_manager() -> None:
@@ -336,7 +336,7 @@ async def cluster_events_command(
                     "Use formats like '1h', '30m', '60s' or ISO format.",
                 )
             )
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
         # Get contexts
         if context:
@@ -431,7 +431,7 @@ async def cluster_events_command(
                 "Unexpected Error", str(e), "Check the logs for more details."
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def cluster_pods_command(
@@ -526,7 +526,7 @@ async def cluster_pods_command(
                 "Unexpected Error", str(e), "Check the logs for more details."
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for Typer

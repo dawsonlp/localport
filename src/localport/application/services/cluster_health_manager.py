@@ -320,7 +320,7 @@ class ClusterHealthManager(ClusterHealthProvider):
                 await monitor.stop_monitoring()
             except Exception:
                 pass
-            raise ClusterConnectionError(context, str(e))
+            raise ClusterConnectionError(context, str(e)) from e
 
     async def refresh_all_clusters(self) -> dict[str, ClusterHealth | None]:
         """

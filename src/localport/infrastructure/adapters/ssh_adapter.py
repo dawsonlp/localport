@@ -203,11 +203,11 @@ class SSHAdapter(PortForwardingAdapter):
             if "sshpass" in str(e):
                 raise RuntimeError(
                     "sshpass command not found. Please install sshpass for password authentication"
-                )
+                ) from e
             else:
                 raise RuntimeError(
                     "ssh command not found. Please ensure OpenSSH client is installed"
-                )
+                ) from e
         except Exception as e:
             if "log_file_handle" in locals():
                 log_file_handle.close()
@@ -219,7 +219,7 @@ class SSHAdapter(PortForwardingAdapter):
                 remote_port=remote_port,
                 host=host,
             )
-            raise RuntimeError(f"Failed to start SSH tunnel: {e}")
+            raise RuntimeError(f"Failed to start SSH tunnel: {e}") from e
 
     async def start_port_forward(
         self, local_port: int, remote_port: int, connection_info: "ConnectionInfo"
@@ -336,11 +336,11 @@ class SSHAdapter(PortForwardingAdapter):
             if "sshpass" in str(e):
                 raise RuntimeError(
                     "sshpass command not found. Please install sshpass for password authentication"
-                )
+                ) from e
             else:
                 raise RuntimeError(
                     "ssh command not found. Please ensure OpenSSH client is installed"
-                )
+                ) from e
         except Exception as e:
             logger.error(
                 "Failed to start SSH tunnel",
@@ -349,7 +349,7 @@ class SSHAdapter(PortForwardingAdapter):
                 remote_port=remote_port,
                 host=host,
             )
-            raise RuntimeError(f"Failed to start SSH tunnel: {e}")
+            raise RuntimeError(f"Failed to start SSH tunnel: {e}") from e
 
     async def stop_port_forward(self, process_id: int) -> None:
         """Stop an SSH tunnel process.
@@ -420,7 +420,7 @@ class SSHAdapter(PortForwardingAdapter):
 
         except Exception as e:
             logger.error("Failed to stop SSH tunnel", pid=process_id, error=str(e))
-            raise RuntimeError(f"Failed to stop SSH tunnel: {e}")
+            raise RuntimeError(f"Failed to stop SSH tunnel: {e}") from e
 
     async def is_process_running(self, process_id: int) -> bool:
         """Check if an SSH tunnel process is still running.

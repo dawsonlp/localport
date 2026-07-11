@@ -159,7 +159,7 @@ class KubectlAdapter(PortForwardingAdapter):
                     pid=process.pid,
                     service_id=service_id,
                 )
-                raise RuntimeError("kubectl port-forward failed to start")
+                raise RuntimeError("kubectl port-forward failed to start") from None
 
             # Store process and service log mapping
             if process.pid:
@@ -187,7 +187,7 @@ class KubectlAdapter(PortForwardingAdapter):
                 log_file_handle.close()
             raise RuntimeError(
                 "kubectl command not found. Please ensure kubectl is installed and in PATH"
-            )
+            ) from None
         except Exception as e:
             if "log_file_handle" in locals():
                 log_file_handle.close()
@@ -198,7 +198,7 @@ class KubectlAdapter(PortForwardingAdapter):
                 local_port=local_port,
                 remote_port=remote_port,
             )
-            raise RuntimeError(f"Failed to start kubectl port-forward: {e}")
+            raise RuntimeError(f"Failed to start kubectl port-forward: {e}") from e
 
     async def start_port_forward(
         self, local_port: int, remote_port: int, connection_info: ConnectionInfo
@@ -284,7 +284,7 @@ class KubectlAdapter(PortForwardingAdapter):
                 logger.error(
                     "kubectl process not found after creation", pid=process.pid
                 )
-                raise RuntimeError("kubectl port-forward failed to start")
+                raise RuntimeError("kubectl port-forward failed to start") from None
 
             # Don't store the subprocess.Popen object as it keeps references
             # Just store the PID for tracking
@@ -306,7 +306,7 @@ class KubectlAdapter(PortForwardingAdapter):
         except FileNotFoundError:
             raise RuntimeError(
                 "kubectl command not found. Please ensure kubectl is installed and in PATH"
-            )
+            ) from None
         except Exception as e:
             logger.error(
                 "Failed to start kubectl port-forward",
@@ -314,7 +314,7 @@ class KubectlAdapter(PortForwardingAdapter):
                 local_port=local_port,
                 remote_port=remote_port,
             )
-            raise RuntimeError(f"Failed to start kubectl port-forward: {e}")
+            raise RuntimeError(f"Failed to start kubectl port-forward: {e}") from e
 
     async def stop_port_forward(self, process_id: int) -> None:
         """Stop a kubectl port-forward process.
@@ -383,7 +383,7 @@ class KubectlAdapter(PortForwardingAdapter):
             logger.error(
                 "Failed to stop kubectl port-forward", pid=process_id, error=str(e)
             )
-            raise RuntimeError(f"Failed to stop kubectl port-forward: {e}")
+            raise RuntimeError(f"Failed to stop kubectl port-forward: {e}") from e
 
     async def is_process_running(self, process_id: int) -> bool:
         """Check if a kubectl port-forward process is still running.

@@ -55,7 +55,7 @@ class Port:
             port_int = int(port_str.strip())
             return cls(port_int)
         except ValueError as e:
-            raise ValueError(f"Invalid port string '{port_str}': {e}")
+            raise ValueError(f"Invalid port string '{port_str}': {e}") from e
 
     def is_privileged(self) -> bool:
         """Check if this is a privileged port (< 1024).

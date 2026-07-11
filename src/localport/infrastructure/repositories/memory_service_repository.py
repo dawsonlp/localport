@@ -50,7 +50,7 @@ class MemoryServiceRepository(ServiceRepository):
             raise
         except Exception as e:
             logger.error("Error saving service", service_id=service.id, error=str(e))
-            raise RepositoryError(f"Failed to save service: {e}")
+            raise RepositoryError(f"Failed to save service: {e}") from e
 
     async def find_by_id(self, service_id: UUID) -> Service | None:
         """Find a service by ID.
@@ -78,7 +78,7 @@ class MemoryServiceRepository(ServiceRepository):
             logger.error(
                 "Error finding service by ID", service_id=service_id, error=str(e)
             )
-            raise RepositoryError(f"Failed to find service by ID: {e}")
+            raise RepositoryError(f"Failed to find service by ID: {e}") from e
 
     async def find_by_name(self, name: str) -> Service | None:
         """Find a service by name.
@@ -106,7 +106,7 @@ class MemoryServiceRepository(ServiceRepository):
             logger.error(
                 "Error finding service by name", service_name=name, error=str(e)
             )
-            raise RepositoryError(f"Failed to find service by name: {e}")
+            raise RepositoryError(f"Failed to find service by name: {e}") from e
 
     async def find_all(self) -> list[Service]:
         """Find all services.
@@ -124,7 +124,7 @@ class MemoryServiceRepository(ServiceRepository):
 
         except Exception as e:
             logger.error("Error finding all services", error=str(e))
-            raise RepositoryError(f"Failed to find all services: {e}")
+            raise RepositoryError(f"Failed to find all services: {e}") from e
 
     async def find_by_tags(self, tags: list[str]) -> list[Service]:
         """Find services by tags.
@@ -154,7 +154,7 @@ class MemoryServiceRepository(ServiceRepository):
 
         except Exception as e:
             logger.error("Error finding services by tags", tags=tags, error=str(e))
-            raise RepositoryError(f"Failed to find services by tags: {e}")
+            raise RepositoryError(f"Failed to find services by tags: {e}") from e
 
     async def find_enabled(self) -> list[Service]:
         """Find all enabled services.
@@ -179,7 +179,7 @@ class MemoryServiceRepository(ServiceRepository):
 
         except Exception as e:
             logger.error("Error finding enabled services", error=str(e))
-            raise RepositoryError(f"Failed to find enabled services: {e}")
+            raise RepositoryError(f"Failed to find enabled services: {e}") from e
 
     async def delete(self, service_id: UUID) -> bool:
         """Delete a service.
@@ -211,7 +211,7 @@ class MemoryServiceRepository(ServiceRepository):
 
         except Exception as e:
             logger.error("Error deleting service", service_id=service_id, error=str(e))
-            raise RepositoryError(f"Failed to delete service: {e}")
+            raise RepositoryError(f"Failed to delete service: {e}") from e
 
     async def exists(self, service_id: UUID) -> bool:
         """Check if a service exists.
@@ -236,7 +236,7 @@ class MemoryServiceRepository(ServiceRepository):
             logger.error(
                 "Error checking service existence", service_id=service_id, error=str(e)
             )
-            raise RepositoryError(f"Failed to check service existence: {e}")
+            raise RepositoryError(f"Failed to check service existence: {e}") from e
 
     async def count(self) -> int:
         """Count the total number of services.
@@ -254,7 +254,7 @@ class MemoryServiceRepository(ServiceRepository):
 
         except Exception as e:
             logger.error("Error counting services", error=str(e))
-            raise RepositoryError(f"Failed to count services: {e}")
+            raise RepositoryError(f"Failed to count services: {e}") from e
 
     async def clear(self) -> None:
         """Clear all services from the repository.
@@ -270,7 +270,7 @@ class MemoryServiceRepository(ServiceRepository):
 
         except Exception as e:
             logger.error("Error clearing repository", error=str(e))
-            raise RepositoryError(f"Failed to clear repository: {e}")
+            raise RepositoryError(f"Failed to clear repository: {e}") from e
 
     async def bulk_save(self, services: list[Service]) -> None:
         """Save multiple services in bulk.
@@ -306,7 +306,7 @@ class MemoryServiceRepository(ServiceRepository):
             raise
         except Exception as e:
             logger.error("Error in bulk save", count=len(services), error=str(e))
-            raise RepositoryError(f"Failed to bulk save services: {e}")
+            raise RepositoryError(f"Failed to bulk save services: {e}") from e
 
     async def find_by_status(self, status: str) -> list[Service]:
         """Find services by status.
@@ -343,7 +343,7 @@ class MemoryServiceRepository(ServiceRepository):
             logger.error(
                 "Error finding services by status", status=status, error=str(e)
             )
-            raise RepositoryError(f"Failed to find services by status: {e}")
+            raise RepositoryError(f"Failed to find services by status: {e}") from e
 
     def get_statistics(self) -> dict[str, int]:
         """Get repository statistics.

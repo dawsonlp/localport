@@ -209,7 +209,7 @@ async def export_config_command(
                     "Check the configuration file and export parameters.",
                 )
             )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def validate_config_command(
@@ -414,7 +414,7 @@ async def validate_config_command(
                     "Check the configuration file syntax and structure.",
                 )
             )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for Typer
@@ -565,11 +565,11 @@ async def add_connection_command(
         ValidationError,
     ) as e:
         error_formatter.format_error(e, output_format)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         logger.exception("Error adding connection")
         error_formatter.format_error(e, output_format)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def _handle_kubectl_connection(
@@ -762,7 +762,7 @@ async def remove_connection_command(
     except Exception as e:
         logger.exception("Error removing connection")
         error_formatter.format_error(e, output_format)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def list_connections_command(
@@ -789,7 +789,7 @@ async def list_connections_command(
     except Exception as e:
         logger.exception("Error listing connections")
         error_formatter.format_error(e, output_format)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for Typer

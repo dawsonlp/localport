@@ -80,7 +80,7 @@ class ConnectionInfo:
             except (ValueError, TypeError):
                 raise ValueError(
                     f"SSH port '{self.config['port']}' must be a valid integer. Example: port: 22 or port: 2222"
-                )
+                ) from None
 
         # Validate key_file path if provided
         if "key_file" in self.config and self.config["key_file"]:
@@ -444,6 +444,6 @@ class ConnectionInfo:
         try:
             technology = ForwardingTechnology(data["technology"])
         except ValueError:
-            raise ValueError(f"Invalid technology: {data['technology']}")
+            raise ValueError(f"Invalid technology: {data['technology']}") from None
 
         return cls(technology, data["config"])

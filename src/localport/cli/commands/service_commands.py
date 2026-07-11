@@ -295,7 +295,7 @@ async def start_services_command(
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def stop_services_command(
@@ -427,7 +427,7 @@ async def stop_services_command(
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def status_services_command(
@@ -543,7 +543,7 @@ async def status_services_command(
         else:
             error_formatter = ErrorFormatter(console)
             error_formatter.print_error(e, VerbosityLevel.NORMAL)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for Typer (since Typer doesn't support async directly)

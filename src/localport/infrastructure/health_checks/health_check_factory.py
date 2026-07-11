@@ -65,7 +65,9 @@ class HealthCheckFactory:
                 config=config,
                 error=str(e),
             )
-            raise ValueError(f"Failed to create {check_type} health checker: {e}")
+            raise ValueError(
+                f"Failed to create {check_type} health checker: {e}"
+            ) from e
 
     def register_health_checker(
         self, check_type: str, health_checker_class: type

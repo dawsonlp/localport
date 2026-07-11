@@ -96,7 +96,7 @@ async def logs_command(
                     "Check if the log directory exists and is readable.",
                 )
             )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def _get_log_entries(
@@ -535,7 +535,7 @@ def logs_sync(
                             "Check if the service exists and logs are accessible.",
                         )
                     )
-                raise typer.Exit(1)
+                raise typer.Exit(1) from e
         else:
             # Show service logs
             asyncio.run(
@@ -667,7 +667,7 @@ async def list_service_logs_command(
                     "Check if the service log manager is properly initialized.",
                 )
             )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def show_log_location_command(
@@ -740,7 +740,7 @@ async def show_log_location_command(
                     "Check if the service log manager is properly initialized.",
                 )
             )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def show_service_log_command(
@@ -834,7 +834,7 @@ async def show_service_log_command(
                         "Check if the log file is readable and not corrupted.",
                     )
                 )
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
         # Apply line limit
         if lines > 0:
@@ -913,7 +913,7 @@ async def show_service_log_command(
                     "Check if the service exists and logs are accessible.",
                 )
             )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for new commands

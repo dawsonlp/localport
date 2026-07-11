@@ -153,7 +153,7 @@ async def start_daemon_command(
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def stop_daemon_command(force: bool = False) -> None:
@@ -222,7 +222,7 @@ async def stop_daemon_command(force: bool = False) -> None:
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def restart_daemon_command(
@@ -296,7 +296,7 @@ async def restart_daemon_command(
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) -> None:
@@ -404,7 +404,7 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def reload_daemon_command() -> None:
@@ -474,7 +474,7 @@ async def reload_daemon_command() -> None:
                 "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for Typer (since Typer doesn't support async directly)

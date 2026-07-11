@@ -180,7 +180,7 @@ async def test_ssh_connectivity_command(
                 "Unexpected Error", str(e), "Check the logs for more details."
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 async def validate_ssh_config_command(
@@ -325,7 +325,7 @@ async def validate_ssh_config_command(
                 "Unexpected Error", str(e), "Check the logs for more details."
             )
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # Sync wrappers for Typer
