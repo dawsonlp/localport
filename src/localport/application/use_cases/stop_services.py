@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class StopServicesCommand:
     """Command to stop services."""
+
     service_names: list[str] | None = None
     tags: list[str] | None = None
     all_services: bool = False
@@ -29,9 +30,7 @@ class StopServicesUseCase:
     """Use case for stopping port forwarding services."""
 
     def __init__(
-        self,
-        service_repository: ServiceRepository,
-        service_manager: ServiceManager
+        self, service_repository: ServiceRepository, service_manager: ServiceManager
     ):
         self._service_repository = service_repository
         self._service_manager = service_manager
@@ -58,12 +57,14 @@ class StopServicesUseCase:
                     total_services=0,
                     successful_services=[],
                     failed_services=[],
-                    errors={}
+                    errors={},
                 )
 
-            logger.info("Resolved services to stop",
-                       count=len(services),
-                       service_names=[s.name for s in services])
+            logger.info(
+                "Resolved services to stop",
+                count=len(services),
+                service_names=[s.name for s in services],
+            )
 
             # Stop each service
             successful_services = []
@@ -76,22 +77,27 @@ class StopServicesUseCase:
 
                     if result.success:
                         successful_services.append(service.name)
-                        logger.info("Service stopped successfully",
-                                   service_name=service.name)
+                        logger.info(
+                            "Service stopped successfully", service_name=service.name
+                        )
                     else:
                         failed_services.append(service.name)
                         errors[service.name] = result.error or "Unknown error"
-                        logger.error("Service failed to stop",
-                                    service_name=service.name,
-                                    error=result.error)
+                        logger.error(
+                            "Service failed to stop",
+                            service_name=service.name,
+                            error=result.error,
+                        )
 
                 except Exception as e:
                     failed_services.append(service.name)
                     error_msg = str(e)
                     errors[service.name] = error_msg
-                    logger.error("Unexpected error stopping service",
-                                service_name=service.name,
-                                error=error_msg)
+                    logger.error(
+                        "Unexpected error stopping service",
+                        service_name=service.name,
+                        error=error_msg,
+                    )
 
             # Create result
             result = BulkOperationResult(
@@ -99,14 +105,16 @@ class StopServicesUseCase:
                 total_services=len(services),
                 successful_services=successful_services,
                 failed_services=failed_services,
-                errors=errors
+                errors=errors,
             )
 
-            logger.info("Stop services use case completed",
-                       total=result.total_services,
-                       successful=result.success_count,
-                       failed=result.failure_count,
-                       success_rate=result.success_rate)
+            logger.info(
+                "Stop services use case completed",
+                total=result.total_services,
+                successful=result.success_count,
+                failed=result.failure_count,
+                success_rate=result.success_rate,
+            )
 
             return result
 
@@ -153,9 +161,7 @@ class StopServicesUseCase:
             return []
 
     async def _stop_single_service(
-        self,
-        service: Service,
-        command: StopServicesCommand
+        self, service: Service, command: StopServicesCommand
     ) -> ServiceStopResult:
         """Stop a single service.
 
@@ -180,12 +186,11 @@ class StopServicesUseCase:
             return result
 
         except Exception as e:
-            logger.error("Error stopping single service",
-                        service_name=service.name,
-                        error=str(e))
+            logger.error(
+                "Error stopping single service", service_name=service.name, error=str(e)
+            )
             return ServiceStopResult.failure_result(
-                service_name=service.name,
-                error=str(e)
+                service_name=service.name, error=str(e)
             )
 
     async def stop_service_by_name(self, service_name: str) -> ServiceStopResult:
@@ -234,8 +239,6 @@ class StopServicesUseCase:
             BulkOperationResult with the outcome
         """
         command = StopServicesCommand(
-            all_services=True,
-            force_stop=True,
-            graceful_timeout=5.0
+            all_services=True, force_stop=True, graceful_timeout=5.0
         )
         return await self.execute(command)

@@ -4,7 +4,6 @@ import asyncio
 
 import structlog
 import typer
-from ..utils.cli_context import LazyConsole
 from rich.table import Table
 
 from ...application.services.daemon_manager import DaemonManager
@@ -18,7 +17,7 @@ from ...infrastructure.repositories.memory_service_repository import (
     MemoryServiceRepository,
 )
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
-from ..utils.cli_context import get_cli_context
+from ..utils.cli_context import LazyConsole, get_cli_context
 from ..utils.progress_utils import EnhancedProgress, get_operation_messages
 from ..utils.rich_utils import (
     create_error_panel,
@@ -32,9 +31,7 @@ console = LazyConsole()
 
 
 async def start_daemon_command(
-    config_file: str | None = None,
-    auto_start: bool = True,
-    detach: bool = False
+    config_file: str | None = None, auto_start: bool = True, detach: bool = False
 ) -> None:
     """Start the LocalPort daemon."""
     try:
@@ -52,19 +49,18 @@ async def start_daemon_command(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
-            health_monitor=health_monitor
+            health_monitor=health_monitor,
         )
 
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
-            service_repository=service_repo,
-            service_manager=service_manager
+            service_repository=service_repo, service_manager=service_manager
         )
 
         # Start daemon with enhanced progress indication
         enhanced_progress = EnhancedProgress(console)
         messages = get_operation_messages("start")
-        
+
         async def start_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
@@ -72,32 +68,33 @@ async def start_daemon_command(
             )
 
             command = ManageDaemonCommand(
-                command=DaemonCommand.START,
-                config_file=config_file
+                command=DaemonCommand.START, config_file=config_file
             )
             return await daemon_use_case.execute(command)
 
         result = await enhanced_progress.run_with_spinner(
-            start_operation,
-            messages["daemon"],
-            messages["success"]
+            start_operation, messages["daemon"], messages["success"]
         )
 
         # Display results
         if result.success:
             if detach:
                 # Background mode - show brief success message with next steps
-                console.print(create_success_panel(
-                    "Daemon Started",
-                    f"LocalPort daemon started in background (PID: {result.pid})"
-                ))
-                
+                console.print(
+                    create_success_panel(
+                        "Daemon Started",
+                        f"LocalPort daemon started in background (PID: {result.pid})",
+                    )
+                )
+
                 if auto_start:
-                    console.print(create_info_panel(
-                        "Auto-start Enabled",
-                        "Configured services will be started automatically"
-                    ))
-                
+                    console.print(
+                        create_info_panel(
+                            "Auto-start Enabled",
+                            "Configured services will be started automatically",
+                        )
+                    )
+
                 # Show helpful next steps
                 console.print("\n[dim]Next steps:[/dim]")
                 console.print("  • Check status: [bold]localport daemon status[/bold]")
@@ -105,16 +102,20 @@ async def start_daemon_command(
                 console.print("  • Stop daemon: [bold]localport daemon stop[/bold]")
             else:
                 # Foreground mode - show different message
-                console.print(create_success_panel(
-                    "Daemon Started",
-                    f"LocalPort daemon started in foreground (PID: {result.pid})"
-                ))
+                console.print(
+                    create_success_panel(
+                        "Daemon Started",
+                        f"LocalPort daemon started in foreground (PID: {result.pid})",
+                    )
+                )
 
                 if auto_start:
-                    console.print(create_info_panel(
-                        "Auto-start Enabled",
-                        "Configured services will be started automatically"
-                    ))
+                    console.print(
+                        create_info_panel(
+                            "Auto-start Enabled",
+                            "Configured services will be started automatically",
+                        )
+                    )
 
                 console.print("[dim]Press Ctrl+C to stop the daemon[/dim]")
                 try:
@@ -128,13 +129,17 @@ async def start_daemon_command(
                     if stop_result.success:
                         console.print("[green]Daemon stopped successfully[/green]")
                     else:
-                        console.print(f"[red]Error stopping daemon: {stop_result.error}[/red]")
+                        console.print(
+                            f"[red]Error stopping daemon: {stop_result.error}[/red]"
+                        )
         else:
-            console.print(create_error_panel(
-                "Failed to Start Daemon",
-                result.error or "Unknown error occurred",
-                "Check if another daemon is running: 'localport daemon status' or view logs: 'localport logs --daemon'"
-            ))
+            console.print(
+                create_error_panel(
+                    "Failed to Start Daemon",
+                    result.error or "Unknown error occurred",
+                    "Check if another daemon is running: 'localport daemon status' or view logs: 'localport logs --daemon'",
+                )
+            )
             raise typer.Exit(1)
 
     except typer.Exit:
@@ -142,11 +147,13 @@ async def start_daemon_command(
         raise
     except Exception as e:
         logger.exception("Error starting daemon")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error",
+                str(e),
+                "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
+            )
+        )
         raise typer.Exit(1)
 
 
@@ -167,49 +174,46 @@ async def stop_daemon_command(force: bool = False) -> None:
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
-            health_monitor=health_monitor
+            health_monitor=health_monitor,
         )
 
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
-            service_repository=service_repo,
-            service_manager=service_manager
+            service_repository=service_repo, service_manager=service_manager
         )
 
         # Stop daemon with enhanced progress indication
         enhanced_progress = EnhancedProgress(console)
         messages = get_operation_messages("stop")
-        
+
         async def stop_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
                 ManageDaemonCommand,
             )
 
-            command = ManageDaemonCommand(
-                command=DaemonCommand.STOP,
-                force=force
-            )
+            command = ManageDaemonCommand(command=DaemonCommand.STOP, force=force)
             return await daemon_use_case.execute(command)
 
         result = await enhanced_progress.run_with_spinner(
-            stop_operation,
-            messages["daemon"],
-            messages["success"]
+            stop_operation, messages["daemon"], messages["success"]
         )
 
         # Display results
         if result.success:
-            console.print(create_success_panel(
-                "Daemon Stopped",
-                "LocalPort daemon stopped successfully"
-            ))
+            console.print(
+                create_success_panel(
+                    "Daemon Stopped", "LocalPort daemon stopped successfully"
+                )
+            )
         else:
-            console.print(create_error_panel(
-                "Failed to Stop Daemon",
-                result.error or "Unknown error occurred",
-                "Try using --force flag or check if daemon is running."
-            ))
+            console.print(
+                create_error_panel(
+                    "Failed to Stop Daemon",
+                    result.error or "Unknown error occurred",
+                    "Try using --force flag or check if daemon is running.",
+                )
+            )
             raise typer.Exit(1)
 
     except typer.Exit:
@@ -217,17 +221,18 @@ async def stop_daemon_command(force: bool = False) -> None:
         raise
     except Exception as e:
         logger.exception("Error stopping daemon")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error",
+                str(e),
+                "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
+            )
+        )
         raise typer.Exit(1)
 
 
 async def restart_daemon_command(
-    config_file: str | None = None,
-    force: bool = False
+    config_file: str | None = None, force: bool = False
 ) -> None:
     """Restart the LocalPort daemon."""
     try:
@@ -245,19 +250,18 @@ async def restart_daemon_command(
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
-            health_monitor=health_monitor
+            health_monitor=health_monitor,
         )
 
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
-            service_repository=service_repo,
-            service_manager=service_manager
+            service_repository=service_repo, service_manager=service_manager
         )
 
         # Restart daemon with enhanced progress indication
         enhanced_progress = EnhancedProgress(console)
         messages = get_operation_messages("restart")
-        
+
         async def restart_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
@@ -265,30 +269,30 @@ async def restart_daemon_command(
             )
 
             command = ManageDaemonCommand(
-                command=DaemonCommand.RESTART,
-                config_file=config_file,
-                force=force
+                command=DaemonCommand.RESTART, config_file=config_file, force=force
             )
             return await daemon_use_case.execute(command)
 
         result = await enhanced_progress.run_with_spinner(
-            restart_operation,
-            messages["daemon"],
-            messages["success"]
+            restart_operation, messages["daemon"], messages["success"]
         )
 
         # Display results
         if result.success:
-            console.print(create_success_panel(
-                "Daemon Restarted",
-                f"LocalPort daemon restarted successfully (PID: {result.pid})"
-            ))
+            console.print(
+                create_success_panel(
+                    "Daemon Restarted",
+                    f"LocalPort daemon restarted successfully (PID: {result.pid})",
+                )
+            )
         else:
-            console.print(create_error_panel(
-                "Failed to Restart Daemon",
-                result.error or "Unknown error occurred",
-                "Check the logs for more details."
-            ))
+            console.print(
+                create_error_panel(
+                    "Failed to Restart Daemon",
+                    result.error or "Unknown error occurred",
+                    "Check the logs for more details.",
+                )
+            )
             raise typer.Exit(1)
 
     except typer.Exit:
@@ -296,11 +300,13 @@ async def restart_daemon_command(
         raise
     except Exception as e:
         logger.exception("Error restarting daemon")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error",
+                str(e),
+                "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
+            )
+        )
         raise typer.Exit(1)
 
 
@@ -321,13 +327,12 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
-            health_monitor=health_monitor
+            health_monitor=health_monitor,
         )
 
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
-            service_repository=service_repo,
-            service_manager=service_manager
+            service_repository=service_repo, service_manager=service_manager
         )
 
         async def show_status():
@@ -341,10 +346,12 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
             result = await daemon_use_case.execute(command)
 
             if not result.success:
-                console.print(create_error_panel(
-                    "Failed to Get Daemon Status",
-                    result.error or "Unknown error occurred"
-                ))
+                console.print(
+                    create_error_panel(
+                        "Failed to Get Daemon Status",
+                        result.error or "Unknown error occurred",
+                    )
+                )
                 return
 
             # Create status table
@@ -353,20 +360,30 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
             table.add_column("Value", style="white")
 
             # Check if we have status information
-            if hasattr(result, 'status') and result.status:
+            if hasattr(result, "status") and result.status:
                 status_info = result.status
-                is_running = getattr(status_info, 'running', False)
+                is_running = getattr(status_info, "running", False)
 
                 # Add daemon information
-                table.add_row("Status", "[green]Running[/green]" if is_running else "[red]Stopped[/red]")
+                table.add_row(
+                    "Status",
+                    "[green]Running[/green]" if is_running else "[red]Stopped[/red]",
+                )
 
                 if is_running:
-                    if hasattr(status_info, 'pid') and status_info.pid:
+                    if hasattr(status_info, "pid") and status_info.pid:
                         table.add_row("PID", str(status_info.pid))
-                    if hasattr(status_info, 'uptime_seconds') and status_info.uptime_seconds:
-                        table.add_row("Uptime", format_uptime(status_info.uptime_seconds))
-                    if hasattr(status_info, 'active_services'):
-                        table.add_row("Active Services", str(status_info.active_services or 0))
+                    if (
+                        hasattr(status_info, "uptime_seconds")
+                        and status_info.uptime_seconds
+                    ):
+                        table.add_row(
+                            "Uptime", format_uptime(status_info.uptime_seconds)
+                        )
+                    if hasattr(status_info, "active_services"):
+                        table.add_row(
+                            "Active Services", str(status_info.active_services or 0)
+                        )
             else:
                 # Fallback - show basic status based on success
                 table.add_row("Status", "[red]Stopped[/red]")
@@ -396,11 +413,13 @@ async def status_daemon_command(watch: bool = False, refresh_interval: int = 5) 
         raise
     except Exception as e:
         logger.exception("Error getting daemon status")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error",
+                str(e),
+                "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
+            )
+        )
         raise typer.Exit(1)
 
 
@@ -421,19 +440,18 @@ async def reload_daemon_command() -> None:
             service_repository=service_repo,
             config_repository=config_repo,
             service_manager=service_manager,
-            health_monitor=health_monitor
+            health_monitor=health_monitor,
         )
 
         # Initialize use case
         daemon_use_case = ManageDaemonUseCase(
-            service_repository=service_repo,
-            service_manager=service_manager
+            service_repository=service_repo, service_manager=service_manager
         )
 
         # Reload daemon configuration with enhanced progress indication
         enhanced_progress = EnhancedProgress(console)
         messages = get_operation_messages("reload")
-        
+
         async def reload_operation():
             from ...application.use_cases.manage_daemon import (
                 DaemonCommand,
@@ -444,23 +462,25 @@ async def reload_daemon_command() -> None:
             return await daemon_use_case.execute(command)
 
         result = await enhanced_progress.run_with_spinner(
-            reload_operation,
-            messages["daemon"],
-            messages["success"]
+            reload_operation, messages["daemon"], messages["success"]
         )
 
         # Display results
         if result.success:
-            console.print(create_success_panel(
-                "Configuration Reloaded",
-                "Daemon configuration reloaded successfully"
-            ))
+            console.print(
+                create_success_panel(
+                    "Configuration Reloaded",
+                    "Daemon configuration reloaded successfully",
+                )
+            )
         else:
-            console.print(create_error_panel(
-                "Failed to Reload Configuration",
-                result.error or "Unknown error occurred",
-                "Check if daemon is running and configuration file is valid."
-            ))
+            console.print(
+                create_error_panel(
+                    "Failed to Reload Configuration",
+                    result.error or "Unknown error occurred",
+                    "Check if daemon is running and configuration file is valid.",
+                )
+            )
             raise typer.Exit(1)
 
     except typer.Exit:
@@ -468,20 +488,28 @@ async def reload_daemon_command() -> None:
         raise
     except Exception as e:
         logger.exception("Error reloading daemon configuration")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error",
+                str(e),
+                "Check the logs in ~/.local/share/localport/logs/ or run with --verbose for more details.",
+            )
+        )
         raise typer.Exit(1)
 
 
 # Sync wrappers for Typer (since Typer doesn't support async directly)
 def start_daemon_sync(
     ctx: typer.Context,
-    config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
-    auto_start: bool = typer.Option(True, "--auto-start/--no-auto-start", help="Auto-start configured services"),
-    foreground: bool = typer.Option(False, "--foreground", "-f", help="Run daemon in foreground (don't detach)")
+    config_file: str | None = typer.Option(
+        None, "--config", "-c", help="Configuration file path"
+    ),
+    auto_start: bool = typer.Option(
+        True, "--auto-start/--no-auto-start", help="Auto-start configured services"
+    ),
+    foreground: bool = typer.Option(
+        False, "--foreground", "-f", help="Run daemon in foreground (don't detach)"
+    ),
 ) -> None:
     """Start the LocalPort daemon."""
     cli_ctx = get_cli_context(ctx)
@@ -493,7 +521,7 @@ def start_daemon_sync(
 
 def stop_daemon_sync(
     ctx: typer.Context,
-    force: bool = typer.Option(False, "--force", "-f", help="Force stop daemon")
+    force: bool = typer.Option(False, "--force", "-f", help="Force stop daemon"),
 ) -> None:
     """Stop the LocalPort daemon."""
     _ = get_cli_context(ctx)  # Ensure global options are available
@@ -502,8 +530,10 @@ def stop_daemon_sync(
 
 def restart_daemon_sync(
     ctx: typer.Context,
-    config_file: str | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
-    force: bool = typer.Option(False, "--force", "-f", help="Force restart daemon")
+    config_file: str | None = typer.Option(
+        None, "--config", "-c", help="Configuration file path"
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Force restart daemon"),
 ) -> None:
     """Restart the LocalPort daemon."""
     cli_ctx = get_cli_context(ctx)
@@ -513,8 +543,12 @@ def restart_daemon_sync(
 
 def status_daemon_sync(
     ctx: typer.Context,
-    watch: bool = typer.Option(False, "--watch", "-w", help="Watch mode - refresh periodically"),
-    refresh_interval: int = typer.Option(5, "--interval", "-i", help="Refresh interval in seconds for watch mode")
+    watch: bool = typer.Option(
+        False, "--watch", "-w", help="Watch mode - refresh periodically"
+    ),
+    refresh_interval: int = typer.Option(
+        5, "--interval", "-i", help="Refresh interval in seconds for watch mode"
+    ),
 ) -> None:
     """Show daemon status."""
     _ = get_cli_context(ctx)  # Ensure global options are available

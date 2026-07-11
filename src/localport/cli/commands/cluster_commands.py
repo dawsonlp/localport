@@ -1,17 +1,16 @@
 """Cluster management commands for LocalPort CLI."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import structlog
 import typer
-from ..utils.cli_context import LazyConsole
 from rich.table import Table
 
 from ...infrastructure.repositories.yaml_config_repository import YamlConfigRepository
 from ..formatters.output_format import OutputFormat
-from ..utils.cli_context import get_cli_context
+from ..utils.cli_context import LazyConsole, get_cli_context
 from ..utils.rich_utils import (
     create_error_panel,
 )
@@ -37,16 +36,16 @@ async def _get_cluster_health_data() -> dict | None:
         # Load configuration
         config_repo = YamlConfigRepository(str(config_path))
         config = await config_repo.load_configuration()
-        
+
         # Check if cluster health is enabled
-        cluster_health_config = config.get('defaults', {}).get('cluster_health', {})
-        if not cluster_health_config.get('enabled', True):
+        cluster_health_config = config.get("defaults", {}).get("cluster_health", {})
+        if not cluster_health_config.get("enabled", True):
             return None
 
         # Load services to determine which clusters to monitor
         services = await config_repo.load_services()
-        kubectl_services = [s for s in services if s.technology.value == 'kubectl']
-        
+        kubectl_services = [s for s in services if s.technology.value == "kubectl"]
+
         if not kubectl_services:
             return None
 
@@ -61,22 +60,24 @@ async def _get_cluster_health_data() -> dict | None:
             return None
 
         # Use lightweight kubectl client directly (same as status command)
-        from ...infrastructure.cluster_monitoring.kubectl_client import KubectlClient
         from ...domain.entities.cluster_health import ClusterHealth
-        
-        kubectl_client = KubectlClient(timeout=30, retry_attempts=2)  # Use normal timeouts for detailed view
-        
+        from ...infrastructure.cluster_monitoring.kubectl_client import KubectlClient
+
+        kubectl_client = KubectlClient(
+            timeout=30, retry_attempts=2
+        )  # Use normal timeouts for detailed view
+
         cluster_data = {}
         for context in contexts:
             try:
                 # Get basic cluster info and resource counts
                 cluster_info = await kubectl_client.get_cluster_info(context)
-                
+
                 if cluster_info.is_reachable:
                     # Get node and pod counts
                     nodes = await kubectl_client.get_node_statuses(context)
                     pods = await kubectl_client.get_pod_statuses(context)
-                    
+
                     # Create proper ClusterHealth entity using the domain factory method
                     cluster_health = ClusterHealth.create_healthy(
                         context=context,
@@ -84,37 +85,40 @@ async def _get_cluster_health_data() -> dict | None:
                         nodes=nodes,
                         pods=pods,
                         events=[],  # Skip events for performance
-                        check_duration=None
+                        check_duration=None,
                     )
-                    
+
                     cluster_data[context] = {
-                        'health': cluster_health,
-                        'info': cluster_info
+                        "health": cluster_health,
+                        "info": cluster_info,
                     }
                 else:
                     # Cluster not reachable - create unhealthy ClusterHealth
                     cluster_health = ClusterHealth.create_unhealthy(
                         context=context,
-                        error=cluster_info.error_message or "Cluster not reachable"
+                        error=cluster_info.error_message or "Cluster not reachable",
                     )
-                    
+
                     cluster_data[context] = {
-                        'health': cluster_health,
-                        'info': cluster_info,
-                        'error': cluster_info.error_message or "Cluster not reachable"
+                        "health": cluster_health,
+                        "info": cluster_info,
+                        "error": cluster_info.error_message or "Cluster not reachable",
                     }
-                    
+
             except Exception as e:
-                logger.debug("Error getting cluster health for context", context=context, error=str(e))
+                logger.debug(
+                    "Error getting cluster health for context",
+                    context=context,
+                    error=str(e),
+                )
                 # Create unhealthy ClusterHealth for errors
                 cluster_health = ClusterHealth.create_unhealthy(
-                    context=context,
-                    error=str(e)
+                    context=context, error=str(e)
                 )
                 cluster_data[context] = {
-                    'health': cluster_health,
-                    'info': None,
-                    'error': str(e)
+                    "health": cluster_health,
+                    "info": None,
+                    "error": str(e),
                 }
 
         return cluster_data if cluster_data else None
@@ -128,29 +132,31 @@ def _format_cluster_health_status(cluster_health) -> str:
     """Format cluster health status with color indicators."""
     if not cluster_health:
         return "[dim]Unknown[/dim]"
-    
+
     # cluster_health is now a ClusterHealth object, not a dict
     is_healthy = cluster_health.is_healthy
     last_check = cluster_health.last_check_time
-    
+
     if is_healthy:
         status = "[green]🟢 Healthy[/green]"
     else:
         status = "[red]🔴 Unhealthy[/red]"
-    
+
     if last_check:
         try:
             # last_check is already a datetime object, use UTC for consistency
-            from datetime import timezone
-            now = datetime.now(timezone.utc) if last_check.tzinfo else datetime.now()
+
+            now = datetime.now(UTC) if last_check.tzinfo else datetime.now()
             if last_check.tzinfo is None:
                 # If last_check is naive, assume it's UTC and make it timezone-aware
-                last_check = last_check.replace(tzinfo=timezone.utc)
-                now = datetime.now(timezone.utc)
-            
+                last_check = last_check.replace(tzinfo=UTC)
+                now = datetime.now(UTC)
+
             time_ago = now - last_check
-            total_seconds = abs(time_ago.total_seconds())  # Use abs to avoid negative values
-            
+            total_seconds = abs(
+                time_ago.total_seconds()
+            )  # Use abs to avoid negative values
+
             if total_seconds < 60:
                 time_str = f"{int(total_seconds)}s ago"
             elif total_seconds < 3600:
@@ -160,41 +166,45 @@ def _format_cluster_health_status(cluster_health) -> str:
             status += f" [dim]({time_str})[/dim]"
         except Exception:
             pass
-    
+
     return status
 
 
 async def cluster_status_command(
-    context: str | None = None,
-    output_format: OutputFormat = OutputFormat.TABLE
+    context: str | None = None, output_format: OutputFormat = OutputFormat.TABLE
 ) -> None:
     """Show detailed cluster health information."""
     try:
         # Get cluster health data using lightweight approach
         cluster_data = await _get_cluster_health_data()
-        
+
         if not cluster_data:
-            console.print(create_error_panel(
-                "Cluster Health Monitoring Unavailable",
-                "Cluster health monitoring is not enabled or no kubectl services configured.",
-                "Enable cluster health monitoring in your configuration or add kubectl services."
-            ))
+            console.print(
+                create_error_panel(
+                    "Cluster Health Monitoring Unavailable",
+                    "Cluster health monitoring is not enabled or no kubectl services configured.",
+                    "Enable cluster health monitoring in your configuration or add kubectl services.",
+                )
+            )
             raise typer.Exit(1)
 
         # Filter by context if specified
         if context:
             if context not in cluster_data:
-                console.print(create_error_panel(
-                    "Context Not Found",
-                    f"Cluster context '{context}' not found in configuration.",
-                    "Check your configuration or use a different context."
-                ))
+                console.print(
+                    create_error_panel(
+                        "Context Not Found",
+                        f"Cluster context '{context}' not found in configuration.",
+                        "Check your configuration or use a different context.",
+                    )
+                )
                 raise typer.Exit(1)
             cluster_data = {context: cluster_data[context]}
 
         if output_format == OutputFormat.JSON:
             # JSON output
             import json
+
             console.print(json.dumps(cluster_data, indent=2, default=str))
         else:
             # Table output
@@ -207,29 +217,24 @@ async def cluster_status_command(
             table.add_column("Last Check", style="dim")
 
             for ctx, data in cluster_data.items():
-                if data.get('error'):
+                if data.get("error"):
                     # Error case
                     table.add_row(
-                        ctx,
-                        "[red]🔴 Error[/red]",
-                        "Error",
-                        "Error",
-                        "Error",
-                        "Error"
+                        ctx, "[red]🔴 Error[/red]", "Error", "Error", "Error", "Error"
                     )
                 else:
-                    health_data = data.get('health')
-                    cluster_info = data.get('info')
-                    
+                    health_data = data.get("health")
+                    cluster_info = data.get("info")
+
                     # Format status
                     status = _format_cluster_health_status(health_data)
-                    
+
                     # Format cluster info (cluster_info is a ClusterInfo object)
                     if cluster_info:
-                        api_server = cluster_info.api_server_url or 'Unknown'
+                        api_server = cluster_info.api_server_url or "Unknown"
                     else:
-                        api_server = 'Unknown'
-                    
+                        api_server = "Unknown"
+
                     # Use health_data for node/pod counts (health_data is a ClusterHealth object)
                     if health_data:
                         node_count = health_data.total_nodes
@@ -237,23 +242,25 @@ async def cluster_status_command(
                     else:
                         node_count = 0
                         pod_count = 0
-                    
+
                     # Format last check time (health_data.last_check_time is a datetime object)
                     if health_data and health_data.last_check_time:
                         try:
-                            last_check_str = health_data.last_check_time.strftime('%H:%M:%S')
+                            last_check_str = health_data.last_check_time.strftime(
+                                "%H:%M:%S"
+                            )
                         except Exception:
                             last_check_str = str(health_data.last_check_time)
                     else:
-                        last_check_str = 'Never'
-                    
+                        last_check_str = "Never"
+
                     table.add_row(
                         ctx,
                         status,
                         api_server,
                         str(node_count),
                         str(pod_count),
-                        last_check_str
+                        last_check_str,
                     )
 
             console.print(table)
@@ -262,11 +269,11 @@ async def cluster_status_command(
         raise
     except Exception as e:
         logger.exception("Error getting cluster status")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error", str(e), "Check the logs for more details."
+            )
+        )
         raise typer.Exit(1)
 
 
@@ -274,40 +281,44 @@ async def cluster_events_command(
     context: str | None = None,
     since: str = "1h",
     limit: int = 20,
-    output_format: OutputFormat = OutputFormat.TABLE
+    output_format: OutputFormat = OutputFormat.TABLE,
 ) -> None:
     """Show recent cluster events."""
     try:
         cluster_health_manager = await _load_cluster_health_manager()
-        
+
         if not cluster_health_manager:
-            console.print(create_error_panel(
-                "Cluster Health Monitoring Unavailable",
-                "Cluster health monitoring is not enabled or no kubectl services configured.",
-                "Enable cluster health monitoring in your configuration."
-            ))
+            console.print(
+                create_error_panel(
+                    "Cluster Health Monitoring Unavailable",
+                    "Cluster health monitoring is not enabled or no kubectl services configured.",
+                    "Enable cluster health monitoring in your configuration.",
+                )
+            )
             raise typer.Exit(1)
 
         # Parse since parameter
         try:
-            if since.endswith('h'):
+            if since.endswith("h"):
                 hours = int(since[:-1])
                 since_dt = datetime.now() - timedelta(hours=hours)
-            elif since.endswith('m'):
+            elif since.endswith("m"):
                 minutes = int(since[:-1])
                 since_dt = datetime.now() - timedelta(minutes=minutes)
-            elif since.endswith('s'):
+            elif since.endswith("s"):
                 seconds = int(since[:-1])
                 since_dt = datetime.now() - timedelta(seconds=seconds)
             else:
                 # Try to parse as ISO format
                 since_dt = datetime.fromisoformat(since)
         except Exception:
-            console.print(create_error_panel(
-                "Invalid Time Format",
-                f"Invalid time format: {since}",
-                "Use formats like '1h', '30m', '60s' or ISO format."
-            ))
+            console.print(
+                create_error_panel(
+                    "Invalid Time Format",
+                    f"Invalid time format: {since}",
+                    "Use formats like '1h', '30m', '60s' or ISO format.",
+                )
+            )
             raise typer.Exit(1)
 
         # Get contexts
@@ -317,16 +328,19 @@ async def cluster_events_command(
             contexts = await cluster_health_manager.get_monitored_contexts()
 
         if not contexts:
-            console.print(create_error_panel(
-                "No Clusters Found",
-                "No cluster contexts are currently being monitored.",
-                "Add kubectl services to your configuration."
-            ))
+            console.print(
+                create_error_panel(
+                    "No Clusters Found",
+                    "No cluster contexts are currently being monitored.",
+                    "Add kubectl services to your configuration.",
+                )
+            )
             raise typer.Exit(1)
 
         if output_format == OutputFormat.JSON:
             # JSON output
             import json
+
             events_data = {}
             for ctx in contexts:
                 events = await cluster_health_manager.get_cluster_events(ctx, since_dt)
@@ -344,57 +358,50 @@ async def cluster_events_command(
 
             for ctx in contexts:
                 try:
-                    events = await cluster_health_manager.get_cluster_events(ctx, since_dt)
+                    events = await cluster_health_manager.get_cluster_events(
+                        ctx, since_dt
+                    )
                     if events:
                         for event in events[:limit]:
                             # Format event time
-                            event_time = event.get('timestamp', '')
+                            event_time = event.get("timestamp", "")
                             if event_time:
                                 try:
-                                    event_dt = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
-                                    time_str = event_dt.strftime('%H:%M:%S')
+                                    event_dt = datetime.fromisoformat(
+                                        event_time.replace("Z", "+00:00")
+                                    )
+                                    time_str = event_dt.strftime("%H:%M:%S")
                                 except Exception:
                                     time_str = event_time
                             else:
-                                time_str = 'Unknown'
-                            
+                                time_str = "Unknown"
+
                             # Format event type with color
-                            event_type = event.get('type', 'Unknown')
-                            if event_type == 'Warning':
+                            event_type = event.get("type", "Unknown")
+                            if event_type == "Warning":
                                 type_str = f"[yellow]{event_type}[/yellow]"
-                            elif event_type == 'Error':
+                            elif event_type == "Error":
                                 type_str = f"[red]{event_type}[/red]"
                             else:
                                 type_str = f"[green]{event_type}[/green]"
-                            
+
                             table.add_row(
                                 ctx,
                                 time_str,
                                 type_str,
-                                event.get('reason', 'Unknown'),
-                                event.get('object', 'Unknown'),
-                                event.get('message', 'No message')[:60] + ('...' if len(event.get('message', '')) > 60 else '')
+                                event.get("reason", "Unknown"),
+                                event.get("object", "Unknown"),
+                                event.get("message", "No message")[:60]
+                                + ("..." if len(event.get("message", "")) > 60 else ""),
                             )
                     else:
-                        table.add_row(
-                            ctx,
-                            "[dim]No events[/dim]",
-                            "",
-                            "",
-                            "",
-                            ""
-                        )
-                        
+                        table.add_row(ctx, "[dim]No events[/dim]", "", "", "", "")
+
                 except Exception as e:
-                    logger.error("Error getting cluster events", context=ctx, error=str(e))
-                    table.add_row(
-                        ctx,
-                        "[red]Error[/red]",
-                        "",
-                        "",
-                        "",
-                        str(e)
+                    logger.error(
+                        "Error getting cluster events", context=ctx, error=str(e)
                     )
+                    table.add_row(ctx, "[red]Error[/red]", "", "", "", str(e))
 
             console.print(table)
 
@@ -402,29 +409,31 @@ async def cluster_events_command(
         raise
     except Exception as e:
         logger.exception("Error getting cluster events")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error", str(e), "Check the logs for more details."
+            )
+        )
         raise typer.Exit(1)
 
 
 async def cluster_pods_command(
     context: str | None = None,
     namespace: str | None = None,
-    output_format: OutputFormat = OutputFormat.TABLE
+    output_format: OutputFormat = OutputFormat.TABLE,
 ) -> None:
     """Show pod status for active services."""
     try:
         cluster_health_manager = await _load_cluster_health_manager()
-        
+
         if not cluster_health_manager:
-            console.print(create_error_panel(
-                "Cluster Health Monitoring Unavailable",
-                "Cluster health monitoring is not enabled or no kubectl services configured.",
-                "Enable cluster health monitoring in your configuration."
-            ))
+            console.print(
+                create_error_panel(
+                    "Cluster Health Monitoring Unavailable",
+                    "Cluster health monitoring is not enabled or no kubectl services configured.",
+                    "Enable cluster health monitoring in your configuration.",
+                )
+            )
             raise typer.Exit(1)
 
         # Get contexts
@@ -434,16 +443,19 @@ async def cluster_pods_command(
             contexts = await cluster_health_manager.get_monitored_contexts()
 
         if not contexts:
-            console.print(create_error_panel(
-                "No Clusters Found",
-                "No cluster contexts are currently being monitored.",
-                "Add kubectl services to your configuration."
-            ))
+            console.print(
+                create_error_panel(
+                    "No Clusters Found",
+                    "No cluster contexts are currently being monitored.",
+                    "Add kubectl services to your configuration.",
+                )
+            )
             raise typer.Exit(1)
 
         if output_format == OutputFormat.JSON:
             # JSON output
             import json
+
             pods_data = {}
             for ctx in contexts:
                 # Get pod status for this context
@@ -470,9 +482,9 @@ async def cluster_pods_command(
                         "[dim]Pod status API not yet implemented[/dim]",
                         "[yellow]Pending[/yellow]",
                         "0",
-                        "Unknown"
+                        "Unknown",
                     )
-                        
+
                 except Exception as e:
                     logger.error("Error getting pod status", context=ctx, error=str(e))
                     table.add_row(
@@ -481,7 +493,7 @@ async def cluster_pods_command(
                         "[red]Error[/red]",
                         "[red]Error[/red]",
                         "Error",
-                        "Error"
+                        "Error",
                     )
 
             console.print(table)
@@ -490,18 +502,20 @@ async def cluster_pods_command(
         raise
     except Exception as e:
         logger.exception("Error getting pod status")
-        console.print(create_error_panel(
-            "Unexpected Error",
-            str(e),
-            "Check the logs for more details."
-        ))
+        console.print(
+            create_error_panel(
+                "Unexpected Error", str(e), "Check the logs for more details."
+            )
+        )
         raise typer.Exit(1)
 
 
 # Sync wrappers for Typer
 def cluster_status_sync(
     ctx: typer.Context,
-    context: str | None = typer.Option(None, "--context", "-c", help="Specific cluster context to check")
+    context: str | None = typer.Option(
+        None, "--context", "-c", help="Specific cluster context to check"
+    ),
 ) -> None:
     """Show detailed cluster health information."""
     cli_ctx = get_cli_context(ctx)
@@ -510,9 +524,15 @@ def cluster_status_sync(
 
 def cluster_events_sync(
     ctx: typer.Context,
-    context: str | None = typer.Option(None, "--context", "-c", help="Specific cluster context to check"),
-    since: str = typer.Option("1h", "--since", "-s", help="Show events since this time (e.g., 1h, 30m, 60s)"),
-    limit: int = typer.Option(20, "--limit", "-l", help="Maximum number of events to show")
+    context: str | None = typer.Option(
+        None, "--context", "-c", help="Specific cluster context to check"
+    ),
+    since: str = typer.Option(
+        "1h", "--since", "-s", help="Show events since this time (e.g., 1h, 30m, 60s)"
+    ),
+    limit: int = typer.Option(
+        20, "--limit", "-l", help="Maximum number of events to show"
+    ),
 ) -> None:
     """Show recent cluster events that might affect services."""
     cli_ctx = get_cli_context(ctx)
@@ -521,8 +541,12 @@ def cluster_events_sync(
 
 def cluster_pods_sync(
     ctx: typer.Context,
-    context: str | None = typer.Option(None, "--context", "-c", help="Specific cluster context to check"),
-    namespace: str | None = typer.Option(None, "--namespace", "-n", help="Specific namespace to check")
+    context: str | None = typer.Option(
+        None, "--context", "-c", help="Specific cluster context to check"
+    ),
+    namespace: str | None = typer.Option(
+        None, "--namespace", "-n", help="Specific namespace to check"
+    ),
 ) -> None:
     """Show pod status for resources used by active services."""
     cli_ctx = get_cli_context(ctx)

@@ -1,10 +1,8 @@
 """Tests for CLI basic functionality."""
 
-import pytest
 from typer.testing import CliRunner
 
 from localport.cli.app import app
-
 
 runner = CliRunner()
 

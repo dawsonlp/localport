@@ -37,39 +37,33 @@ class HealthCheckResult:
 
     @classmethod
     def healthy(
-        cls,
-        message: str | None = None,
-        response_time_ms: float | None = None
+        cls, message: str | None = None, response_time_ms: float | None = None
     ) -> "HealthCheckResult":
         """Create a healthy result."""
         return cls(
             status=HealthCheckStatus.HEALTHY,
             timestamp=datetime.now(),
             message=message,
-            response_time_ms=response_time_ms
+            response_time_ms=response_time_ms,
         )
 
     @classmethod
     def unhealthy(
-        cls,
-        message: str | None = None,
-        error: str | None = None
+        cls, message: str | None = None, error: str | None = None
     ) -> "HealthCheckResult":
         """Create an unhealthy result."""
         return cls(
             status=HealthCheckStatus.UNHEALTHY,
             timestamp=datetime.now(),
             message=message,
-            error=error
+            error=error,
         )
 
     @classmethod
     def error(cls, error: str) -> "HealthCheckResult":
         """Create an error result."""
         return cls(
-            status=HealthCheckStatus.ERROR,
-            timestamp=datetime.now(),
-            error=error
+            status=HealthCheckStatus.ERROR, timestamp=datetime.now(), error=error
         )
 
 

@@ -42,16 +42,14 @@ class MemoryServiceRepository(ServiceRepository):
             self._services[service.id] = service
             self._name_index[service.name] = service.id
 
-            logger.debug("Service saved",
-                        service_id=service.id,
-                        service_name=service.name)
+            logger.debug(
+                "Service saved", service_id=service.id, service_name=service.name
+            )
 
         except DuplicateServiceError:
             raise
         except Exception as e:
-            logger.error("Error saving service",
-                        service_id=service.id,
-                        error=str(e))
+            logger.error("Error saving service", service_id=service.id, error=str(e))
             raise RepositoryError(f"Failed to save service: {e}")
 
     async def find_by_id(self, service_id: UUID) -> Service | None:
@@ -77,9 +75,9 @@ class MemoryServiceRepository(ServiceRepository):
             return service
 
         except Exception as e:
-            logger.error("Error finding service by ID",
-                        service_id=service_id,
-                        error=str(e))
+            logger.error(
+                "Error finding service by ID", service_id=service_id, error=str(e)
+            )
             raise RepositoryError(f"Failed to find service by ID: {e}")
 
     async def find_by_name(self, name: str) -> Service | None:
@@ -105,9 +103,9 @@ class MemoryServiceRepository(ServiceRepository):
                 return None
 
         except Exception as e:
-            logger.error("Error finding service by name",
-                        service_name=name,
-                        error=str(e))
+            logger.error(
+                "Error finding service by name", service_name=name, error=str(e)
+            )
             raise RepositoryError(f"Failed to find service by name: {e}")
 
     async def find_all(self) -> list[Service]:
@@ -148,16 +146,14 @@ class MemoryServiceRepository(ServiceRepository):
                 if any(tag in service.tags for tag in tags):
                     matching_services.append(service)
 
-            logger.debug("Found services by tags",
-                        tags=tags,
-                        count=len(matching_services))
+            logger.debug(
+                "Found services by tags", tags=tags, count=len(matching_services)
+            )
 
             return matching_services
 
         except Exception as e:
-            logger.error("Error finding services by tags",
-                        tags=tags,
-                        error=str(e))
+            logger.error("Error finding services by tags", tags=tags, error=str(e))
             raise RepositoryError(f"Failed to find services by tags: {e}")
 
     async def find_enabled(self) -> list[Service]:
@@ -207,16 +203,14 @@ class MemoryServiceRepository(ServiceRepository):
             del self._services[service_id]
             del self._name_index[service.name]
 
-            logger.debug("Service deleted",
-                        service_id=service_id,
-                        service_name=service.name)
+            logger.debug(
+                "Service deleted", service_id=service_id, service_name=service.name
+            )
 
             return True
 
         except Exception as e:
-            logger.error("Error deleting service",
-                        service_id=service_id,
-                        error=str(e))
+            logger.error("Error deleting service", service_id=service_id, error=str(e))
             raise RepositoryError(f"Failed to delete service: {e}")
 
     async def exists(self, service_id: UUID) -> bool:
@@ -233,15 +227,15 @@ class MemoryServiceRepository(ServiceRepository):
         """
         try:
             exists = service_id in self._services
-            logger.debug("Service existence check",
-                        service_id=service_id,
-                        exists=exists)
+            logger.debug(
+                "Service existence check", service_id=service_id, exists=exists
+            )
             return exists
 
         except Exception as e:
-            logger.error("Error checking service existence",
-                        service_id=service_id,
-                        error=str(e))
+            logger.error(
+                "Error checking service existence", service_id=service_id, error=str(e)
+            )
             raise RepositoryError(f"Failed to check service existence: {e}")
 
     async def count(self) -> int:
@@ -311,9 +305,7 @@ class MemoryServiceRepository(ServiceRepository):
         except DuplicateServiceError:
             raise
         except Exception as e:
-            logger.error("Error in bulk save",
-                        count=len(services),
-                        error=str(e))
+            logger.error("Error in bulk save", count=len(services), error=str(e))
             raise RepositoryError(f"Failed to bulk save services: {e}")
 
     async def find_by_status(self, status: str) -> list[Service]:
@@ -336,20 +328,21 @@ class MemoryServiceRepository(ServiceRepository):
                 return []
 
             matching_services = [
-                service for service in self._services.values()
+                service
+                for service in self._services.values()
                 if service.status == status_enum
             ]
 
-            logger.debug("Found services by status",
-                        status=status,
-                        count=len(matching_services))
+            logger.debug(
+                "Found services by status", status=status, count=len(matching_services)
+            )
 
             return matching_services
 
         except Exception as e:
-            logger.error("Error finding services by status",
-                        status=status,
-                        error=str(e))
+            logger.error(
+                "Error finding services by status", status=status, error=str(e)
+            )
             raise RepositoryError(f"Failed to find services by status: {e}")
 
     def get_statistics(self) -> dict[str, int]:
@@ -364,7 +357,7 @@ class MemoryServiceRepository(ServiceRepository):
             stats = {
                 "total_services": len(self._services),
                 "by_status": {},
-                "by_technology": {}
+                "by_technology": {},
             }
 
             # Count by status

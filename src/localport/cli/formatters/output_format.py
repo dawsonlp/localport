@@ -32,4 +32,6 @@ class OutputFormat(str, Enum):
             return cls(value.lower())
         except ValueError:
             valid_formats = [f.value for f in cls]
-            raise ValueError(f"Unsupported output format '{value}'. Valid formats: {valid_formats}")
+            raise ValueError(
+                f"Unsupported output format '{value}'. Valid formats: {valid_formats}"
+            )

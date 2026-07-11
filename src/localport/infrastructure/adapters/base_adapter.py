@@ -15,10 +15,7 @@ class PortForwardingAdapter(ABC):
 
     @abstractmethod
     async def start_port_forward(
-        self,
-        local_port: int,
-        remote_port: int,
-        connection_info: ConnectionInfo
+        self, local_port: int, remote_port: int, connection_info: ConnectionInfo
     ) -> int:
         """Start a port forwarding process.
 
@@ -60,7 +57,9 @@ class PortForwardingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def validate_connection_info(self, connection_info: ConnectionInfo) -> list[str]:
+    async def validate_connection_info(
+        self, connection_info: ConnectionInfo
+    ) -> list[str]:
         """Validate connection information for this adapter.
 
         Args:
@@ -105,14 +104,18 @@ class PortForwardingAdapter(ABC):
                 missing_tools.append(tool)
 
         if missing_tools:
-            logger.warning("Missing required tools for adapter",
-                          adapter=self.get_adapter_name(),
-                          missing_tools=missing_tools)
+            logger.warning(
+                "Missing required tools for adapter",
+                adapter=self.get_adapter_name(),
+                missing_tools=missing_tools,
+            )
             return False
 
-        logger.debug("Prerequisites check passed",
-                    adapter=self.get_adapter_name(),
-                    required_tools=required_tools)
+        logger.debug(
+            "Prerequisites check passed",
+            adapter=self.get_adapter_name(),
+            required_tools=required_tools,
+        )
         return True
 
     async def get_port_forward_status(self, process_id: int) -> dict[str, Any]:
@@ -129,31 +132,27 @@ class PortForwardingAdapter(ABC):
 
             if not psutil.pid_exists(process_id):
                 return {
-                    'running': False,
-                    'status': 'not_found',
-                    'error': 'Process not found'
+                    "running": False,
+                    "status": "not_found",
+                    "error": "Process not found",
                 }
 
             process = psutil.Process(process_id)
 
             return {
-                'running': True,
-                'status': process.status(),
-                'cpu_percent': process.cpu_percent(),
-                'memory_info': process.memory_info()._asdict(),
-                'create_time': process.create_time(),
-                'cmdline': process.cmdline()
+                "running": True,
+                "status": process.status(),
+                "cpu_percent": process.cpu_percent(),
+                "memory_info": process.memory_info()._asdict(),
+                "create_time": process.create_time(),
+                "cmdline": process.cmdline(),
             }
 
         except Exception as e:
-            logger.error("Failed to get port forward status",
-                        process_id=process_id,
-                        error=str(e))
-            return {
-                'running': False,
-                'status': 'error',
-                'error': str(e)
-            }
+            logger.error(
+                "Failed to get port forward status", process_id=process_id, error=str(e)
+            )
+            return {"running": False, "status": "error", "error": str(e)}
 
     async def cleanup_dead_processes(self) -> int:
         """Clean up any dead port forward processes created by this adapter.
@@ -169,46 +168,54 @@ class PortForwardingAdapter(ABC):
             adapter_name = self.get_adapter_name().lower()
 
             # Look for processes that might be from this adapter
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            for proc in psutil.process_iter(["pid", "name", "cmdline"]):
                 try:
-                    cmdline = proc.info.get('cmdline', [])
+                    cmdline = proc.info.get("cmdline", [])
                     if not cmdline:
                         continue
 
                     # Check if this looks like a process from this adapter
-                    cmdline_str = ' '.join(cmdline).lower()
+                    cmdline_str = " ".join(cmdline).lower()
 
-                    if adapter_name in cmdline_str and 'port-forward' in cmdline_str:
+                    if adapter_name in cmdline_str and "port-forward" in cmdline_str:
                         # Check if process is actually dead/zombie
                         if proc.status() in [psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD]:
                             proc.terminate()
                             cleaned_count += 1
-                            logger.debug("Cleaned up dead process",
-                                        adapter=self.get_adapter_name(),
-                                        pid=proc.pid)
+                            logger.debug(
+                                "Cleaned up dead process",
+                                adapter=self.get_adapter_name(),
+                                pid=proc.pid,
+                            )
 
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
 
             if cleaned_count > 0:
-                logger.info("Cleaned up dead processes",
-                           adapter=self.get_adapter_name(),
-                           count=cleaned_count)
+                logger.info(
+                    "Cleaned up dead processes",
+                    adapter=self.get_adapter_name(),
+                    count=cleaned_count,
+                )
 
             return cleaned_count
 
         except Exception as e:
-            logger.error("Failed to cleanup dead processes",
-                        adapter=self.get_adapter_name(),
-                        error=str(e))
+            logger.error(
+                "Failed to cleanup dead processes",
+                adapter=self.get_adapter_name(),
+                error=str(e),
+            )
             return 0
 
 
 class AdapterError(Exception):
     """Base exception for adapter-related errors."""
+
     pass
 
 
 class AdapterNotAvailableError(AdapterError):
     """Raised when an adapter's prerequisites are not met."""
+
     pass

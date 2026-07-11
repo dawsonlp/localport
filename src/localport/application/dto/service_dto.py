@@ -19,27 +19,20 @@ class ServiceStartResult:
 
     @classmethod
     def success_result(
-        cls,
-        service_name: str,
-        process_id: int,
-        started_at: datetime | None = None
+        cls, service_name: str, process_id: int, started_at: datetime | None = None
     ) -> "ServiceStartResult":
         """Create a successful start result."""
         return cls(
             service_name=service_name,
             success=True,
             process_id=process_id,
-            started_at=started_at or datetime.now()
+            started_at=started_at or datetime.now(),
         )
 
     @classmethod
     def failure_result(cls, service_name: str, error: str) -> "ServiceStartResult":
         """Create a failed start result."""
-        return cls(
-            service_name=service_name,
-            success=False,
-            error=error
-        )
+        return cls(service_name=service_name, success=False, error=error)
 
 
 @dataclass
@@ -53,25 +46,19 @@ class ServiceStopResult:
 
     @classmethod
     def success_result(
-        cls,
-        service_name: str,
-        stopped_at: datetime | None = None
+        cls, service_name: str, stopped_at: datetime | None = None
     ) -> "ServiceStopResult":
         """Create a successful stop result."""
         return cls(
             service_name=service_name,
             success=True,
-            stopped_at=stopped_at or datetime.now()
+            stopped_at=stopped_at or datetime.now(),
         )
 
     @classmethod
     def failure_result(cls, service_name: str, error: str) -> "ServiceStopResult":
         """Create a failed stop result."""
-        return cls(
-            service_name=service_name,
-            success=False,
-            error=error
-        )
+        return cls(service_name=service_name, success=False, error=error)
 
 
 @dataclass
@@ -197,6 +184,7 @@ class BulkOperationResult:
 @dataclass
 class DaemonStatusResult:
     """Result of daemon status check."""
+
     running: bool
     pid: int | None = None
     uptime_seconds: float | None = None
@@ -222,6 +210,7 @@ class DaemonStatusResult:
 @dataclass
 class DaemonOperationResult:
     """Result of daemon operation."""
+
     command: str
     success: bool
     pid: int | None = None
@@ -231,24 +220,12 @@ class DaemonOperationResult:
 
     @classmethod
     def success_result(
-        cls,
-        command: str,
-        message: str,
-        pid: int | None = None
+        cls, command: str, message: str, pid: int | None = None
     ) -> "DaemonOperationResult":
         """Create a successful operation result."""
-        return cls(
-            command=command,
-            success=True,
-            message=message,
-            pid=pid
-        )
+        return cls(command=command, success=True, message=message, pid=pid)
 
     @classmethod
     def failure_result(cls, command: str, error: str) -> "DaemonOperationResult":
         """Create a failed operation result."""
-        return cls(
-            command=command,
-            success=False,
-            error=error
-        )
+        return cls(command=command, success=False, error=error)

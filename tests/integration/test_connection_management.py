@@ -1,13 +1,14 @@
 """Integration tests for connection management workflow."""
 
-import asyncio
-import tempfile
 import os
+import tempfile
 
 import pytest
 import yaml
 
-from localport.infrastructure.repositories.yaml_config_repository import YamlConfigRepository
+from localport.infrastructure.repositories.yaml_config_repository import (
+    YamlConfigRepository,
+)
 
 
 class TestConnectionManagementIntegration:
@@ -27,15 +28,13 @@ class TestConnectionManagementIntegration:
                     "connection": {
                         "resource_name": "postgres",
                         "namespace": "default",
-                        "resource_type": "service"
+                        "resource_type": "service",
                     },
-                    "tags": ["database"]
+                    "tags": ["database"],
                 }
-            ]
+            ],
         }
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.yaml', delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
             yield f.name
         os.unlink(f.name)
@@ -75,8 +74,8 @@ class TestConnectionManagementIntegration:
             "connection": {
                 "resource_name": "redis",
                 "namespace": "default",
-                "resource_type": "service"
-            }
+                "resource_type": "service",
+            },
         }
         await repo.add_service_config(new_service)
         assert await repo.service_exists("redis") is True
@@ -85,6 +84,7 @@ class TestConnectionManagementIntegration:
     async def test_add_connection_service_already_exists(self, config_file):
         """Test that adding duplicate service raises error."""
         from localport.domain.exceptions import ServiceAlreadyExistsError
+
         repo = YamlConfigRepository(config_file)
         duplicate = {
             "name": "postgres",
@@ -94,8 +94,8 @@ class TestConnectionManagementIntegration:
             "connection": {
                 "resource_name": "postgres2",
                 "namespace": "default",
-                "resource_type": "service"
-            }
+                "resource_type": "service",
+            },
         }
         with pytest.raises(ServiceAlreadyExistsError):
             await repo.add_service_config(duplicate)
@@ -127,8 +127,8 @@ class TestConnectionManagementIntegration:
             "connection": {
                 "resource_name": "postgres",
                 "namespace": "default",
-                "resource_type": "service"
-            }
+                "resource_type": "service",
+            },
         }
         result = await repo.update_service_config("postgres", updated)
         assert result is True
@@ -159,8 +159,8 @@ class TestConnectionManagementIntegration:
             "connection": {
                 "resource_name": "redis",
                 "namespace": "default",
-                "resource_type": "service"
-            }
+                "resource_type": "service",
+            },
         }
         await repo.add_service_config(new_service)
 
