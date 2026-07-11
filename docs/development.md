@@ -6,7 +6,7 @@ This guide covers day-to-day development workflows, best practices, and practica
 
 ### Prerequisites
 
-- **Python 3.13+** installed on your system
+- **Python 3.11+** installed on your system
 - **Git** for version control
 - **UV** for fast package management (recommended)
 - **Docker** (optional, for integration testing)
@@ -302,7 +302,7 @@ localport --log-level DEBUG start --all
 localport --verbose start postgres
 
 # Check configuration
-localport config validate --strict
+localport config validate
 ```
 
 #### Python Debugging
@@ -492,7 +492,7 @@ uv cache clean
 
 # Reinstall dependencies
 rm -rf .venv
-uv venv --python 3.13
+uv venv --python 3.11
 uv sync --dev
 ```
 
@@ -501,12 +501,12 @@ uv sync --dev
 # Check Python version
 python --version
 
-# Install Python 3.13 (Ubuntu/Debian)
+# Install Python 3.11+ (Ubuntu/Debian)
 sudo apt update
-sudo apt install python3.13 python3.13-venv
+sudo apt install python3.11 python3.11-venv
 
-# Install Python 3.13 (macOS with Homebrew)
-brew install python@3.13
+# Install Python 3.11+ (macOS with Homebrew)
+brew install python@3.11
 ```
 
 #### Import Errors

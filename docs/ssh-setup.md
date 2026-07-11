@@ -385,16 +385,16 @@ LocalPort creates detailed logs for SSH tunnels:
 
 ```bash
 # View service logs
-localport logs my-service
+localport logs --service my-service
 
-# Follow logs in real-time
-localport logs my-service --follow
+# Filter for errors
+localport logs --service my-service --grep error
 
-# View logs with timestamps
-localport logs my-service --timestamps
+# Follow output live with external tools
+tail -f "$(localport logs --service my-service --path)"
 
 # Export logs for analysis
-localport logs my-service --export /tmp/ssh-debug.log
+cp "$(localport logs --service my-service --path)" /tmp/ssh-debug.log
 ```
 
 ## Advanced Configuration

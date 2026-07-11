@@ -19,7 +19,7 @@ Thank you for your interest in contributing to LocalPort! This guide will help y
 
 Before you begin, ensure you have:
 
-- **Python 3.13+** installed
+- **Python 3.11+** installed
 - **Git** for version control
 - **UV** for package management (recommended)
 - Basic familiarity with:

@@ -1,10 +1,8 @@
 # LocalPort
 
-> **🚀 BETA RELEASE - Universal port forwarding manager with intelligent health monitoring**
+> **Universal port forwarding manager with intelligent health monitoring**
 
-**ℹ️ LocalPort is in active development with new features being added regularly. While core functionality is stable and well-tested, some advanced features are still being developed. We welcome feedback and issue reports!**
-
-LocalPort is a modern Python CLI tool that simplifies port forwarding across different technologies (kubectl, SSH) while providing enterprise-grade features like automatic health monitoring, intelligent restart policies, and daemon-mode operation.
+LocalPort is a modern Python CLI tool that simplifies port forwarding across different technologies (kubectl, SSH) while providing features like automatic health monitoring, intelligent restart policies, and daemon-mode operation. Feedback and issue reports are welcome.
 
 ## ✨ Why LocalPort?
 
@@ -20,7 +18,7 @@ LocalPort is a modern Python CLI tool that simplifies port forwarding across dif
 ### Installation
 
 #### Production Release (PyPI)
-> **Note**: LocalPort is now available on production PyPI! This is beta software with stable core functionality and active feature development.
+> **Note**: LocalPort is available on production PyPI.
 
 > **⚠️ Python 3.11+ Required**: LocalPort requires Python 3.11 or newer. If you don't have Python 3.11+, see [Python Installation](#python-installation) below.
 
@@ -81,7 +79,7 @@ pipx install --index-url https://test.pypi.org/simple/ --pip-args="--extra-index
 pipx install git+https://github.com/dawsonlp/localport.git
 
 # Install specific version/tag
-pipx install git+https://github.com/dawsonlp/localport.git@v0.3.0
+pipx install git+https://github.com/dawsonlp/localport.git@v1.1.1
 
 # Development: Install from source
 git clone https://github.com/dawsonlp/localport.git
@@ -106,7 +104,7 @@ services:
       namespace: default
     tags: [database]
 
-  # Forward Redis from Kubernetes (SSH tunnels planned for v0.4.0)
+  # Forward Redis from Kubernetes
   - name: redis
     technology: kubectl
     local_port: 6379
@@ -304,18 +302,25 @@ services:
 ```
 
 ### SSH Tunnels
-> **⚠️ Note**: SSH tunnel support is planned for v0.4.0 and not yet implemented. The configuration below shows the planned syntax.
+
+SSH port forwarding is fully supported, including bastion/jump hosts via `remote_host`.
 
 ```yaml
 - name: service-name
   technology: ssh
+  local_port: 5432
+  remote_port: 5432
   connection:
     host: remote-server.com
-    user: deploy
+    user: deploy                 # optional (falls back to SSH config / agent)
     port: 22                     # optional, default 22
-    key_file: ~/.ssh/id_rsa     # optional
-    password: secret             # optional (not recommended)
+    key_file: ~/.ssh/id_rsa      # optional
+    remote_host: db.internal     # optional, for bastion/jump-host tunneling
+    password: secret             # optional (not recommended; use keys)
 ```
+
+See the [SSH Setup Guide](docs/ssh-setup.md) for bastion hosts, key management, and the
+`localport ssh test` / `localport ssh validate` helper commands.
 
 ## 🌟 Advanced Features
 
@@ -406,33 +411,20 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📊 Status
 
-🎯 **Beta Release 0.3.x** - Stable core functionality with cluster health monitoring and daemon mode!
+**Stable (v1.x)** — core functionality is production-ready.
 
-**Current Progress:**
-- ✅ Core Infrastructure (100% complete)
-- ✅ kubectl Port Forwarding (100% complete)
-- ✅ Process Persistence (100% complete)
-- ✅ ConnectionInfo Value Objects (100% complete)
-- ✅ Health Monitoring Framework (100% complete)
-- ✅ Configuration Management (100% complete)
-- ✅ Daemon Mode (100% complete)
-- ✅ Basic Testing Suite (100% complete)
-- ✅ Hybrid Verbosity System (100% complete)
-- 🚧 SSH Tunnels (planned for 0.4.0)
-- 🚧 Advanced Health Checks (in progress)
-- 🚧 Documentation (in progress)
+**Implemented:**
+- ✅ kubectl port forwarding (services, deployments, pods)
+- ✅ SSH port forwarding, including bastion/jump hosts
+- ✅ Health monitoring (TCP, HTTP/HTTPS, Kafka, PostgreSQL) with intelligent restart policies
+- ✅ Daemon mode with hot configuration reload
+- ✅ Cluster health monitoring for Kubernetes contexts
+- ✅ Configuration management (`config add`/`remove`/`list`/`validate`/`export`)
+- ✅ Service logging and diagnostics
+- ✅ Progressive verbosity (`-v`, `-vv`, `--debug`) with clean default output
 
-**Known Issues:**
-- **PostgreSQL Health Check**: Requires password configuration (see [Configuration Guide](docs/configuration.md))
-- **Kafka Health Check**: May be too aggressive in failure detection
-- **SSH Tunnels**: Not yet implemented
-
-**Recent Improvements:**
-- ✅ Daemon startup detection and verification
-- ✅ Health check interface standardization
-- ✅ Progressive verbosity system (-v, -vv, --debug)
-- ✅ Clean CLI output by default
-- ✅ **v0.3.5 Architectural Enhancements**: Complete kubectl adapter interface compliance with enhanced validation, type safety, and comprehensive testing (31 unit tests)
+**Notes:**
+- **PostgreSQL / Kafka health checks** require the optional extras (`localport[postgres]`, `localport[kafka]`) and appropriate credentials — see the [Configuration Guide](docs/configuration.md).
 
 ## 🗺️ Roadmap
 

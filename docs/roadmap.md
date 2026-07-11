@@ -58,13 +58,13 @@ LocalPort aims to become the universal port forwarding and service connectivity 
 - Cross-cloud connectivity
 
 #### Enhanced SSH Tunnels
-**Status**: In Progress (v0.4.0) | **Complexity**: Medium | **Impact**: High
+**Status**: Shipped | **Complexity**: Medium | **Impact**: High
 
-- Full SSH tunnel support with authentication
-- Jump host and bastion server support
-- SSH key management and agent integration
-- Dynamic port allocation
-- SSH connection pooling and multiplexing
+- ✅ Full SSH tunnel support with authentication
+- ✅ Jump host and bastion server support (`remote_host`)
+- ✅ SSH key management and agent integration
+- 🚧 Dynamic port allocation
+- 🚧 SSH connection pooling and multiplexing
 
 **Use Cases**:
 - Secure access to remote services
@@ -322,7 +322,6 @@ LocalPort aims to become the universal port forwarding and service connectivity 
 - Documentation improvements
 
 #### Intermediate
-- SSH tunnel implementation
 - Reverse proxy basic functionality
 - Enhanced logging features
 - IDE plugin development

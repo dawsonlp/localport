@@ -141,7 +141,9 @@ Provides command-line interface using Typer and Rich for beautiful output.
 #### Command Structure
 - **ServiceCommands**: start, stop, status, logs
 - **DaemonCommands**: daemon start, stop, restart, status, reload
-- **ConfigCommands**: validate, export
+- **ConfigCommands**: validate, export, add, remove, list
+- **SSHCommands**: ssh test, ssh validate
+- **ClusterCommands**: cluster status, events, pods
 
 #### Output Formatting
 - **TableFormatter**: Human-readable tabular output
@@ -267,7 +269,7 @@ class StartServicesCommand:
 ## Technology Stack
 
 ### Core Dependencies
-- **Python 3.13+**: Latest Python with modern features
+- **Python 3.11+**: Modern Python with typing and asyncio features
 - **Typer**: Modern CLI framework with Rich integration
 - **Rich**: Beautiful terminal output and formatting
 - **Pydantic**: Data validation and settings management

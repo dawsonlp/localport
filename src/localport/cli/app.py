@@ -22,7 +22,7 @@ logger = structlog.get_logger()
 # Create main Typer app
 app = typer.Typer(
     name="localport",
-    help="[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring\n\n[bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues\n[blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]",
+    help="[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring\n\n[blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]\n[blue]🐛 Report issues: https://github.com/dawsonlp/localport/issues[/blue]",
     rich_markup_mode="rich",
     no_args_is_help=False,
     add_completion=False,
@@ -112,8 +112,6 @@ def main(
 ):
     """
     [bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring.
-
-    [bold red]⚠️  ALPHA SOFTWARE[/bold red] - Core functionality works, but expect breaking changes.
 
     LocalPort provides a unified interface for managing port forwards across different
     technologies (kubectl, SSH) with automatic health monitoring and restart capabilities.
@@ -366,7 +364,6 @@ def cli_main():
             # Display help with dynamic configuration status
             console.print(f"""[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring
 
-[bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues
 [blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]
 
 [bold]Usage:[/bold] localport [OPTIONS] COMMAND [ARGS]...{config_status}
@@ -378,6 +375,7 @@ def cli_main():
   [cyan]logs[/cyan]     View service logs
   [cyan]daemon[/cyan]   Daemon management commands
   [cyan]config[/cyan]   Configuration management commands
+  [cyan]ssh[/cyan]      SSH connectivity commands
   [cyan]cluster[/cyan]  Cluster health monitoring commands
 
 [bold]Options:[/bold]
