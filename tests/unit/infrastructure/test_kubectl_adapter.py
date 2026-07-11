@@ -1,5 +1,6 @@
 """Unit tests for KubectlAdapter."""
 
+import shutil
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import psutil
@@ -361,8 +362,11 @@ class TestKubectlAdapter:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    shutil.which("kubectl") is None, reason="requires the kubectl binary"
+)
 class TestKubectlAdapterIntegration:
-    """Integration tests for KubectlAdapter."""
+    """Integration tests for KubectlAdapter (require a real kubectl binary)."""
 
     @pytest.mark.asyncio
     async def test_kubectl_adapter_factory_integration(self):
