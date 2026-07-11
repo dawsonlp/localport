@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **`cluster events` and `cluster pods` commands**: these were never functional — they queried the daemon's in-memory monitor state, which a standalone CLI process cannot reach, and one was an explicit stub. Removed the commands and the now-dead public `get_cluster_events` API they relied on. `cluster status` (which queries kubectl directly) is unaffected.
+
 ### Fixed
 - **Hot reload crash**: Health monitoring registered each service loop with both the `TaskManager` and the `CooperativeTask`, running two loops per service and leaving a task name that was never released — so the second monitoring start (config hot reload) raised `ValueError: Task already exists`. The `CooperativeTask` now solely owns its loop; hot reload works and each service is health-checked once per interval.
 - **`enabled: false` ignored**: The YAML loader validated the `enabled` field but never propagated it to the `Service` entity, so disabled services were still auto-started. The flag is now honored.

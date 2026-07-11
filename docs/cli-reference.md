@@ -335,33 +335,6 @@ localport cluster status [OPTIONS]
 |--------|-------|-------------|
 | `--context NAME` | `-c` | Show status for a specific cluster context |
 
-### `localport cluster events`
-
-Show recent cluster events that might affect services.
-
-```bash
-localport cluster events [OPTIONS]
-```
-
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--context NAME` | `-c` | Cluster context | |
-| `--since TIME` | `-s` | Show events since this time (e.g. `1h`, `30m`, `60s`) | `1h` |
-| `--limit N` | `-l` | Maximum number of events to show | `20` |
-
-### `localport cluster pods`
-
-Show pod status for resources used by active services.
-
-```bash
-localport cluster pods [OPTIONS]
-```
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--context NAME` | `-c` | Cluster context |
-| `--namespace NAME` | `-n` | Specific namespace to check |
-
 ## SSH Commands
 
 ### `localport ssh test`
