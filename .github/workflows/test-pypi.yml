@@ -19,7 +19,12 @@ permissions:
 jobs:
   build-and-publish-test:
     runs-on: ubuntu-latest
-    
+    # pyproject uses dynamic versioning (setuptools_scm reads git tags), so there
+    # is no static version line to edit. Override the version for the test
+    # release via setuptools_scm's pretend-version env var instead.
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION_FOR_LOCALPORT: ${{ inputs.version }}
+
     steps:
     - uses: actions/checkout@v4
     
@@ -34,12 +39,8 @@ jobs:
     - name: Install dependencies
       run: uv sync --dev
     
-    - name: Update version for test release
-      run: |
-        # Update version in pyproject.toml for test release
-        sed -i 's/version = ".*"/version = "${{ inputs.version }}"/' pyproject.toml
-        echo "Updated version to ${{ inputs.version }}"
-        grep 'version = ' pyproject.toml
+    - name: Show target version
+      run: echo "Building localport ${{ inputs.version }} (via SETUPTOOLS_SCM_PRETEND_VERSION_FOR_LOCALPORT)"
     
     - name: Run tests
       run: |
