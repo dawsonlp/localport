@@ -413,6 +413,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **Stable (v1.x)** — core functionality is production-ready.
 
+> **Platform:** Linux and macOS. The daemon relies on POSIX features (forking and Unix signals), so Windows is not supported.
+
 **Implemented:**
 - ✅ kubectl port forwarding (services, deployments, pods)
 - ✅ SSH port forwarding, including bastion/jump hosts
