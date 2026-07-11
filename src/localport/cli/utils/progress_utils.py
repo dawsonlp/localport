@@ -12,7 +12,6 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
-    TimeRemainingColumn,
 )
 
 
@@ -157,32 +156,6 @@ class EnhancedProgress:
             await asyncio.sleep(0.5)
             
         return results
-
-
-def create_service_operation_steps(
-    service_names: list[str], 
-    operation_name: str
-) -> list[tuple[str, Callable]]:
-    """Create step descriptions for service operations.
-    
-    Args:
-        service_names: List of service names
-        operation_name: Operation being performed (start, stop, etc.)
-        
-    Returns:
-        List of step descriptions and placeholder operations
-    """
-    if not service_names:
-        return [(f"{operation_name.title()}ing all services", lambda: None)]
-    
-    steps = []
-    for service_name in service_names:
-        steps.append((
-            f"{operation_name.title()}ing {service_name}",
-            lambda: None  # Placeholder - actual operation will be injected
-        ))
-    
-    return steps
 
 
 def get_operation_messages(operation: str, count: int = 1) -> dict[str, str]:

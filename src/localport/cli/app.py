@@ -246,10 +246,7 @@ from .commands.daemon_commands import (
     stop_daemon_sync,
 )
 from .commands.log_commands import (
-    list_service_logs_sync,
     logs_sync,
-    show_log_location_sync,
-    show_service_log_sync,
 )
 from .commands.service_commands import (
     start_services_sync,

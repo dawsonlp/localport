@@ -536,38 +536,3 @@ class PostgreSQLHealthCheck(HealthChecker):
             },
             "additionalProperties": False
         }
-
-
-# Convenience function for simple health checks
-async def check_postgres_health(
-    host: str = 'localhost',
-    port: int = 5432,
-    database: str = 'postgres',
-    user: str = 'postgres',
-    password: str = '',
-    timeout: float = 10.0
-) -> bool:
-    """Simple PostgreSQL health check function.
-
-    Args:
-        host: Database host
-        port: Database port
-        database: Database name
-        user: Database user
-        password: Database password
-        timeout: Connection timeout in seconds
-
-    Returns:
-        True if PostgreSQL is healthy, False otherwise
-    """
-    health_check = PostgreSQLHealthCheck()
-    config = {
-        'host': host,
-        'port': port,
-        'database': database,
-        'user': user,
-        'password': password,
-        'timeout': timeout
-    }
-    result = await health_check.check_health(config)
-    return result.status.value == 'healthy'

@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID, uuid4, uuid5, NAMESPACE_DNS
-import traceback
+from uuid import UUID, uuid5, NAMESPACE_DNS
 
 import structlog
 

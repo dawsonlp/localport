@@ -6,10 +6,8 @@ from typing import Any
 from ...domain.repositories.config_repository import ConfigRepository
 from ...domain.repositories.discovery_repository import KubernetesDiscoveryRepository
 from ...domain.enums import ForwardingTechnology
-from ...domain.entities.service import Service
 from ...domain.exceptions import (
     ServiceAlreadyExistsError,
-    KubernetesResourceNotFoundError,
     MultipleNamespacesFoundError,
     NoPortsAvailableError
 )

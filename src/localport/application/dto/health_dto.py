@@ -68,45 +68,6 @@ class HealthCheckResult:
 
 
 @dataclass
-class HealthMetrics:
-    """Health metrics for a service over time."""
-
-    service_id: UUID
-    service_name: str
-    total_checks: int
-    successful_checks: int
-    failed_checks: int
-    average_response_time: float
-    last_check_time: datetime | None = None
-    current_failure_streak: int = 0
-    max_failure_streak: int = 0
-    uptime_percentage: float = 0.0
-
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate as percentage."""
-        if self.total_checks == 0:
-            return 0.0
-        return (self.successful_checks / self.total_checks) * 100.0
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary for serialization."""
-        return {
-            'service_id': str(self.service_id),
-            'service_name': self.service_name,
-            'total_checks': self.total_checks,
-            'successful_checks': self.successful_checks,
-            'failed_checks': self.failed_checks,
-            'success_rate': self.success_rate,
-            'average_response_time': self.average_response_time,
-            'last_check_time': self.last_check_time.isoformat() if self.last_check_time else None,
-            'current_failure_streak': self.current_failure_streak,
-            'max_failure_streak': self.max_failure_streak,
-            'uptime_percentage': self.uptime_percentage
-        }
-
-
-@dataclass
 class RestartAttempt:
     """Information about a service restart attempt."""
 

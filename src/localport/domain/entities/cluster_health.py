@@ -5,7 +5,7 @@ Cluster health domain entity that aggregates cluster state.
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List
 
 from .cluster_info import ClusterInfo
 from .cluster_event import ClusterEvent

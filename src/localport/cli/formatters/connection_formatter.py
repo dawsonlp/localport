@@ -5,12 +5,10 @@ from typing import Any, Dict, List
 
 from rich.console import Console
 from rich.table import Table
-from rich.text import Text
 
 import structlog
 
 from ...application.dto.connection_dto import ListConnectionsResponse
-from ...domain.enums import ForwardingTechnology
 
 logger = structlog.get_logger()
 

@@ -7,8 +7,6 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
-import subprocess
-import shlex
 
 from ...domain.entities.cluster_info import ClusterInfo
 from ...domain.entities.cluster_event import ClusterEvent, EventType

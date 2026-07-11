@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from ..enums import ForwardingTechnology
-from ..exceptions import SSHKeyNotFoundError, ConfigurationValidationError
+from ..exceptions import SSHKeyNotFoundError
 
 
 @dataclass(frozen=True)

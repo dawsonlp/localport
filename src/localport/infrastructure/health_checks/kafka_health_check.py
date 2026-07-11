@@ -344,23 +344,3 @@ class KafkaHealthCheck(HealthChecker):
             },
             "additionalProperties": False
         }
-
-
-# Convenience function for simple health checks
-async def check_kafka_health(
-    bootstrap_servers: str = 'localhost:9092',
-    timeout: float = 10.0
-) -> bool:
-    """Simple Kafka health check function.
-
-    Args:
-        bootstrap_servers: Comma-separated list of bootstrap servers
-        timeout: Connection timeout in seconds
-
-    Returns:
-        True if Kafka is healthy, False otherwise
-    """
-    health_check = KafkaHealthCheck()
-    config = {'bootstrap_servers': bootstrap_servers, 'timeout': timeout}
-    result = await health_check.check_health(config)
-    return result.status.value == 'healthy'

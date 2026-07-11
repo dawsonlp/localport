@@ -15,7 +15,6 @@ from ...domain.entities.service import ForwardingTechnology, Service, ServiceSta
 from ...infrastructure.adapters.kubectl_adapter import KubectlAdapter
 from ...infrastructure.adapters.ssh_adapter import SSHAdapter
 from ...infrastructure.health_checks.tcp_health_check import TCPHealthCheck
-from ...infrastructure.logging.service_log_manager import get_service_log_manager
 from ...config.settings import get_settings
 from ..dto.service_dto import ServiceStartResult, ServiceStatusInfo, ServiceStopResult
 

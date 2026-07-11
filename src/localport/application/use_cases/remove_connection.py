@@ -1,7 +1,6 @@
 """Use case for removing a connection from the configuration."""
 
 import structlog
-from typing import Any
 
 from ...domain.repositories.config_repository import ConfigRepository
 from ...domain.repositories.service_repository import ServiceRepository

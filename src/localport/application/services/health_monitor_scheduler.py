@@ -1,6 +1,5 @@
 """Health monitoring scheduler for continuous service health checking."""
 
-import asyncio
 from datetime import datetime
 from uuid import UUID
 

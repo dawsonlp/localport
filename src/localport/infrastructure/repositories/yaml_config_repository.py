@@ -20,7 +20,6 @@ from ...domain.repositories.config_repository import (
     ConfigurationError,
 )
 from ...domain.value_objects.connection_info import ConnectionInfo
-from ...domain.value_objects.port import Port
 from ...domain.exceptions import SSHKeyNotFoundError
 
 logger = structlog.get_logger()

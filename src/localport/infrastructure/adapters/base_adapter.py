@@ -212,18 +212,3 @@ class AdapterError(Exception):
 class AdapterNotAvailableError(AdapterError):
     """Raised when an adapter's prerequisites are not met."""
     pass
-
-
-class PortForwardStartError(AdapterError):
-    """Raised when a port forward fails to start."""
-    pass
-
-
-class PortForwardStopError(AdapterError):
-    """Raised when a port forward fails to stop."""
-    pass
-
-
-class InvalidConnectionInfoError(AdapterError):
-    """Raised when connection information is invalid."""
-    pass

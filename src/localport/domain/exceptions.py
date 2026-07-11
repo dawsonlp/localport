@@ -60,25 +60,6 @@ class UserError(LocalPortError):
         )
 
 
-class SystemError(LocalPortError):
-    """Base class for system/environment errors."""
-    
-    def __init__(
-        self,
-        message: str,
-        context: Optional[Dict[str, Any]] = None,
-        suggestions: Optional[list[str]] = None,
-        technical_details: Optional[str] = None
-    ):
-        super().__init__(
-            message=message,
-            category=ErrorCategory.SYSTEM_ERROR,
-            context=context,
-            suggestions=suggestions,
-            technical_details=technical_details
-        )
-
-
 class NetworkError(LocalPortError):
     """Base class for network/connection errors."""
     
@@ -169,7 +150,6 @@ class SSHKeyNotFoundError(UserError):
         /Users/puneetvyas/.ssh/key.pem -> ~/.ssh/key.pem
         /home/user/.ssh/key.pem -> ~/.ssh/key.pem
         """
-        import os
         from pathlib import Path
         
         path = Path(full_path)

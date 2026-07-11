@@ -1,8 +1,6 @@
 """Kubernetes discovery adapter for finding resources and ports."""
 
-import asyncio
 import json
-import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
@@ -10,11 +8,9 @@ import structlog
 from ...domain.repositories.discovery_repository import KubernetesDiscoveryRepository
 from ...domain.value_objects.discovery import KubernetesResource, DiscoveredPort
 from ...domain.exceptions import (
-    KubernetesResourceNotFoundError,
-    MultipleNamespacesFoundError,
-    NoPortsAvailableError
+    KubernetesResourceNotFoundError
 )
-from ..cluster_monitoring.kubectl_client import KubectlClient, KubectlError
+from ..cluster_monitoring.kubectl_client import KubectlClient
 
 logger = structlog.get_logger()
 
