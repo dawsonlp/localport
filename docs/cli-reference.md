@@ -1,38 +1,37 @@
 # CLI Reference
 
-This guide provides comprehensive documentation for all LocalPort CLI commands, options, and usage patterns.
+Complete reference for all LocalPort commands, options, and usage patterns. Every option
+below matches the actual command signatures in the current release.
+
+```bash
+localport [GLOBAL_OPTIONS] COMMAND [ARGS] [COMMAND_OPTIONS]
+```
 
 ## Global Options
 
-These options are available for all commands:
-
-```bash
-localport [GLOBAL_OPTIONS] COMMAND [COMMAND_OPTIONS]
-```
-
-### Global Options
+Available on every command (specify them before the subcommand):
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--config PATH` | `-c` | Path to configuration file | Auto-detected |
-| `--verbose` | `-v` | Enable verbose logging | `false` |
-| `--quiet` | `-q` | Suppress non-essential output | `false` |
-| `--log-level LEVEL` | | Set log level (DEBUG, INFO, WARN, ERROR) | `INFO` |
+| `--verbose` | `-v` | Increase verbosity: `-v` = info, `-vv` = debug (repeatable) | off |
+| `--debug` | | Enable debug logging (equivalent to `-vv`) | `false` |
+| `--quiet` | `-q` | Suppress non-essential output (errors only) | `false` |
+| `--log-level LEVEL` | | Set log level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
 | `--no-color` | | Disable colored output | `false` |
-| `--output FORMAT` | `-o` | Output format (table, json, text) | `table` |
-| `--version` | `-V` | Show version information | |
-| `--help` | `-h` | Show help message | |
-
-### Examples
+| `--output FORMAT` | `-o` | Output format (`table`, `json`, `text`) | `table` |
+| `--version` | `-V` | Show version information and exit | |
+| `--help` | `-h` | Show help message and exit | |
 
 ```bash
-# Use custom configuration file
+# Use a custom configuration file
 localport --config /path/to/config.yaml start --all
 
-# Enable verbose logging
-localport --verbose start postgres
+# Increase verbosity
+localport -v start postgres        # info
+localport -vv start postgres       # debug
 
-# Output in JSON format
+# JSON output for scripting
 localport --output json status
 
 # Quiet mode (errors only)
@@ -46,144 +45,72 @@ localport --quiet start --all
 Start port forwarding services.
 
 ```bash
-localport start [OPTIONS] [SERVICES...]
+localport start [OPTIONS] [SERVICES]...
 ```
-
-#### Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--all` | `-a` | Start all enabled services |
-| `--tag TAG` | `-t` | Start services with specific tag |
-| `--wait` | | Wait for services to be healthy before returning |
-| `--no-wait` | | Don't wait for health checks (default) |
-| `--timeout SECONDS` | | Timeout for health checks (default: 30) |
-
-#### Examples
+| `--all` | `-a` | Start all configured services |
+| `--tag TAG` | `-t` | Start services with the given tag (repeatable) |
+| `--force` | `-f` | Force restart if already running |
 
 ```bash
-# Start all services
-localport start --all
-
-# Start specific services
-localport start postgres redis kafka
-
-# Start services by tag
-localport start --tag database
-localport start --tag essential
-
-# Start and wait for health checks
-localport start --all --wait --timeout 60
-
-# Start with verbose output
-localport --verbose start postgres
+localport start --all                 # start everything
+localport start postgres redis kafka  # start specific services
+localport start --tag database        # start by tag
+localport start --force postgres      # restart even if already running
 ```
-
-#### Exit Codes
-
-- `0`: All services started successfully
-- `1`: One or more services failed to start
-- `2`: Configuration error
-- `130`: Interrupted by user (Ctrl+C)
 
 ### `localport stop`
 
 Stop running port forwarding services.
 
 ```bash
-localport stop [OPTIONS] [SERVICES...]
+localport stop [OPTIONS] [SERVICES]...
 ```
-
-#### Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--all` | `-a` | Stop all running services |
-| `--tag TAG` | `-t` | Stop services with specific tag |
 | `--force` | `-f` | Force stop (kill processes) |
-| `--timeout SECONDS` | | Timeout for graceful shutdown (default: 10) |
-
-#### Examples
 
 ```bash
-# Stop all services
 localport stop --all
-
-# Stop specific services
 localport stop postgres redis
-
-# Stop services by tag
-localport stop --tag database
-
-# Force stop with immediate termination
 localport stop --all --force
-
-# Stop with custom timeout
-localport stop --all --timeout 30
 ```
-
-#### Exit Codes
-
-- `0`: All services stopped successfully
-- `1`: One or more services failed to stop
-- `2`: Configuration error
 
 ### `localport status`
 
-Show status of port forwarding services.
+Show the status of port forwarding services.
 
 ```bash
-localport status [OPTIONS] [SERVICES...]
+localport status [OPTIONS] [SERVICES]...
 ```
 
-#### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--all` | `-a` | Show all services (including disabled) |
-| `--tag TAG` | `-t` | Show services with specific tag |
-| `--watch` | `-w` | Watch status in real-time |
-| `--refresh SECONDS` | | Refresh interval for watch mode (default: 2) |
-| `--health` | | Include detailed health information |
-
-#### Examples
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--watch` | `-w` | Watch mode — refresh periodically | `false` |
+| `--interval SECONDS` | `-i` | Refresh interval for watch mode | `5` |
 
 ```bash
-# Show status of all enabled services
-localport status
-
-# Show specific services
-localport status postgres redis
-
-# Show all services including disabled
-localport status --all
-
-# Show services by tag
-localport status --tag database
-
-# Watch status in real-time
-localport status --watch
-
-# Watch with custom refresh interval
-localport status --watch --refresh 5
-
-# Include health check details
-localport status --health
-
-# Output in JSON format
-localport --output json status
+localport status                      # all services
+localport status postgres redis       # specific services
+localport status --watch              # live view
+localport status --watch --interval 2 # live view, refresh every 2s
+localport --output json status        # machine-readable
 ```
 
-#### Output Formats
+**Table format (default):**
 
-**Table Format (default):**
 ```
 Service   Status    Local Port  Remote Port  Technology  Health    Uptime
 postgres  Running   5432        5432         kubectl     Healthy   2m 30s
 redis     Stopped   6379        6379         ssh         -         -
 ```
 
-**JSON Format:**
+**JSON format:**
+
 ```json
 {
   "services": [
@@ -203,106 +130,65 @@ redis     Stopped   6379        6379         ssh         -         -
 
 ### `localport logs`
 
-View and manage service logs for troubleshooting and diagnostics.
+View service logs for troubleshooting and diagnostics.
 
 ```bash
-localport logs [OPTIONS] [SERVICE]
+localport logs [OPTIONS] [SERVICES]...
 ```
 
-#### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--list` | `-l` | List all available service logs |
-| `--location` | | Show service log directory locations |
-| `--service SERVICE` | `-s` | View logs for specific service |
-| `--path` | | Show log file path for service (use with --service) |
-| `--grep PATTERN` | | Filter log lines by pattern (use with --service) |
-| `--follow` | `-f` | Follow log output (planned for future release) |
-| `--tail LINES` | `-n` | Number of lines to show (planned for future release) |
-
-#### Examples
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--service SERVICE` | `-s` | Show logs for a specific service | |
+| `--list` | | List all available service logs | `false` |
+| `--location` | | Show log directory locations | `false` |
+| `--path` | | Show the log file path (use with `--service`) | `false` |
+| `--follow` | `-f` | Keep the log view open (real-time streaming is not yet implemented; prints current entries then waits) | `false` |
+| `--lines N` | `-n` | Number of lines to show (`0` for all) | `100` |
+| `--level LEVEL` | `-l` | Filter by log level (DEBUG, INFO, WARNING, ERROR) | |
+| `--since TIME` | | Show logs since a time (ISO or relative, e.g. `1h`, `30m`) | |
+| `--until TIME` | | Show logs until a time (ISO or relative) | |
+| `--grep PATTERN` | `-g` | Filter log lines by pattern (case-insensitive) | |
 
 ```bash
-# List all available service logs
-localport logs --list
+localport logs --list                             # discover available logs
+localport logs --location                         # show log directories
+localport logs --service postgres                 # view a service's logs
+localport logs --service postgres --path          # print the log file path
+localport logs --service postgres --grep error    # filter by pattern
 
-# Show service log directory locations
-localport logs --location
-
-# View logs for specific service
-localport logs --service postgres
-
-# Get log file path for external tools
-localport logs --service postgres --path
-
-# Filter logs with grep pattern
-localport logs --service postgres --grep "error"
-localport logs --service kafka --grep "connection"
-
-# View logs without specifying --service (shows daemon logs)
-localport logs
-
-# Use with external tools
-tail -f $(localport logs --service postgres --path)
-less $(localport logs --service redis --path)
+# Follow output live with external tools (recommended over --follow)
+tail -f "$(localport logs --service postgres --path)"
 ```
 
-#### Service Log Features
+**Log locations:**
 
-**Service Log Discovery:**
-- Automatically detects available service logs
-- Shows service status and log availability
-- Provides helpful guidance for log access
-
-**Log File Locations:**
 - Service logs: `~/.local/share/localport/logs/services/`
-- Daemon logs: `~/.local/share/localport/logs/daemon.log`
-- Log format: `<service-name>_<unique-id>.log`
+- Daemon log: `~/.local/share/localport/logs/daemon.log`
+- File naming: `<service-name>_<unique-id>.log`
 
-**Log Content:**
-- Raw kubectl/ssh subprocess output
-- Service metadata headers with diagnostic information
-- Connection events, errors, and reconnections
-- Platform-specific diagnostic information
-
-#### Output Formats
-
-**List Format:**
-```
-Available Service Logs
-┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Service logs capture the raw kubectl/ssh subprocess output plus metadata headers with
+connection events, errors, and reconnections.
 
 ## Daemon Management Commands
 
 ### `localport daemon start`
 
-Start LocalPort daemon for background operation.
+Start the LocalPort daemon for background operation.
 
 ```bash
 localport daemon start [OPTIONS]
 ```
 
-#### Options
-
-| Option | Description |
-|--------|-------------|
-| `--auto-start` | Automatically start configured services |
-| `--no-auto-start` | Don't start services automatically |
-| `--pid-file PATH` | Path to PID file |
-| `--log-file PATH` | Path to log file |
-
-#### Examples
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--config PATH` | `-c` | Configuration file path | Auto-detected |
+| `--auto-start` / `--no-auto-start` | | Auto-start configured services | `--auto-start` |
+| `--foreground` | `-f` | Run in the foreground (don't detach) | `false` |
 
 ```bash
-# Start daemon with auto-start
 localport daemon start --auto-start
-
-# Start daemon without auto-starting services
 localport daemon start --no-auto-start
-
-# Start with custom PID file
-localport daemon start --pid-file /var/run/localport.pid
+localport daemon start --foreground     # useful for debugging / containers
 ```
 
 ### `localport daemon stop`
@@ -313,25 +199,9 @@ Stop the LocalPort daemon.
 localport daemon stop [OPTIONS]
 ```
 
-#### Options
-
-| Option | Description |
-|--------|-------------|
-| `--timeout SECONDS` | Timeout for graceful shutdown (default: 30) |
-| `--force` | Force stop daemon |
-
-#### Examples
-
-```bash
-# Stop daemon gracefully
-localport daemon stop
-
-# Stop with custom timeout
-localport daemon stop --timeout 60
-
-# Force stop daemon
-localport daemon stop --force
-```
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--force` | `-f` | Force stop the daemon |
 
 ### `localport daemon restart`
 
@@ -341,22 +211,10 @@ Restart the LocalPort daemon.
 localport daemon restart [OPTIONS]
 ```
 
-#### Options
-
-| Option | Description |
-|--------|-------------|
-| `--timeout SECONDS` | Timeout for graceful shutdown (default: 30) |
-| `--auto-start` | Auto-start services after restart |
-
-#### Examples
-
-```bash
-# Restart daemon
-localport daemon restart
-
-# Restart with auto-start
-localport daemon restart --auto-start
-```
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--config PATH` | `-c` | Configuration file path |
+| `--force` | `-f` | Force restart |
 
 ### `localport daemon status`
 
@@ -366,240 +224,142 @@ Show daemon status information.
 localport daemon status [OPTIONS]
 ```
 
-#### Examples
-
-```bash
-# Show daemon status
-localport daemon status
-
-# Show in JSON format
-localport --output json daemon status
-```
-
-#### Output Example
-
-```
-Daemon Status: Running
-PID: 12345
-Started: 2024-01-15 10:30:00
-Uptime: 2h 15m 30s
-Managed Services: 4
-Active Forwards: 3
-Health Checks: Enabled
-Last Health Check: 2024-01-15 12:44:30
-```
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--watch` | `-w` | Watch mode — refresh periodically | `false` |
+| `--interval SECONDS` | `-i` | Refresh interval for watch mode | `5` |
 
 ### `localport daemon reload`
 
-Reload daemon configuration without restart.
+Reload the daemon configuration without restarting (hot reload).
 
 ```bash
-localport daemon reload [OPTIONS]
-```
-
-#### Examples
-
-```bash
-# Reload configuration
 localport daemon reload
-
-# Reload with verbose output
-localport --verbose daemon reload
 ```
 
 ## Configuration Management Commands
 
 ### `localport config validate`
 
-Validate configuration file.
+Validate a configuration file.
 
 ```bash
 localport config validate [OPTIONS]
 ```
 
-#### Options
-
-| Option | Description |
-|--------|-------------|
-| `--strict` | Enable strict validation mode |
-
-#### Examples
-
-```bash
-# Validate current configuration
-localport config validate
-
-# Validate specific file
-localport --config /path/to/config.yaml config validate
-
-# Strict validation
-localport config validate --strict
-```
-
-#### Output Example
-
-```
-✓ Configuration is valid
-  - 4 services configured
-  - 2 health checks configured
-  - No validation errors found
-```
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--config PATH` | `-c` | Configuration file to validate |
 
 ### `localport config export`
 
-Export configuration to file or stdout.
+Export configuration to a file or stdout.
 
 ```bash
 localport config export [OPTIONS]
 ```
 
-#### Options
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--output PATH` | `-o` | Output file path | stdout |
+| `--format FORMAT` | `-f` | Export format (`yaml`, `json`) | `yaml` |
+| `--include-defaults` / `--no-defaults` | | Include default settings | `--include-defaults` |
+| `--include-disabled` | | Include disabled services | `false` |
+| `--service NAME` | `-s` | Export specific services only (repeatable) | |
+| `--tag TAG` | `-t` | Export services with the given tag (repeatable) | |
+
+```bash
+localport config export
+localport config export --output backup.yaml
+localport config export --format json
+localport config export --tag database --output db.yaml
+```
+
+### `localport config add`
+
+Add a connection to the configuration interactively or via flags.
+
+```bash
+localport config add [OPTIONS]
+```
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--name NAME` | `-n` | Service name | |
+| `--technology TECH` | `-t` | Technology (`kubectl` or `ssh`) | |
+| `--local-port PORT` | `-l` | Local port | |
+| `--remote-port PORT` | | Remote port | |
+| `--resource NAME` | `-r` | Kubernetes resource name (kubectl) | |
+| `--namespace NAME` | | Kubernetes namespace (kubectl) | |
+| `--host HOST` | | SSH hostname (ssh) | |
+| `--user USER` | `-u` | SSH username (ssh) | |
+| `--key PATH` | `-k` | SSH key file (ssh) | |
+| `--ssh-port PORT` | | SSH port (ssh) | `22` |
+
+Run `localport config add` with no flags to be prompted for the missing values.
+For kubectl connections, the resource, namespace, and target port are auto-discovered
+from the cluster when omitted. The config file is backed up automatically before any
+`config add` or `config remove` change.
+
+### `localport config remove`
+
+Remove a connection from the configuration.
+
+```bash
+localport config remove SERVICE_NAME [OPTIONS]
+```
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--output PATH` | `-o` | Output file path (default: stdout) |
-| `--format FORMAT` | `-f` | Output format (yaml, json) (default: yaml) |
-| `--service NAMES` | `-s` | Export specific services |
-| `--tag TAG` | `-t` | Export services with specific tag |
-| `--include-disabled` | | Include disabled services |
-| `--no-defaults` | | Exclude default values |
+| `--force` | `-f` | Skip the confirmation prompt |
 
-#### Examples
+### `localport config list`
+
+List the connections defined in the configuration.
 
 ```bash
-# Export all configuration
-localport config export
-
-# Export to file
-localport config export --output backup.yaml
-
-# Export in JSON format
-localport config export --format json
-
-# Export specific services
-localport config export --service postgres redis
-
-# Export by tag
-localport config export --tag database
-
-# Export without defaults
-localport config export --no-defaults
-
-# Include disabled services
-localport config export --include-disabled
+localport config list
 ```
 
 ## Cluster Health Commands
 
+Cluster commands require cluster health monitoring to be enabled in the configuration and
+only report on clusters that have active kubectl services.
+
 ### `localport cluster status`
 
-Show detailed cluster health information for Kubernetes contexts used by services.
+Show cluster health for the Kubernetes contexts used by services.
 
 ```bash
 localport cluster status [OPTIONS]
 ```
 
-#### Options
-
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--context NAME` | `-c` | Show status for specific cluster context |
-
-#### Examples
-
-```bash
-# Show health status for all monitored clusters
-localport cluster status
-
-# Show status for specific cluster
-localport cluster status --context minikube
-
-# Output in JSON format
-localport --output json cluster status
-```
-
-### `localport cluster events`
-
-Show recent cluster events that might affect services.
-
-```bash
-localport cluster events [OPTIONS]
-```
-
-#### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--context NAME` | `-c` | Show events for specific cluster context |
-| `--since TIME` | `-s` | Show events since time (e.g., 1h, 30m, 60s) |
-| `--limit NUMBER` | `-l` | Maximum number of events to show (default: 20) |
-
-#### Examples
-
-```bash
-# Show events from last hour
-localport cluster events --since 1h
-
-# Show events for specific cluster
-localport cluster events --context minikube
-
-# Show last 50 events
-localport cluster events --limit 50
-
-# Show events from last 30 minutes in JSON
-localport --output json cluster events --since 30m
-```
-
-### `localport cluster pods`
-
-Show pod status for resources used by active services.
-
-```bash
-localport cluster pods [OPTIONS]
-```
-
-#### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--context NAME` | `-c` | Show pods for specific cluster context |
-| `--namespace NAME` | `-n` | Show pods in specific namespace |
-
-#### Examples
-
-```bash
-# Show pod status for all monitored clusters
-localport cluster pods
-
-# Show pods for specific cluster
-localport cluster pods --context minikube
-
-# Show pods in specific namespace
-localport cluster pods --namespace default
-```
-
-#### Notes
-
-- Cluster commands require cluster health monitoring to be enabled in configuration
-- Only clusters with active kubectl services are monitored
-- Commands gracefully handle unavailable clusters with helpful error messages
+| `--context NAME` | `-c` | Show status for a specific cluster context |
 
 ## SSH Commands
 
 ### `localport ssh test`
 
-Test SSH connectivity for configured services.
+Test SSH connectivity for a configured service or an ad-hoc host.
 
 ```bash
-localport ssh test [OPTIONS] [SERVICES]...
+localport ssh test [SERVICE_NAME] [OPTIONS]
 ```
 
-#### Options
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--host HOST` | `-h` | SSH host to test | |
+| `--user USER` | `-u` | SSH username | |
+| `--port PORT` | `-p` | SSH port | `22` |
+| `--key-file PATH` | `-k` | SSH private key file | |
+| `--config PATH` | `-c` | Configuration file path | |
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--all` | `-a` | Test all SSH services |
-| `--timeout SECONDS` | | Connection timeout (default: 10) |
+```bash
+localport ssh test my-tunnel                       # test a configured service
+localport ssh test --host example.com --user deploy  # ad-hoc test
+```
 
 ### `localport ssh validate`
 
@@ -609,188 +369,95 @@ Validate SSH configuration.
 localport ssh validate [OPTIONS]
 ```
 
-#### Options
-
-| Option | Description |
-|--------|-------------|
-| `--config PATH` | Path to configuration file |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--config PATH` | `-c` | Configuration file path |
+| `--service NAME` | `-s` | Validate a specific service only |
 
 ## Output Formats
 
-LocalPort supports multiple output formats for most commands:
+Most commands honor the global `--output` option:
 
-### Table Format (Default)
-
-Human-readable tabular output with colors and formatting.
-
-```bash
-localport status
-```
-
-### JSON Format
-
-Machine-readable JSON output for scripting and automation.
+- `table` (default) — human-readable, colored tabular output
+- `json` — machine-readable output for scripting and automation
+- `text` — simple text output for basic parsing
 
 ```bash
 localport --output json status
-```
-
-### Text Format
-
-Simple text output for basic parsing.
-
-```bash
 localport --output text status
 ```
 
 ## Environment Variables
 
-LocalPort recognizes these environment variables:
+Any setting can be provided via an environment variable using the `LOCALPORT_` prefix
+(a local `.env` file is also read). Common variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LOCALPORT_CONFIG` | Path to configuration file | Auto-detected |
+| `LOCALPORT_CONFIG_FILE` | Path to configuration file | Auto-detected |
 | `LOCALPORT_LOG_LEVEL` | Default log level | `INFO` |
 | `LOCALPORT_NO_COLOR` | Disable colored output | `false` |
-| `NO_COLOR` | Standard no-color environment variable | `false` |
+| `LOCALPORT_RUNTIME_DIR` | Runtime directory for PID files and logs | Platform default |
+| `LOCALPORT_SERVICE_LOGGING_ENABLED` | Capture kubectl/ssh subprocess logs | `true` |
+| `LOCALPORT_SERVICE_LOG_RETENTION_DAYS` | Days to retain service logs | `3` |
+| `NO_COLOR` | Standard no-color variable (honored by the terminal renderer) | unset |
+
+## Configuration File Discovery
+
+When `--config` is not given, LocalPort resolves the configuration file in this order:
+
+1. `--config` / `-c` command-line option
+2. `LOCALPORT_CONFIG_FILE` environment variable
+3. `./localport.yaml`
+4. `./localport.yml`
+5. `./.localport.yaml`
+6. `~/.localport.yaml`
+7. `~/.config/localport/config.yaml`
+8. `/etc/localport/config.yaml`
 
 ## Exit Codes
-
-LocalPort uses standard exit codes:
 
 | Code | Meaning |
 |------|---------|
 | `0` | Success |
-| `1` | General error |
-| `2` | Configuration error |
-| `3` | Service error |
-| `4` | Network error |
-| `5` | Permission error |
+| `1` | Error (configuration, service, or runtime failure) |
 | `130` | Interrupted by user (Ctrl+C) |
-
-## Shell Completion
-
-LocalPort supports shell completion for bash, zsh, and fish:
-
-### Bash
-
-```bash
-# Add to ~/.bashrc
-eval "$(_LOCALPORT_COMPLETE=bash_source localport)"
-```
-
-### Zsh
-
-```bash
-# Add to ~/.zshrc
-eval "$(_LOCALPORT_COMPLETE=zsh_source localport)"
-```
-
-### Fish
-
-```bash
-# Add to ~/.config/fish/config.fish
-eval (env _LOCALPORT_COMPLETE=fish_source localport)
-```
-
-## Configuration File Discovery
-
-LocalPort searches for configuration files in this order:
-
-1. `--config` command line option
-2. `LOCALPORT_CONFIG` environment variable
-3. `./localport.yaml` (current directory)
-4. `~/.config/localport/config.yaml`
-5. `~/.localport.yaml`
-6. `/etc/localport/config.yaml`
 
 ## Logging
 
-LocalPort uses structured logging with these levels:
+LocalPort uses structured logging with the standard levels DEBUG, INFO, WARNING, and
+ERROR. Console output goes to stderr; in daemon mode logs are written to
+`~/.local/share/localport/logs/daemon.log`, and per-service subprocess output is captured
+under `~/.local/share/localport/logs/services/`. Increase verbosity with `-v`/`-vv` or
+`--debug`.
 
-- **DEBUG**: Detailed debugging information
-- **INFO**: General information about operations
-- **WARN**: Warning messages for potential issues
-- **ERROR**: Error messages for failures
+## Common Patterns
 
-### Log Locations
-
-- **Console**: All commands log to stderr by default
-- **Daemon Mode**: Logs to `~/.local/share/localport/logs/daemon.log`
-- **Service Logs**: Individual service logs in `~/.local/share/localport/logs/services/`
-
-### Verbose Mode
-
-Enable verbose mode for detailed output:
+**Development workflow:**
 
 ```bash
-localport --verbose start --all
-```
-
-## Examples and Common Patterns
-
-### Development Workflow
-
-```bash
-# Start development services
 localport start --tag development
-
-# Check status
-localport status --tag development
-
-# Follow logs for debugging
-localport logs --follow api
-
-# Stop when done
-localport stop --tag development
+localport status                         # (status/logs take service names; use tags at start/stop)
+localport logs --service api --grep error
+localport stop --all
 ```
 
-### Production Deployment
+**Daemon / background operation:**
 
 ```bash
-# Start daemon with auto-start
 localport daemon start --auto-start
-
-# Check daemon status
 localport daemon status
-
-# Reload configuration after changes
-localport daemon reload
-
-# Monitor service health
-localport status --health --watch
+localport daemon reload                  # apply config changes without restart
+localport status --watch
 ```
 
-### Configuration Management
+**Configuration management:**
 
 ```bash
-# Validate before deployment
-localport config validate --strict
-
-# Export current configuration
-localport config export --output backup-$(date +%Y%m%d).yaml
-
-# Export production services only
+localport config validate
+localport config export --output "backup-$(date +%Y%m%d).yaml"
 localport config export --tag production --output prod-config.yaml
 ```
 
-### Troubleshooting
-
-```bash
-# Check service status with health details
-localport status --health
-
-# View recent logs
-localport logs --tail 100 postgres
-
-# Follow logs in real-time
-localport logs --follow --level ERROR postgres
-
-# Validate configuration
-localport config validate
-
-# Use verbose mode for debugging
-localport --verbose start postgres
-```
-
-For more examples and use cases, see the [User Guide](user-guide.md) and [Examples](examples/) directory.
+For end-to-end setup, see the [Getting Started Guide](getting-started.md) and the
+[Configuration Guide](configuration.md).

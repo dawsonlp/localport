@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 import os
-import signal
 import sys
 from pathlib import Path
 
@@ -41,7 +40,7 @@ class LocalPortDaemon:
         self.config_file = config_file
         self.auto_start = auto_start
         self.daemon_manager: DaemonManager | None = None
-        
+
         # New shutdown infrastructure
         self._task_manager = TaskManager()
         self._signal_handler: AsyncSignalHandler | None = None
@@ -49,16 +48,17 @@ class LocalPortDaemon:
 
     async def start(self) -> None:
         """Start the daemon process with graceful shutdown infrastructure."""
-        logger.info("Starting LocalPort daemon with graceful shutdown",
-                   config_file=self.config_file,
-                   auto_start=self.auto_start)
+        logger.info(
+            "Starting LocalPort daemon with graceful shutdown",
+            config_file=self.config_file,
+            auto_start=self.auto_start,
+        )
 
         try:
             # Initialize shutdown infrastructure first
             self._signal_handler = AsyncSignalHandler()
             self._shutdown_coordinator = ShutdownCoordinator(
-                self._task_manager,
-                self._signal_handler
+                self._task_manager, self._signal_handler
             )
 
             # Setup signal handlers
@@ -74,9 +74,7 @@ class LocalPortDaemon:
             service_manager = ServiceManager()
             restart_manager = RestartManager(service_manager)
             health_monitor = HealthMonitorScheduler(
-                health_check_factory, 
-                restart_manager,
-                task_manager=self._task_manager
+                health_check_factory, restart_manager, task_manager=self._task_manager
             )
 
             # Initialize daemon manager with new health monitoring system
@@ -84,7 +82,7 @@ class LocalPortDaemon:
                 service_repository=service_repo,
                 config_repository=config_repo,
                 service_manager=service_manager,
-                health_monitor=health_monitor
+                health_monitor=health_monitor,
             )
 
             # Register daemon manager tasks with task manager
@@ -97,12 +95,12 @@ class LocalPortDaemon:
 
             # Run until shutdown signal
             await self._shutdown_coordinator.wait_for_shutdown_signal()
-            
+
             logger.info("Shutdown signal received, initiating graceful shutdown")
-            
+
             # Perform graceful shutdown
             success = await self._shutdown_coordinator.initiate_shutdown()
-            
+
             if success:
                 logger.info("Graceful shutdown completed successfully")
             else:
@@ -122,30 +120,23 @@ class LocalPortDaemon:
     async def _register_daemon_tasks(self) -> None:
         """Register daemon manager tasks with the task manager."""
         logger.debug("Registering daemon tasks with task manager")
-        
+
         # Register daemon manager shutdown callback
         if self._shutdown_coordinator and self.daemon_manager:
             from .infrastructure.shutdown.shutdown_coordinator import ShutdownPhase
-            
+
             # Register daemon manager stop in the CANCEL_TASKS phase
             self._shutdown_coordinator.register_phase_callback(
-                ShutdownPhase.CANCEL_TASKS,
-                self._stop_daemon_manager
+                ShutdownPhase.CANCEL_TASKS, self._stop_daemon_manager
             )
-            
-            # Register configuration reload handler
+
+            # Monitor for reload signals (SIGUSR1) and apply configuration reloads.
             if self._signal_handler:
-                # Handle reload signals
-                async def handle_reload():
-                    if self.daemon_manager:
-                        await self.daemon_manager.reload_configuration()
-                
-                # Check for reload signals periodically
-                reload_task = self._task_manager.register_task(
+                self._task_manager.register_task(
                     "reload_signal_monitor",
                     self._monitor_reload_signals(),
                     group="daemon_management",
-                    priority=10
+                    priority=10,
                 )
 
     async def _stop_daemon_manager(self) -> None:
@@ -158,23 +149,22 @@ class LocalPortDaemon:
         """Monitor for reload signals."""
         if not self._signal_handler:
             return
-            
+
         while True:
             try:
                 # Wait for reload signal with timeout
                 await asyncio.wait_for(
-                    self._signal_handler.wait_for_reload(),
-                    timeout=5.0
+                    self._signal_handler.wait_for_reload(), timeout=5.0
                 )
-                
+
                 logger.info("Reload signal received")
                 if self.daemon_manager:
                     await self.daemon_manager.reload_configuration()
-                    
+
                 # Reset the reload event for next signal
                 self._signal_handler.reload_event.clear()
-                
-            except asyncio.TimeoutError:
+
+            except TimeoutError:
                 # Normal timeout, continue monitoring
                 continue
             except asyncio.CancelledError:
@@ -224,7 +214,7 @@ def daemonize() -> None:
     with open(os.devnull) as dev_null_r:
         os.dup2(dev_null_r.fileno(), sys.stdin.fileno())
 
-    with open(os.devnull, 'w') as dev_null_w:
+    with open(os.devnull, "w") as dev_null_w:
         os.dup2(dev_null_w.fileno(), sys.stdout.fileno())
         os.dup2(dev_null_w.fileno(), sys.stderr.fileno())
 
@@ -254,7 +244,7 @@ def setup_daemon_logging(log_file: str | None = None) -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -268,9 +258,7 @@ def setup_daemon_logging(log_file: str | None = None) -> None:
 
     # Create file handler with rotation
     file_handler = logging.handlers.RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=5
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
     )
     file_handler.setLevel(logging.INFO)
 
@@ -283,31 +271,21 @@ def setup_daemon_logging(log_file: str | None = None) -> None:
 def main() -> None:
     """Main entry point for the daemon."""
     parser = argparse.ArgumentParser(description="LocalPort daemon")
-    parser.add_argument(
-        "--config", "-c",
-        type=str,
-        help="Configuration file path"
-    )
+    parser.add_argument("--config", "-c", type=str, help="Configuration file path")
     parser.add_argument(
         "--no-auto-start",
         action="store_true",
-        help="Don't auto-start configured services"
+        help="Don't auto-start configured services",
     )
     parser.add_argument(
-        "--foreground", "-f",
+        "--foreground",
+        "-f",
         action="store_true",
-        help="Run in foreground (don't daemonize)"
+        help="Run in foreground (don't daemonize)",
     )
+    parser.add_argument("--log-file", type=str, help="Log file path")
     parser.add_argument(
-        "--log-file",
-        type=str,
-        help="Log file path"
-    )
-    parser.add_argument(
-        "--pid-file",
-        type=str,
-        default="/tmp/localport.pid",
-        help="PID file path"
+        "--pid-file", type=str, default="/tmp/localport.pid", help="PID file path"
     )
 
     args = parser.parse_args()
@@ -321,17 +299,14 @@ def main() -> None:
 
     # Write PID file
     try:
-        with open(args.pid_file, 'w') as f:
+        with open(args.pid_file, "w") as f:
             f.write(str(os.getpid()))
     except Exception as e:
         logger.error("Failed to write PID file", pid_file=args.pid_file, error=str(e))
         sys.exit(1)
 
     # Create and start daemon
-    daemon = LocalPortDaemon(
-        config_file=args.config,
-        auto_start=not args.no_auto_start
-    )
+    daemon = LocalPortDaemon(config_file=args.config, auto_start=not args.no_auto_start)
 
     try:
         # Run daemon

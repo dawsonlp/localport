@@ -11,7 +11,7 @@ from ..formatters.output_format import OutputFormat
 
 def get_console() -> Console:
     """Return a Console that respects the NO_COLOR environment variable.
-    
+
     Command modules should call this instead of creating a module-level
     ``Console()`` so that the ``--no-color`` global flag (which sets
     ``os.environ["NO_COLOR"]``) is honoured even though the flag is
@@ -40,11 +40,12 @@ class LazyConsole:
 @dataclass
 class CLIContext:
     """Encapsulates all global CLI options from the Typer context.
-    
+
     Provides a single, consistent interface for subcommands to access
     global options set in the main callback (--config, --verbose, --quiet,
     --log-level, --no-color, --output).
     """
+
     config_file: str | None = None
     verbose: bool = False
     verbosity_level: int = 0
@@ -67,14 +68,14 @@ class CLIContext:
 
 def get_cli_context(ctx: typer.Context) -> CLIContext:
     """Extract global CLI options from a Typer Context into a CLIContext.
-    
+
     This function reads the ctx.obj dictionary populated by the main
     app callback and returns a structured CLIContext object. If ctx.obj
     is not initialised (e.g. during testing), sensible defaults are used.
-    
+
     Args:
         ctx: The Typer Context passed into a command function.
-        
+
     Returns:
         A CLIContext with all global options resolved.
     """

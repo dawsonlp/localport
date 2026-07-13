@@ -27,10 +27,10 @@ class JSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         elif isinstance(obj, UUID):
             return str(obj)
-        elif hasattr(obj, '__dict__'):
+        elif hasattr(obj, "__dict__"):
             # Handle dataclasses and other objects with __dict__
             return obj.__dict__
-        elif hasattr(obj, 'value'):
+        elif hasattr(obj, "value"):
             # Handle enums
             return obj.value
         else:
@@ -73,7 +73,9 @@ class BaseJSONFormatter(ABC):
         """
         pass
 
-    def _format_error(self, error_type: str, message: str, details: dict[str, Any] | None = None) -> str:
+    def _format_error(
+        self, error_type: str, message: str, details: dict[str, Any] | None = None
+    ) -> str:
         """Format an error as JSON.
 
         Args:
@@ -87,11 +89,7 @@ class BaseJSONFormatter(ABC):
         error_data = {
             "timestamp": datetime.now().isoformat(),
             "success": False,
-            "error": {
-                "type": error_type,
-                "message": message,
-                "details": details
-            }
+            "error": {"type": error_type, "message": message, "details": details},
         }
 
         try:
@@ -110,11 +108,7 @@ class BaseJSONFormatter(ABC):
         Returns:
             Enhanced data dictionary with metadata
         """
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "command": command,
-            **data
-        }
+        return {"timestamp": datetime.now().isoformat(), "command": command, **data}
 
 
 class ServiceStatusJSONFormatter(BaseJSONFormatter):
@@ -138,8 +132,12 @@ class ServiceStatusJSONFormatter(BaseJSONFormatter):
             "failed_services": data.failed_services,
             "healthy_services": data.healthy_services,
             "unhealthy_services": data.unhealthy_services,
-            "success_rate": round(data.success_rate, 2) if hasattr(data, 'success_rate') else 0.0,
-            "health_rate": round(data.health_rate, 2) if hasattr(data, 'health_rate') else 0.0
+            "success_rate": (
+                round(data.success_rate, 2) if hasattr(data, "success_rate") else 0.0
+            ),
+            "health_rate": (
+                round(data.health_rate, 2) if hasattr(data, "health_rate") else 0.0
+            ),
         }
 
         # Extract service details
@@ -148,24 +146,25 @@ class ServiceStatusJSONFormatter(BaseJSONFormatter):
             service_data = {
                 "name": service_info.name,
                 "status": str(service_info.status).lower(),
-                "technology": getattr(service_info, 'technology', 'unknown'),
+                "technology": getattr(service_info, "technology", "unknown"),
                 "local_port": service_info.local_port,
                 "remote_port": service_info.remote_port,
                 "target": f"remote:{service_info.remote_port}",  # Simplified for now
                 "is_healthy": service_info.is_healthy,
                 "uptime_seconds": service_info.uptime_seconds or 0,
-                "last_health_check": service_info.last_health_check.isoformat() if service_info.last_health_check else None,
-                "failure_count": getattr(service_info, 'failure_count', 0),
-                "restart_count": getattr(service_info, 'restart_count', 0),
-                "tags": getattr(service_info, 'tags', []),
-                "description": getattr(service_info, 'description', None)
+                "last_health_check": (
+                    service_info.last_health_check.isoformat()
+                    if service_info.last_health_check
+                    else None
+                ),
+                "failure_count": getattr(service_info, "failure_count", 0),
+                "restart_count": getattr(service_info, "restart_count", 0),
+                "tags": getattr(service_info, "tags", []),
+                "description": getattr(service_info, "description", None),
             }
             services.append(service_data)
 
-        return self._add_metadata({
-            "summary": summary,
-            "services": services
-        }, "status")
+        return self._add_metadata({"summary": summary, "services": services}, "status")
 
 
 class ServiceOperationJSONFormatter(BaseJSONFormatter):
@@ -181,50 +180,53 @@ class ServiceOperationJSONFormatter(BaseJSONFormatter):
         Returns:
             Dictionary ready for JSON serialization
         """
-        command_name = kwargs.get('command_name', 'operation')
+        command_name = kwargs.get("command_name", "operation")
 
         # Handle different result types
-        if hasattr(data, 'success'):
+        if hasattr(data, "success"):
             # Single operation result
             results = [data]
             overall_success = data.success
         elif isinstance(data, list):
             # Multiple operation results
             results = data
-            overall_success = all(getattr(r, 'success', False) for r in results)
+            overall_success = all(getattr(r, "success", False) for r in results)
         else:
             # Fallback for unknown data types
             results = []
             overall_success = False
 
         # Calculate summary
-        successful_operations = sum(1 for r in results if getattr(r, 'success', False))
+        successful_operations = sum(1 for r in results if getattr(r, "success", False))
         failed_operations = len(results) - successful_operations
 
         summary = {
             "requested_services": len(results),
             "successful_operations": successful_operations,
-            "failed_operations": failed_operations
+            "failed_operations": failed_operations,
         }
 
         # Format individual results
         formatted_results = []
         for result in results:
             result_data = {
-                "service_name": getattr(result, 'service_name', 'unknown'),
-                "success": getattr(result, 'success', False),
-                "message": getattr(result, 'message', ''),
-                "error": getattr(result, 'error', None),
-                "process_id": getattr(result, 'process_id', None),
-                "duration_ms": getattr(result, 'duration_ms', None)
+                "service_name": getattr(result, "service_name", "unknown"),
+                "success": getattr(result, "success", False),
+                "message": getattr(result, "message", ""),
+                "error": getattr(result, "error", None),
+                "process_id": getattr(result, "process_id", None),
+                "duration_ms": getattr(result, "duration_ms", None),
             }
             formatted_results.append(result_data)
 
-        return self._add_metadata({
-            "success": overall_success,
-            "summary": summary,
-            "results": formatted_results
-        }, command_name)
+        return self._add_metadata(
+            {
+                "success": overall_success,
+                "summary": summary,
+                "results": formatted_results,
+            },
+            command_name,
+        )
 
 
 class DaemonStatusJSONFormatter(BaseJSONFormatter):
@@ -242,28 +244,28 @@ class DaemonStatusJSONFormatter(BaseJSONFormatter):
         """
         # Extract daemon information
         daemon_info = {
-            "running": getattr(data, 'success', False),
-            "pid": getattr(data, 'pid', None),
+            "running": getattr(data, "success", False),
+            "pid": getattr(data, "pid", None),
             "uptime_seconds": None,  # Would need to be calculated
-            "config_file": getattr(data, 'config_file', None),
-            "active_services": getattr(data, 'active_services', 0),
-            "health_monitor_active": getattr(data, 'health_monitor_active', False),
-            "last_reload": None  # Would need to be tracked
+            "config_file": getattr(data, "config_file", None),
+            "active_services": getattr(data, "active_services", 0),
+            "health_monitor_active": getattr(data, "health_monitor_active", False),
+            "last_reload": None,  # Would need to be tracked
         }
 
         # Add status information if available
-        if hasattr(data, 'status') and data.status:
+        if hasattr(data, "status") and data.status:
             status_info = data.status
-            daemon_info.update({
-                "running": getattr(status_info, 'running', False),
-                "pid": getattr(status_info, 'pid', None),
-                "uptime_seconds": getattr(status_info, 'uptime_seconds', None),
-                "active_services": getattr(status_info, 'active_services', 0)
-            })
+            daemon_info.update(
+                {
+                    "running": getattr(status_info, "running", False),
+                    "pid": getattr(status_info, "pid", None),
+                    "uptime_seconds": getattr(status_info, "uptime_seconds", None),
+                    "active_services": getattr(status_info, "active_services", 0),
+                }
+            )
 
-        return self._add_metadata({
-            "daemon": daemon_info
-        }, "daemon status")
+        return self._add_metadata({"daemon": daemon_info}, "daemon status")
 
 
 class DaemonOperationJSONFormatter(BaseJSONFormatter):
@@ -279,17 +281,20 @@ class DaemonOperationJSONFormatter(BaseJSONFormatter):
         Returns:
             Dictionary ready for JSON serialization
         """
-        command_name = kwargs.get('command_name', 'daemon operation')
+        command_name = kwargs.get("command_name", "daemon operation")
 
         daemon_info = {
-            "pid": getattr(data, 'pid', None),
-            "config_file": getattr(data, 'config_file', None),
-            "auto_start_enabled": getattr(data, 'auto_start_enabled', False)
+            "pid": getattr(data, "pid", None),
+            "config_file": getattr(data, "config_file", None),
+            "auto_start_enabled": getattr(data, "auto_start_enabled", False),
         }
 
-        return self._add_metadata({
-            "success": getattr(data, 'success', False),
-            "message": getattr(data, 'message', ''),
-            "daemon": daemon_info,
-            "error": getattr(data, 'error', None)
-        }, command_name)
+        return self._add_metadata(
+            {
+                "success": getattr(data, "success", False),
+                "message": getattr(data, "message", ""),
+                "daemon": daemon_info,
+                "error": getattr(data, "error", None),
+            },
+            command_name,
+        )

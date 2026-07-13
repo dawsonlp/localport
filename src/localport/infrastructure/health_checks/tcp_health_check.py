@@ -3,7 +3,7 @@
 import asyncio
 import socket
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 
@@ -20,22 +20,22 @@ class TCPHealthCheck(HealthChecker):
         """Initialize the TCP health check."""
         pass
 
-    async def check_health(self, config: Dict[str, Any]) -> HealthCheckResult:
+    async def check_health(self, config: dict[str, Any]) -> HealthCheckResult:
         """Perform TCP health check with given configuration.
-        
+
         Args:
             config: Configuration containing host, port, timeout
-            
+
         Returns:
             HealthCheckResult with the check outcome
         """
         # Merge with defaults and validate
         merged_config = self.merge_with_defaults(config)
-        
-        host = merged_config.get('host', 'localhost')
-        port = merged_config.get('port', 80)
-        timeout = merged_config.get('timeout', 5.0)
-        
+
+        host = merged_config.get("host", "localhost")
+        port = merged_config.get("port", 80)
+        timeout = merged_config.get("timeout", 5.0)
+
         return await self.check(host=host, port=port, timeout=timeout)
 
     async def check(
@@ -43,7 +43,7 @@ class TCPHealthCheck(HealthChecker):
         host: str = "localhost",
         port: int = 80,
         timeout: float = 5.0,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> HealthCheckResult:
         """Perform TCP health check.
 
@@ -71,55 +71,51 @@ class TCPHealthCheck(HealthChecker):
             writer.close()
             await writer.wait_closed()
 
-            logger.debug("TCP health check passed",
-                        host=host,
-                        port=port,
-                        response_time_ms=response_time_ms)
+            logger.debug(
+                "TCP health check passed",
+                host=host,
+                port=port,
+                response_time_ms=response_time_ms,
+            )
 
             return HealthCheckResult.healthy(
                 message=f"TCP connection to {host}:{port} successful",
-                response_time_ms=response_time_ms
+                response_time_ms=response_time_ms,
             )
 
         except TimeoutError:
-            logger.debug("TCP health check timed out",
-                        host=host,
-                        port=port,
-                        timeout=timeout)
+            logger.debug(
+                "TCP health check timed out", host=host, port=port, timeout=timeout
+            )
 
             return HealthCheckResult.unhealthy(
                 message=f"TCP connection to {host}:{port} timed out after {timeout}s",
-                error="Connection timeout"
+                error="Connection timeout",
             )
 
         except ConnectionRefusedError:
-            logger.debug("TCP health check connection refused",
-                        host=host,
-                        port=port)
+            logger.debug("TCP health check connection refused", host=host, port=port)
 
             return HealthCheckResult.unhealthy(
                 message=f"TCP connection to {host}:{port} refused",
-                error="Connection refused"
+                error="Connection refused",
             )
 
         except OSError as e:
-            logger.debug("TCP health check OS error",
-                        host=host,
-                        port=port,
-                        error=str(e))
+            logger.debug(
+                "TCP health check OS error", host=host, port=port, error=str(e)
+            )
 
             return HealthCheckResult.unhealthy(
-                message=f"TCP connection to {host}:{port} failed",
-                error=str(e)
+                message=f"TCP connection to {host}:{port} failed", error=str(e)
             )
 
         except Exception as e:
-            logger.error("TCP health check unexpected error",
-                        host=host,
-                        port=port,
-                        error=str(e))
+            logger.error(
+                "TCP health check unexpected error", host=host, port=port, error=str(e)
+            )
 
-            return HealthCheckResult.error(
+            return HealthCheckResult.errored(
                 error=f"Unexpected error during TCP health check: {e}"
             )
 
@@ -132,9 +128,9 @@ class TCPHealthCheck(HealthChecker):
         Returns:
             HealthCheckResult with the check outcome
         """
-        host = config.get('host', 'localhost')
-        port = config.get('port', 80)
-        timeout = config.get('timeout', 5.0)
+        host = config.get("host", "localhost")
+        port = config.get("port", 80)
+        timeout = config.get("timeout", 5.0)
 
         return await self.check(host=host, port=port, timeout=timeout)
 
@@ -149,24 +145,24 @@ class TCPHealthCheck(HealthChecker):
         """
         try:
             # Check required fields
-            if 'port' not in config:
+            if "port" not in config:
                 logger.error("TCP health check missing required 'port' field")
                 return False
 
             # Validate port
-            port = config['port']
+            port = config["port"]
             if not isinstance(port, int) or not 1 <= port <= 65535:
                 logger.error("TCP health check invalid port", port=port)
                 return False
 
             # Validate optional host
-            host = config.get('host', 'localhost')
+            host = config.get("host", "localhost")
             if not isinstance(host, str) or not host.strip():
                 logger.error("TCP health check invalid host", host=host)
                 return False
 
             # Validate optional timeout
-            timeout = config.get('timeout', 5.0)
+            timeout = config.get("timeout", 5.0)
             if not isinstance(timeout, int | float) or timeout <= 0:
                 logger.error("TCP health check invalid timeout", timeout=timeout)
                 return False
@@ -199,10 +195,9 @@ class TCPHealthCheck(HealthChecker):
             # Port is in use or cannot be bound
             return False
         except Exception as e:
-            logger.error("Error checking port availability",
-                        port=port,
-                        host=host,
-                        error=str(e))
+            logger.error(
+                "Error checking port availability", port=port, host=host, error=str(e)
+            )
             return False
 
     async def scan_port_range(
@@ -210,7 +205,7 @@ class TCPHealthCheck(HealthChecker):
         start_port: int,
         end_port: int,
         host: str = "localhost",
-        timeout: float = 1.0
+        timeout: float = 1.0,
     ) -> dict[int, bool]:
         """Scan a range of ports for connectivity.
 
@@ -237,10 +232,7 @@ class TCPHealthCheck(HealthChecker):
                 is_open = await task
                 results[port] = is_open
             except Exception as e:
-                logger.debug("Error scanning port",
-                           port=port,
-                           host=host,
-                           error=str(e))
+                logger.debug("Error scanning port", port=port, host=host, error=str(e))
                 results[port] = False
 
         return results
@@ -274,11 +266,7 @@ class TCPHealthCheck(HealthChecker):
         Returns:
             Default configuration dictionary
         """
-        return {
-            "host": "localhost",
-            "port": 80,
-            "timeout": 5.0
-        }
+        return {"host": "localhost", "port": 80, "timeout": 5.0}
 
     def get_config_schema(self) -> dict[str, Any]:
         """Get configuration schema for TCP health checks.
@@ -292,22 +280,22 @@ class TCPHealthCheck(HealthChecker):
                 "host": {
                     "type": "string",
                     "default": "localhost",
-                    "description": "Host to connect to"
+                    "description": "Host to connect to",
                 },
                 "port": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 65535,
-                    "description": "Port to connect to"
+                    "description": "Port to connect to",
                 },
                 "timeout": {
                     "type": "number",
                     "minimum": 0.1,
                     "maximum": 300,
                     "default": 5.0,
-                    "description": "Connection timeout in seconds"
-                }
+                    "description": "Connection timeout in seconds",
+                },
             },
             "required": ["port"],
-            "additionalProperties": False
+            "additionalProperties": False,
         }

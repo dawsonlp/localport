@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import psutil
+
 from localport.domain.entities.port_forward import PortForward
 
 
@@ -20,7 +22,7 @@ class TestPortForwardEntity:
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=started_at
+            started_at=started_at,
         )
 
         assert port_forward.service_id == service_id
@@ -31,37 +33,51 @@ class TestPortForwardEntity:
         assert port_forward.restart_count == 0
         assert port_forward.last_health_check is None
 
-    @patch('psutil.pid_exists')
-    def test_is_process_alive_with_valid_pid(self, mock_pid_exists: MagicMock) -> None:
-        """Test process alive check with valid PID."""
-        mock_pid_exists.return_value = True
+    @patch("psutil.Process")
+    def test_is_process_alive_with_running_pid(self, mock_process: MagicMock) -> None:
+        """Test process alive check with a running PID."""
+        mock_process.return_value.status.return_value = psutil.STATUS_RUNNING
 
         port_forward = PortForward(
             service_id=uuid4(),
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         assert port_forward.is_process_alive()
-        mock_pid_exists.assert_called_once_with(12345)
+        mock_process.assert_called_once_with(12345)
 
-    @patch('psutil.pid_exists')
-    def test_is_process_alive_with_invalid_pid(self, mock_pid_exists: MagicMock) -> None:
-        """Test process alive check with invalid PID."""
-        mock_pid_exists.return_value = False
+    @patch("psutil.Process")
+    def test_is_process_alive_with_zombie_pid(self, mock_process: MagicMock) -> None:
+        """Regression (C4): a zombie/defunct process must be reported as not alive."""
+        mock_process.return_value.status.return_value = psutil.STATUS_ZOMBIE
 
         port_forward = PortForward(
             service_id=uuid4(),
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         assert not port_forward.is_process_alive()
-        mock_pid_exists.assert_called_once_with(12345)
+
+    @patch("psutil.Process")
+    def test_is_process_alive_with_missing_pid(self, mock_process: MagicMock) -> None:
+        """Test process alive check when the PID no longer exists."""
+        mock_process.side_effect = psutil.NoSuchProcess(12345)
+
+        port_forward = PortForward(
+            service_id=uuid4(),
+            process_id=12345,
+            local_port=8080,
+            remote_port=80,
+            started_at=datetime.now(),
+        )
+
+        assert not port_forward.is_process_alive()
 
     def test_is_process_alive_with_no_pid(self) -> None:
         """Test process alive check with no PID."""
@@ -70,22 +86,22 @@ class TestPortForwardEntity:
             process_id=None,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         assert not port_forward.is_process_alive()
 
-    @patch('psutil.pid_exists')
-    def test_is_process_alive_with_exception(self, mock_pid_exists: MagicMock) -> None:
-        """Test process alive check when psutil raises exception."""
-        mock_pid_exists.side_effect = Exception("Process error")
+    @patch("psutil.Process")
+    def test_is_process_alive_with_exception(self, mock_process: MagicMock) -> None:
+        """Test process alive check when psutil raises an unexpected exception."""
+        mock_process.side_effect = Exception("Process error")
 
         port_forward = PortForward(
             service_id=uuid4(),
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         assert not port_forward.is_process_alive()
@@ -97,7 +113,7 @@ class TestPortForwardEntity:
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         assert port_forward.restart_count == 0
@@ -115,7 +131,7 @@ class TestPortForwardEntity:
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         assert port_forward.last_health_check is None
@@ -139,7 +155,7 @@ class TestPortForwardEntity:
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=started_at
+            started_at=started_at,
         )
 
         uptime = port_forward.get_uptime_seconds()
@@ -153,7 +169,7 @@ class TestPortForwardEntity:
             process_id=12345,
             local_port=8080,
             remote_port=80,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         # Should restart with low restart count

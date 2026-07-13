@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID, uuid4, uuid5, NAMESPACE_DNS
-import traceback
+from uuid import NAMESPACE_DNS, UUID, uuid5
 
 import structlog
 
@@ -34,7 +33,6 @@ class Service:
         """Initialize default values after dataclass creation."""
         if self.tags is None:
             self.tags = []
-        
 
     @staticmethod
     def generate_deterministic_id(
@@ -45,30 +43,30 @@ class Service:
         connection_info: ConnectionInfo,
     ) -> UUID:
         """Generate deterministic service ID based on configuration.
-        
+
         The ID is stable across configuration reloads and LocalPort restarts,
         but changes when the service configuration changes.
-        
+
         Args:
             name: Service name
             technology: Forwarding technology (kubectl/ssh)
             local_port: Local port number
             remote_port: Remote port number
             connection_info: Connection details
-            
+
         Returns:
             Deterministic UUID based on service configuration
         """
         # Build stable config key from essential service properties
         config_key = f"{name}:{technology.value}:{local_port}:{remote_port}"
-        
+
         # Add connection-specific details
         if technology == ForwardingTechnology.KUBECTL:
             namespace = connection_info.get_kubectl_namespace()
             resource_name = connection_info.get_kubectl_resource_name()
             resource_type = connection_info.get_kubectl_resource_type()
             config_key += f":{namespace}:{resource_name}:{resource_type}"
-            
+
             context = connection_info.get_kubectl_context()
             if context:
                 config_key += f":{context}"
@@ -76,11 +74,11 @@ class Service:
             host = connection_info.get_ssh_host()
             port = connection_info.get_ssh_port()
             config_key += f":{host}:{port}"
-            
+
             user = connection_info.get_ssh_user()
             if user:
                 config_key += f":{user}"
-        
+
         # Generate deterministic UUID using UUID5 with DNS namespace
         return uuid5(NAMESPACE_DNS, config_key)
 
@@ -102,7 +100,7 @@ class Service:
             remote_port=remote_port,
             connection_info=connection_info,
         )
-        
+
         return cls(
             id=service_id,
             name=name,
@@ -110,7 +108,7 @@ class Service:
             local_port=local_port,
             remote_port=remote_port,
             connection_info=connection_info,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
@@ -126,7 +124,7 @@ class Service:
         **kwargs: Any,
     ) -> "Service":
         """Factory method to create a kubectl service from discovery information.
-        
+
         Args:
             resource_name: Name of the Kubernetes resource
             namespace: Kubernetes namespace
@@ -136,31 +134,31 @@ class Service:
             resource_type: Type of Kubernetes resource (service, pod, deployment)
             context: Kubernetes context to use
             **kwargs: Additional service options (tags, description, etc.)
-            
+
         Returns:
             Service instance configured for kubectl forwarding
         """
         # Default service name to resource name for kubectl
         name = service_name if service_name else resource_name
-        
+
         # Validate service name
         cls._validate_service_name(name)
-        
+
         # Create kubectl connection info
         connection_info = ConnectionInfo.kubectl(
             resource_name=resource_name,
             namespace=namespace,
             resource_type=resource_type,
-            context=context
+            context=context,
         )
-        
+
         return cls.create(
             name=name,
             technology=ForwardingTechnology.KUBECTL,
             local_port=local_port,
             remote_port=remote_port,
             connection_info=connection_info,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
@@ -177,7 +175,7 @@ class Service:
         **kwargs: Any,
     ) -> "Service":
         """Factory method to create an SSH service from configuration.
-        
+
         Args:
             service_name: Name for the service
             host: SSH host to connect to
@@ -188,56 +186,52 @@ class Service:
             key_file: Path to SSH private key file
             remote_host: Remote host for tunneling (defaults to localhost)
             **kwargs: Additional service options (tags, description, etc.)
-            
+
         Returns:
             Service instance configured for SSH forwarding
         """
         # Validate service name
         cls._validate_service_name(service_name)
-        
+
         # Create SSH connection info
         connection_info = ConnectionInfo.ssh(
-            host=host,
-            user=user,
-            port=port,
-            key_file=key_file,
-            remote_host=remote_host
+            host=host, user=user, port=port, key_file=key_file, remote_host=remote_host
         )
-        
+
         return cls.create(
             name=service_name,
             technology=ForwardingTechnology.SSH,
             local_port=local_port,
             remote_port=remote_port,
             connection_info=connection_info,
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
     def _validate_service_name(name: str) -> None:
         """Validate service name according to LocalPort naming conventions.
-        
+
         Args:
             name: Service name to validate
-            
+
         Raises:
             ValueError: If service name is invalid
         """
         if not name or not name.strip():
             raise ValueError("Service name cannot be empty")
-        
+
         # Check for reasonable length
         if len(name) > 100:
             raise ValueError("Service name cannot exceed 100 characters")
-        
+
         # Check for invalid characters (keeping it simple for now)
-        invalid_chars = [' ', '\t', '\n', '\r']
+        invalid_chars = [" ", "\t", "\n", "\r"]
         for char in invalid_chars:
             if char in name:
-                raise ValueError(f"Service name cannot contain whitespace characters")
-        
+                raise ValueError("Service name cannot contain whitespace characters")
+
         # Reserved names
-        reserved_names = ['all', 'default', 'system']
+        reserved_names = ["all", "default", "system"]
         if name.lower() in reserved_names:
             raise ValueError(f"'{name}' is a reserved service name")
 

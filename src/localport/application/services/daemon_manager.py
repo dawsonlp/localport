@@ -1,8 +1,6 @@
 """Daemon manager for background processing capabilities."""
 
 import asyncio
-import signal
-import sys
 from datetime import datetime
 from typing import Any
 
@@ -12,12 +10,12 @@ from ...domain.entities.service import Service, ServiceStatus
 from ...domain.repositories.config_repository import ConfigRepository
 from ...domain.repositories.service_repository import ServiceRepository
 from ..dto.service_dto import DaemonStatusInfo
+from .cluster_config_manager import ClusterConfigManager
+from .cluster_health_manager import ClusterHealthManager
 from .configuration_differ import ConfigurationDiff
 from .configuration_manager import ConfigurationManager
 from .health_monitor_scheduler import HealthMonitorScheduler
 from .service_manager import ServiceManager
-from .cluster_health_manager import ClusterHealthManager
-from .cluster_config_manager import ClusterConfigManager
 
 logger = structlog.get_logger()
 
@@ -30,7 +28,7 @@ class DaemonManager:
         service_repository: ServiceRepository,
         config_repository: ConfigRepository,
         service_manager: ServiceManager,
-        health_monitor: HealthMonitorScheduler
+        health_monitor: HealthMonitorScheduler,
     ):
         """Initialize the daemon manager.
 
@@ -47,8 +45,7 @@ class DaemonManager:
 
         # Initialize configuration manager
         self._config_manager = ConfigurationManager(
-            config_repository=config_repository,
-            service_repository=service_repository
+            config_repository=config_repository, service_repository=service_repository
         )
 
         # Initialize cluster health components
@@ -69,9 +66,6 @@ class DaemonManager:
         self._hot_reload_enabled = True
         self._graceful_shutdown_timeout = 30  # seconds
 
-        # Signal handlers
-        self._original_handlers: dict[int, any] = {}
-
     async def start_daemon(self, auto_start_services: bool = True) -> None:
         """Start the daemon manager.
 
@@ -89,8 +83,8 @@ class DaemonManager:
         self._auto_start_services = auto_start_services
 
         try:
-            # Setup signal handlers
-            self._setup_signal_handlers()
+            # Signal handling is owned by the daemon process (AsyncSignalHandler);
+            # the daemon manager does not install its own OS signal handlers.
 
             # Load configuration
             await self._load_configuration()
@@ -149,10 +143,9 @@ class DaemonManager:
             # Cancel background tasks
             await self._cancel_background_tasks(timeout)
 
-            # Restore signal handlers
-            self._restore_signal_handlers()
-
-            logger.info("Daemon manager stopped - services continue running independently")
+            logger.info(
+                "Daemon manager stopped - services continue running independently"
+            )
 
         except Exception as e:
             logger.error("Error during daemon shutdown", error=str(e))
@@ -160,7 +153,7 @@ class DaemonManager:
 
     async def reload_configuration(self) -> None:
         """Reload configuration and apply changes incrementally.
-        
+
         Uses the ConfigurationDiffer to detect what changed and applies
         only the necessary modifications:
         - Services with connection/port changes are restarted
@@ -177,7 +170,6 @@ class DaemonManager:
         try:
             # Capture old configuration before reloading
             old_config = await self._config_repository.load_configuration()
-            old_services = await self._service_repository.find_all()
 
             # Load new configuration into the repository
             await self._load_configuration()
@@ -187,6 +179,7 @@ class DaemonManager:
 
             # Compute diff
             from .configuration_differ import ConfigurationDiffer
+
             differ = ConfigurationDiffer()
             diff = await differ.compare_configurations(old_config, new_config)
 
@@ -228,7 +221,9 @@ class DaemonManager:
         # Get service counts
         services = await self._service_repository.find_all()
         managed_services = len(services)
-        active_forwards = len([s for s in services if s.status == ServiceStatus.RUNNING])
+        active_forwards = len(
+            [s for s in services if s.status == ServiceStatus.RUNNING]
+        )
 
         # Get health monitoring status
         health_checks_enabled = len(self._health_monitor._cooperative_tasks) > 0
@@ -237,7 +232,11 @@ class DaemonManager:
             # Get the most recent health check time from any service
             health_statuses = self._health_monitor.get_all_health_status()
             if health_statuses:
-                recent_checks = [info.checked_at for info in health_statuses.values() if info.checked_at]
+                recent_checks = [
+                    info.checked_at
+                    for info in health_statuses.values()
+                    if info.checked_at
+                ]
                 if recent_checks:
                     last_health_check = max(recent_checks)
 
@@ -249,7 +248,7 @@ class DaemonManager:
             managed_services=managed_services,
             active_forwards=active_forwards,
             health_checks_enabled=health_checks_enabled,
-            last_health_check=last_health_check
+            last_health_check=last_health_check,
         )
 
     async def run_until_shutdown(self) -> None:
@@ -270,41 +269,6 @@ class DaemonManager:
             raise
         finally:
             await self.stop_daemon()
-
-    def _setup_signal_handlers(self) -> None:
-        """Setup signal handlers for daemon control."""
-        if sys.platform == "win32":
-            # Windows doesn't support UNIX signals
-            return
-
-        def handle_shutdown(signum, frame):
-            """Handle shutdown signals."""
-            logger.info("Received shutdown signal", signal=signum)
-            asyncio.create_task(self.stop_daemon())
-
-        def handle_reload(signum, frame):
-            """Handle reload signal."""
-            logger.info("Received reload signal", signal=signum)
-            if self._config_reload_enabled:
-                asyncio.create_task(self.reload_configuration())
-
-        # Store original handlers
-        self._original_handlers[signal.SIGTERM] = signal.signal(signal.SIGTERM, handle_shutdown)
-        self._original_handlers[signal.SIGINT] = signal.signal(signal.SIGINT, handle_shutdown)
-        self._original_handlers[signal.SIGUSR1] = signal.signal(signal.SIGUSR1, handle_reload)
-
-        logger.debug("Signal handlers configured")
-
-    def _restore_signal_handlers(self) -> None:
-        """Restore original signal handlers."""
-        if sys.platform == "win32":
-            return
-
-        for signum, handler in self._original_handlers.items():
-            signal.signal(signum, handler)
-
-        self._original_handlers.clear()
-        logger.debug("Signal handlers restored")
 
     async def _load_configuration(self) -> None:
         """Load configuration from repository."""
@@ -330,19 +294,26 @@ class DaemonManager:
         try:
             # Load raw YAML configuration
             config_data = await self._config_repository.load_configuration()
-            
+
             # Load cluster health configuration
             self._cluster_config_manager.load_from_yaml_config(config_data)
-            
+
             # Check if cluster health monitoring is enabled
-            self._enable_cluster_health_monitoring = self._cluster_config_manager.is_cluster_health_enabled()
-            
-            logger.info("Cluster health configuration loaded",
-                       enabled=self._enable_cluster_health_monitoring,
-                       summary=self._cluster_config_manager.get_configuration_summary())
+            self._enable_cluster_health_monitoring = (
+                self._cluster_config_manager.is_cluster_health_enabled()
+            )
+
+            logger.info(
+                "Cluster health configuration loaded",
+                enabled=self._enable_cluster_health_monitoring,
+                summary=self._cluster_config_manager.get_configuration_summary(),
+            )
 
         except Exception as e:
-            logger.warning("Failed to load cluster health configuration, using defaults", error=str(e))
+            logger.warning(
+                "Failed to load cluster health configuration, using defaults",
+                error=str(e),
+            )
             # Continue with defaults if cluster configuration fails
             self._enable_cluster_health_monitoring = True
 
@@ -371,9 +342,11 @@ class DaemonManager:
             success_count = sum(1 for r in results if not isinstance(r, Exception))
             failure_count = len(results) - success_count
 
-            logger.info("Auto-start completed",
-                       success_count=success_count,
-                       failure_count=failure_count)
+            logger.info(
+                "Auto-start completed",
+                success_count=success_count,
+                failure_count=failure_count,
+            )
 
         except Exception as e:
             logger.error("Failed to auto-start services", error=str(e))
@@ -390,143 +363,186 @@ class DaemonManager:
             if result.success:
                 logger.info("Service started", service_name=service.name)
             else:
-                logger.error("Failed to start service",
-                           service_name=service.name,
-                           error=result.error)
+                logger.error(
+                    "Failed to start service",
+                    service_name=service.name,
+                    error=result.error,
+                )
         except Exception as e:
-            logger.error("Error starting service",
-                        service_name=service.name,
-                        error=str(e))
+            logger.error(
+                "Error starting service", service_name=service.name, error=str(e)
+            )
 
     async def _start_health_monitoring(self) -> None:
         """Start health monitoring for services."""
         logger.info("Starting health monitoring subsystem")
-        
+
         try:
             # Step 1: Load services from repository
             services = await self._service_repository.find_all()
-            logger.info("Loaded services from repository",
-                       total_services=len(services),
-                       service_names=[s.name for s in services])
-            
+            logger.info(
+                "Loaded services from repository",
+                total_services=len(services),
+                service_names=[s.name for s in services],
+            )
+
             # Step 2: Log initial service states from configuration
             logger.info("Initial service states from configuration:")
             for service in services:
-                logger.info("  Service configuration state",
-                           service_name=service.name,
-                           service_id=str(service.id),
-                           config_status=service.status.value,
-                           has_health_check=bool(service.health_check_config),
-                           health_check_type=service.health_check_config.get('type') if service.health_check_config else None)
-            
+                logger.info(
+                    "  Service configuration state",
+                    service_name=service.name,
+                    service_id=str(service.id),
+                    config_status=service.status.value,
+                    has_health_check=bool(service.health_check_config),
+                    health_check_type=(
+                        service.health_check_config.get("type")
+                        if service.health_check_config
+                        else None
+                    ),
+                )
+
             # Step 3: CRITICAL - Synchronize service statuses with service manager
             # Services loaded from configuration have default STOPPED status, but may actually be running.
             # We need to get the actual status from the service manager before starting health monitoring.
             logger.info("Synchronizing service statuses with service manager")
-            
+
             status_changes = []
             for service in services:
                 original_status = service.status
-                
+
                 # Get actual status from service manager and update the service object
                 status_info = await self._service_manager.get_service_status(service)
                 service.update_status(status_info.status)
-                
+
                 # Track status changes for logging
                 if original_status != status_info.status:
-                    status_changes.append({
-                        'service_name': service.name,
-                        'service_id': str(service.id),
-                        'original_status': original_status.value,
-                        'actual_status': status_info.status.value,
-                        'is_running': status_info.status == ServiceStatus.RUNNING,
-                        'has_health_check': bool(service.health_check_config)
-                    })
-                
-                logger.debug("Service status synchronized",
-                           service_name=service.name,
-                           service_id=str(service.id),
-                           original_status=original_status.value,
-                           actual_status=status_info.status.value,
-                           status_changed=original_status != status_info.status,
-                           is_running=status_info.status == ServiceStatus.RUNNING,
-                           has_health_check=bool(service.health_check_config))
-            
+                    status_changes.append(
+                        {
+                            "service_name": service.name,
+                            "service_id": str(service.id),
+                            "original_status": original_status.value,
+                            "actual_status": status_info.status.value,
+                            "is_running": status_info.status == ServiceStatus.RUNNING,
+                            "has_health_check": bool(service.health_check_config),
+                        }
+                    )
+
+                logger.debug(
+                    "Service status synchronized",
+                    service_name=service.name,
+                    service_id=str(service.id),
+                    original_status=original_status.value,
+                    actual_status=status_info.status.value,
+                    status_changed=original_status != status_info.status,
+                    is_running=status_info.status == ServiceStatus.RUNNING,
+                    has_health_check=bool(service.health_check_config),
+                )
+
             # Log summary of status synchronization
             if status_changes:
-                logger.info("Service status synchronization completed",
-                           total_services=len(services),
-                           status_changes=len(status_changes),
-                           changes=status_changes)
+                logger.info(
+                    "Service status synchronization completed",
+                    total_services=len(services),
+                    status_changes=len(status_changes),
+                    changes=status_changes,
+                )
             else:
-                logger.info("Service status synchronization completed - no changes needed",
-                           total_services=len(services))
-            
+                logger.info(
+                    "Service status synchronization completed - no changes needed",
+                    total_services=len(services),
+                )
+
             # Step 4: Determine which services will be monitored
             logger.info("Evaluating services for health monitoring eligibility:")
-            
+
             monitored_services = []
             skipped_services = []
-            
+
             for service in services:
                 has_health_check = bool(service.health_check_config)
                 is_running = service.status == ServiceStatus.RUNNING
                 will_monitor = has_health_check and is_running
-                
+
                 service_info = {
-                    'service_name': service.name,
-                    'service_id': str(service.id),
-                    'has_health_check': has_health_check,
-                    'is_running': is_running,
-                    'status': service.status.value,
-                    'will_monitor': will_monitor
+                    "service_name": service.name,
+                    "service_id": str(service.id),
+                    "has_health_check": has_health_check,
+                    "is_running": is_running,
+                    "status": service.status.value,
+                    "will_monitor": will_monitor,
                 }
-                
+
                 if has_health_check:
-                    service_info['health_check_type'] = service.health_check_config.get('type')
-                    service_info['health_check_interval'] = service.health_check_config.get('interval')
-                
+                    service_info["health_check_type"] = service.health_check_config.get(
+                        "type"
+                    )
+                    service_info["health_check_interval"] = (
+                        service.health_check_config.get("interval")
+                    )
+
                 if will_monitor:
                     monitored_services.append(service)
                     logger.info("  ✓ Service eligible for monitoring", **service_info)
                 else:
                     skipped_services.append(service_info)
                     if not has_health_check:
-                        logger.info("  ⊘ Service skipped - no health check configured", **service_info)
+                        logger.info(
+                            "  ⊘ Service skipped - no health check configured",
+                            **service_info,
+                        )
                     elif not is_running:
                         logger.info("  ⊘ Service skipped - not running", **service_info)
                     else:
-                        logger.info("  ⊘ Service skipped - unknown reason", **service_info)
+                        logger.info(
+                            "  ⊘ Service skipped - unknown reason", **service_info
+                        )
 
             # Step 5: Set cluster health provider if available
-            if self._cluster_health_manager and hasattr(self._health_monitor, '_cluster_health_provider'):
-                self._health_monitor._cluster_health_provider = self._cluster_health_manager
+            if self._cluster_health_manager and hasattr(
+                self._health_monitor, "_cluster_health_provider"
+            ):
+                self._health_monitor._cluster_health_provider = (
+                    self._cluster_health_manager
+                )
                 logger.info("Connected cluster health provider to health monitor")
 
             # Step 6: Start health monitoring
             if monitored_services:
-                logger.info("Starting health monitor with eligible services",
-                           monitored_count=len(monitored_services),
-                           monitored_services=[s.name for s in monitored_services],
-                           skipped_count=len(skipped_services))
-                
+                logger.info(
+                    "Starting health monitor with eligible services",
+                    monitored_count=len(monitored_services),
+                    monitored_services=[s.name for s in monitored_services],
+                    skipped_count=len(skipped_services),
+                )
+
                 await self._health_monitor.start_monitoring(monitored_services)
-                
-                logger.info("Health monitoring started successfully",
-                           monitored_count=len(monitored_services),
-                           cluster_aware_enabled=self._cluster_health_manager is not None,
-                           active_health_tasks=len(self._health_monitor._cooperative_tasks))
+
+                logger.info(
+                    "Health monitoring started successfully",
+                    monitored_count=len(monitored_services),
+                    cluster_aware_enabled=self._cluster_health_manager is not None,
+                    active_health_tasks=len(self._health_monitor._cooperative_tasks),
+                )
             else:
-                logger.warning("No services eligible for health monitoring",
-                             total_services=len(services),
-                             services_with_health_checks=len([s for s in services if s.health_check_config]),
-                             running_services=len([s for s in services if s.status == ServiceStatus.RUNNING]),
-                             skipped_reasons=skipped_services)
+                logger.warning(
+                    "No services eligible for health monitoring",
+                    total_services=len(services),
+                    services_with_health_checks=len(
+                        [s for s in services if s.health_check_config]
+                    ),
+                    running_services=len(
+                        [s for s in services if s.status == ServiceStatus.RUNNING]
+                    ),
+                    skipped_reasons=skipped_services,
+                )
 
         except Exception as e:
-            logger.error("Failed to start health monitoring", 
-                        error=str(e),
-                        error_type=type(e).__name__)
+            logger.error(
+                "Failed to start health monitoring",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             raise
 
     async def _start_cluster_health_monitoring(self) -> None:
@@ -534,30 +550,36 @@ class DaemonManager:
         try:
             # Get all services to extract cluster contexts
             services = await self._service_repository.find_all()
-            
+
             # Extract cluster contexts from services
-            cluster_contexts = self._cluster_config_manager.extract_cluster_contexts_from_services(services)
-            
+            cluster_contexts = (
+                self._cluster_config_manager.extract_cluster_contexts_from_services(
+                    services
+                )
+            )
+
             if not cluster_contexts:
                 logger.info("No cluster contexts found for monitoring")
                 return
-            
+
             # Get default cluster monitor configuration
             default_config = self._cluster_config_manager.get_default_config()
-            
+
             # Initialize cluster health manager
             self._cluster_health_manager = ClusterHealthManager(default_config)
-            
+
             # Start the cluster health manager
             await self._cluster_health_manager.start()
-            
+
             # Register cluster contexts for monitoring
             await self._cluster_health_manager.update_active_contexts(cluster_contexts)
-            
-            logger.info("Cluster health monitoring started",
-                       monitored_contexts=list(cluster_contexts),
-                       context_count=len(cluster_contexts),
-                       config_summary=self._cluster_config_manager.get_configuration_summary())
+
+            logger.info(
+                "Cluster health monitoring started",
+                monitored_contexts=list(cluster_contexts),
+                context_count=len(cluster_contexts),
+                config_summary=self._cluster_config_manager.get_configuration_summary(),
+            )
 
         except Exception as e:
             logger.error("Failed to start cluster health monitoring", error=str(e))
@@ -612,11 +634,15 @@ class DaemonManager:
             # Log statistics
             health_statuses = self._health_monitor.get_all_health_status()
             monitored_services = len(health_statuses)
-            healthy_services = len([s for s in health_statuses.values() if s.is_healthy])
+            healthy_services = len(
+                [s for s in health_statuses.values() if s.is_healthy]
+            )
 
-            logger.debug("Maintenance completed",
-                        monitored_services=monitored_services,
-                        healthy_services=healthy_services)
+            logger.debug(
+                "Maintenance completed",
+                monitored_services=monitored_services,
+                healthy_services=healthy_services,
+            )
 
         except Exception as e:
             logger.error("Maintenance error", error=str(e))
@@ -625,7 +651,9 @@ class DaemonManager:
         """Stop all running services."""
         try:
             services = await self._service_repository.find_all()
-            running_services = [s for s in services if s.status == ServiceStatus.RUNNING]
+            running_services = [
+                s for s in services if s.status == ServiceStatus.RUNNING
+            ]
 
             if not running_services:
                 return
@@ -659,9 +687,9 @@ class DaemonManager:
             else:
                 logger.error("Failed to stop service", service_name=service.name)
         except Exception as e:
-            logger.error("Error stopping service",
-                        service_name=service.name,
-                        error=str(e))
+            logger.error(
+                "Error stopping service", service_name=service.name, error=str(e)
+            )
 
     async def _cancel_background_tasks(self, timeout: float) -> None:
         """Cancel all background tasks.
@@ -672,7 +700,9 @@ class DaemonManager:
         if not self._background_tasks:
             return
 
-        logger.debug("Cancelling background tasks", task_count=len(self._background_tasks))
+        logger.debug(
+            "Cancelling background tasks", task_count=len(self._background_tasks)
+        )
 
         # Cancel all tasks
         for task in self._background_tasks:
@@ -682,7 +712,7 @@ class DaemonManager:
         try:
             await asyncio.wait_for(
                 asyncio.gather(*self._background_tasks, return_exceptions=True),
-                timeout=timeout
+                timeout=timeout,
             )
         except TimeoutError:
             logger.warning("Background tasks did not complete within timeout")
@@ -708,7 +738,9 @@ class DaemonManager:
         for name in removed:
             service = next((s for s in current_services if s.name == name), None)
             if service and service.status == ServiceStatus.RUNNING:
-                logger.info("Stopping service removed from configuration", service_name=name)
+                logger.info(
+                    "Stopping service removed from configuration", service_name=name
+                )
                 await self._stop_service_safe(service)
 
         logger.info(
@@ -793,9 +825,11 @@ class DaemonManager:
             )
 
             if success:
-                logger.info("Configuration hot reloading started",
-                          watcher_type=self._config_manager.watcher_type,
-                          config_path=str(self._config_manager.config_path))
+                logger.info(
+                    "Configuration hot reloading started",
+                    watcher_type=self._config_manager.watcher_type,
+                    config_path=str(self._config_manager.config_path),
+                )
             else:
                 logger.warning("Failed to start configuration hot reloading")
 
@@ -811,8 +845,10 @@ class DaemonManager:
         if not diff.has_changes:
             return
 
-        logger.info("Processing configuration changes",
-                   summary=self._config_manager._differ.format_diff_summary(diff))
+        logger.info(
+            "Processing configuration changes",
+            summary=self._config_manager._differ.format_diff_summary(diff),
+        )
 
         try:
             # Update service repository with new configuration
@@ -858,20 +894,26 @@ class DaemonManager:
                     # --- New service: start it ---
                     service = await self._service_repository.find_by_name(service_name)
                     if service and service.enabled:
-                        logger.info("Starting newly added service", service_name=service_name)
+                        logger.info(
+                            "Starting newly added service", service_name=service_name
+                        )
                         await self._start_service_safe(service)
 
                 elif change.change_type == ChangeType.REMOVED:
                     # --- Removed service: stop and clean up ---
                     service = await self._service_repository.find_by_name(service_name)
                     if service and service.status == ServiceStatus.RUNNING:
-                        logger.info("Stopping removed service", service_name=service_name)
+                        logger.info(
+                            "Stopping removed service", service_name=service_name
+                        )
                         await self._stop_service_safe(service)
 
                 elif change.change_type == ChangeType.MODIFIED:
                     service = await self._service_repository.find_by_name(service_name)
                     if not service:
-                        logger.warning("Modified service not found", service_name=service_name)
+                        logger.warning(
+                            "Modified service not found", service_name=service_name
+                        )
                         continue
 
                     if change.requires_restart:
@@ -902,9 +944,7 @@ class DaemonManager:
                     error=str(e),
                 )
 
-    async def _apply_in_place_update(
-        self, service: Service, change
-    ) -> None:
+    async def _apply_in_place_update(self, service: Service, change) -> None:
         """Apply non-restart configuration changes to a running service.
 
         Updates service metadata (tags, health_check_config, restart_policy,
@@ -921,7 +961,9 @@ class DaemonManager:
             new_tags = new_config.get("tags", [])
             if hasattr(service, "tags"):
                 service.tags = new_tags
-            logger.debug("Updated tags in-place", service_name=service.name, tags=new_tags)
+            logger.debug(
+                "Updated tags in-place", service_name=service.name, tags=new_tags
+            )
 
         # Update health check configuration
         if "health_check" in change.changed_fields:
@@ -964,19 +1006,21 @@ class DaemonManager:
             config_status = await self._config_manager.get_configuration_status()
 
             # Add daemon-specific information
-            config_status.update({
-                'daemon_running': self._is_running,
-                'config_reload_enabled': self._config_reload_enabled,
-                'hot_reload_enabled': self._hot_reload_enabled,
-            })
+            config_status.update(
+                {
+                    "daemon_running": self._is_running,
+                    "config_reload_enabled": self._config_reload_enabled,
+                    "hot_reload_enabled": self._hot_reload_enabled,
+                }
+            )
 
             return config_status
 
         except Exception as e:
             logger.error("Error getting configuration status", error=str(e))
             return {
-                'error': str(e),
-                'daemon_running': self._is_running,
-                'config_reload_enabled': self._config_reload_enabled,
-                'hot_reload_enabled': self._hot_reload_enabled,
+                "error": str(e),
+                "daemon_running": self._is_running,
+                "config_reload_enabled": self._config_reload_enabled,
+                "hot_reload_enabled": self._hot_reload_enabled,
             }

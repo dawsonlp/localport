@@ -1,10 +1,8 @@
 """Tests for CLI basic functionality."""
 
-import pytest
 from typer.testing import CliRunner
 
 from localport.cli.app import app
-
 
 runner = CliRunner()
 
@@ -67,8 +65,6 @@ class TestCLIBasic:
         result = runner.invoke(app, ["cluster", "--help"])
         assert result.exit_code == 0
         assert "status" in result.stdout.lower()
-        assert "events" in result.stdout.lower()
-        assert "pods" in result.stdout.lower()
 
     def test_ssh_commands_exist(self):
         """Test that ssh subcommands are registered."""

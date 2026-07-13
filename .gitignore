@@ -189,11 +189,6 @@ config.local.yaml
 config.local.yml
 .localport/
 
-# Test artifacts
-.coverage
-htmlcov/
-.pytest_cache/
-
 # Build artifacts
 *.whl
 *.tar.gz

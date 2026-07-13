@@ -12,7 +12,7 @@ def setup_rich_logging(
     verbosity_level: int = 0,
     console: Console | None = None,
     level: str | None = None,  # Backward compatibility
-    verbose: bool | None = None  # Backward compatibility
+    verbose: bool | None = None,  # Backward compatibility
 ) -> None:
     """Setup Rich-based logging with verbosity levels.
 
@@ -35,14 +35,14 @@ def setup_rich_logging(
 
     # Map verbosity to log levels
     log_level_map = {
-        -1: logging.ERROR,    # Quiet: Only errors
-        0: logging.WARNING,   # Clean: Only warnings/errors
-        1: logging.INFO,      # Informational: Include info logs
-        2: logging.DEBUG      # Debug: Everything
+        -1: logging.ERROR,  # Quiet: Only errors
+        0: logging.WARNING,  # Clean: Only warnings/errors
+        1: logging.INFO,  # Informational: Include info logs
+        2: logging.DEBUG,  # Debug: Everything
     }
-    
+
     log_level = log_level_map.get(verbosity_level, logging.WARNING)
-    
+
     # Install rich traceback handler
     install(console=console, show_locals=(verbosity_level >= 2))
 
@@ -51,32 +51,32 @@ def setup_rich_logging(
         # Clean/Quiet mode: Minimal, structured output
         rich_handler = RichHandler(
             console=console,
-            show_time=False,      # No timestamps
-            show_path=False,      # No file paths
-            show_level=False,     # No log levels
+            show_time=False,  # No timestamps
+            show_path=False,  # No file paths
+            show_level=False,  # No log levels
             rich_tracebacks=True,
-            markup=True
+            markup=True,
         )
     elif verbosity_level == 1:
         # Info mode: Helpful context
         rich_handler = RichHandler(
             console=console,
-            show_time=True,       # Show timestamps
-            show_path=False,      # No file paths
-            show_level=False,     # No log levels (cleaner)
+            show_time=True,  # Show timestamps
+            show_path=False,  # No file paths
+            show_level=False,  # No log levels (cleaner)
             rich_tracebacks=True,
-            markup=True
+            markup=True,
         )
     else:  # verbosity_level >= 2
         # Debug mode: Full details
         rich_handler = RichHandler(
             console=console,
-            show_time=True,       # Show timestamps
-            show_path=True,       # Show file paths
-            show_level=True,      # Show log levels
+            show_time=True,  # Show timestamps
+            show_path=True,  # Show file paths
+            show_level=True,  # Show log levels
             rich_tracebacks=True,
             tracebacks_show_locals=True,
-            markup=True
+            markup=True,
         )
 
     rich_handler.setLevel(log_level)
@@ -87,7 +87,7 @@ def setup_rich_logging(
         format="%(message)s",
         datefmt="[%X]",
         handlers=[rich_handler],
-        force=True  # Override any existing configuration
+        force=True,  # Override any existing configuration
     )
 
     # Configure structlog based on verbosity level
@@ -97,14 +97,12 @@ def setup_rich_logging(
     elif verbosity_level == 1:
         # Info mode: Use clean key-value renderer
         final_processor = structlog.processors.KeyValueRenderer(
-            key_order=['timestamp', 'level', 'event'],
-            drop_missing=True
+            key_order=["timestamp", "level", "event"], drop_missing=True
         )
     else:
         # Clean/Quiet mode: Minimal output
         final_processor = structlog.processors.KeyValueRenderer(
-            key_order=['event'],
-            drop_missing=True
+            key_order=["event"], drop_missing=True
         )
 
     structlog.configure(
@@ -141,7 +139,7 @@ def get_status_color(status: str) -> str:
         "starting": "yellow",
         "failed": "bright_red",
         "restarting": "orange3",
-        "unknown": "dim"
+        "unknown": "dim",
     }
     return status_colors.get(status.lower(), "white")
 
@@ -202,18 +200,14 @@ def format_technology(technology) -> str:
         Formatted technology string
     """
     # Handle both string and enum types
-    if hasattr(technology, 'value'):
+    if hasattr(technology, "value"):
         # It's an enum, get the string value
         tech_str = technology.value
     else:
         # It's already a string
         tech_str = str(technology)
-    
-    tech_colors = {
-        "kubectl": "blue",
-        "ssh": "green",
-        "docker": "cyan"
-    }
+
+    tech_colors = {"kubectl": "blue", "ssh": "green", "docker": "cyan"}
     color = tech_colors.get(tech_str.lower(), "white")
     return f"[{color}]{tech_str}[/{color}]"
 
@@ -263,7 +257,7 @@ def create_error_panel(title: str, message: str, suggestion: str | None = None) 
         content,
         title=f"[bold red]{title}[/bold red]",
         border_style="red",
-        padding=(1, 2)
+        padding=(1, 2),
     )
 
     return panel
@@ -290,7 +284,7 @@ def create_success_panel(title: str, message: str) -> str:
         content,
         title=f"[bold green]{title}[/bold green]",
         border_style="green",
-        padding=(1, 2)
+        padding=(1, 2),
     )
 
     return panel
@@ -317,7 +311,7 @@ def create_info_panel(title: str, message: str) -> str:
         content,
         title=f"[bold blue]{title}[/bold blue]",
         border_style="blue",
-        padding=(1, 2)
+        padding=(1, 2),
     )
 
     return panel

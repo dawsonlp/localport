@@ -7,7 +7,6 @@ from rich.table import Table
 
 from ..utils.rich_utils import (
     format_health_status,
-    format_port,
     format_service_name,
     format_technology,
     format_uptime,
@@ -51,7 +50,9 @@ class FormatRouter:
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
 
-    def format_service_operation(self, data: Any, output_format: OutputFormat, command_name: str) -> str:
+    def format_service_operation(
+        self, data: Any, output_format: OutputFormat, command_name: str
+    ) -> str:
         """Format service operation output.
 
         Args:
@@ -86,7 +87,9 @@ class FormatRouter:
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
 
-    def format_daemon_operation(self, data: Any, output_format: OutputFormat, command_name: str) -> str:
+    def format_daemon_operation(
+        self, data: Any, output_format: OutputFormat, command_name: str
+    ) -> str:
         """Format daemon operation output.
 
         Args:
@@ -120,9 +123,9 @@ class FormatRouter:
             show_header=True,
             header_style="bold white on blue",
             border_style="blue",
-            expand=False
+            expand=False,
         )
-        
+
         # Add columns with improved styling and spacing
         table.add_column("Service", style="bold cyan", min_width=12)
         table.add_column("Status", style="bold", justify="center", min_width=10)
@@ -136,30 +139,33 @@ class FormatRouter:
         if data.services:
             for service_info in data.services:
                 # Get status string properly
-                if hasattr(service_info.status, 'value'):
+                if hasattr(service_info.status, "value"):
                     status_str = service_info.status.value
                 else:
                     status_str = str(service_info.status)
-                
+
                 status_color = get_status_color(status_str)
                 health_status = format_health_status(
-                    service_info.is_healthy,
-                    getattr(service_info, 'failure_count', 0)
+                    service_info.is_healthy, getattr(service_info, "failure_count", 0)
                 )
 
                 # Enhanced target formatting
                 target_port = service_info.remote_port
-                technology = getattr(service_info, 'technology', 'kubectl')
-                if technology == 'kubectl':
+                technology = getattr(service_info, "technology", "kubectl")
+                if technology == "kubectl":
                     target = f"pod:{target_port}"
-                elif technology == 'ssh':
+                elif technology == "ssh":
                     target = f"ssh:{target_port}"
                 else:
                     target = f"remote:{target_port}"
 
                 # Add status icons for better visual clarity
-                status_icon = "🟢" if status_str.lower() == "running" else "🔴" if status_str.lower() == "failed" else "🟡"
-                
+                status_icon = (
+                    "🟢"
+                    if status_str.lower() == "running"
+                    else "🔴" if status_str.lower() == "failed" else "🟡"
+                )
+
                 table.add_row(
                     format_service_name(service_info.name),
                     f"{status_icon} [{status_color}]{status_str.title()}[/{status_color}]",
@@ -167,18 +173,18 @@ class FormatRouter:
                     f":{service_info.local_port}",
                     target,
                     health_status,
-                    format_uptime(service_info.uptime_seconds or 0)
+                    format_uptime(service_info.uptime_seconds or 0),
                 )
         else:
             # Enhanced empty state message
             table.add_row(
-                "[dim]No services configured[/dim]", 
-                "[dim]—[/dim]", 
-                "[dim]—[/dim]", 
-                "[dim]—[/dim]", 
-                "[dim]—[/dim]", 
-                "[dim]—[/dim]", 
-                "[dim]—[/dim]"
+                "[dim]No services configured[/dim]",
+                "[dim]—[/dim]",
+                "[dim]—[/dim]",
+                "[dim]—[/dim]",
+                "[dim]—[/dim]",
+                "[dim]—[/dim]",
+                "[dim]—[/dim]",
             )
 
         # Print the enhanced table
@@ -188,28 +194,40 @@ class FormatRouter:
         if data.services:
             # Create summary with status indicators
             running_indicator = "🟢" if data.running_services > 0 else "🔴"
-            healthy_indicator = "💚" if data.healthy_services == data.total_services else "💛" if data.healthy_services > 0 else "❤️"
-            
+            healthy_indicator = (
+                "💚"
+                if data.healthy_services == data.total_services
+                else "💛" if data.healthy_services > 0 else "❤️"
+            )
+
             summary_parts = [
                 f"📊 Total: [bold]{data.total_services}[/bold]",
                 f"{running_indicator} Running: [bold green]{data.running_services}[/bold green]",
-                f"{healthy_indicator} Healthy: [bold]{data.healthy_services}[/bold]"
+                f"{healthy_indicator} Healthy: [bold]{data.healthy_services}[/bold]",
             ]
-            
+
             summary = " | ".join(summary_parts)
             self.console.print(f"\n{summary}")
-            
+
             # Add helpful tips if there are issues
             if data.running_services == 0 and data.total_services > 0:
-                self.console.print("\n[dim]💡 Tip: Start services with 'localport start --all' or 'localport daemon start'[/dim]")
+                self.console.print(
+                    "\n[dim]💡 Tip: Start services with 'localport start --all' or 'localport daemon start'[/dim]"
+                )
             elif data.healthy_services < data.running_services:
                 unhealthy_count = data.running_services - data.healthy_services
-                self.console.print(f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs --list'[/dim]")
+                self.console.print(
+                    f"\n[dim]⚠️  {unhealthy_count} service(s) may have health issues. Check logs with 'localport logs --list'[/dim]"
+                )
             else:
                 # All services healthy - show log access tip
-                self.console.print("\n[dim]📋 View service logs: 'localport logs --list' | Get log details: 'localport logs --service <name>'[/dim]")
+                self.console.print(
+                    "\n[dim]📋 View service logs: 'localport logs --list' | Get log details: 'localport logs --service <name>'[/dim]"
+                )
         else:
-            self.console.print("\n[dim]💡 Get started: Create a config with 'localport config init' or see 'localport --help'[/dim]")
+            self.console.print(
+                "\n[dim]💡 Get started: Create a config with 'localport config init' or see 'localport --help'[/dim]"
+            )
 
         return ""  # Return empty string since we printed directly
 
@@ -225,42 +243,44 @@ class FormatRouter:
         """
         try:
             from pathlib import Path
-            import os
-            
+
             # Get log directory path
-            log_dir = Path.home() / ".local" / "share" / "localport" / "logs" / "services"
-            
+            log_dir = (
+                Path.home() / ".local" / "share" / "localport" / "logs" / "services"
+            )
+
             if not log_dir.exists():
                 return "[dim]—[/dim]"
-            
+
             # Look for log files matching this service name
             log_files = list(log_dir.glob(f"{service_name}_*.log"))
-            
+
             if not log_files:
                 if is_running:
                     return "[yellow]📝[/yellow]"  # Service running but no logs yet
                 else:
                     return "[dim]—[/dim]"  # Service not running, no logs
-            
+
             # Check if we have recent log files
             recent_logs = []
             for log_file in log_files:
                 try:
                     # Check if file was modified recently (within last hour)
                     import time
+
                     file_age = time.time() - log_file.stat().st_mtime
                     if file_age < 3600:  # 1 hour
                         recent_logs.append(log_file)
                 except (OSError, AttributeError):
                     continue
-            
+
             if recent_logs:
                 return "[green]📋[/green]"  # Recent logs available
             elif log_files:
                 return "[dim magenta]📋[/dim magenta]"  # Old logs available
             else:
                 return "[dim]—[/dim]"
-                
+
         except Exception:
             # If anything fails, just return a neutral indicator
             return "[dim]—[/dim]"
@@ -277,7 +297,7 @@ class FormatRouter:
         """
         # For now, return a simple success/failure message
         # This would be enhanced with actual table formatting
-        if hasattr(data, 'success'):
+        if hasattr(data, "success"):
             if data.success:
                 return f"✓ Service {command_name} operation completed successfully"
             else:
@@ -301,32 +321,45 @@ class FormatRouter:
             show_header=True,
             header_style="bold white on blue",
             border_style="blue",
-            expand=False
+            expand=False,
         )
-        
+
         table.add_column("Property", style="bold cyan", min_width=15)
         table.add_column("Value", style="white", min_width=20)
 
         # Check if we have status information
-        if hasattr(data, 'status') and data.status:
+        if hasattr(data, "status") and data.status:
             status_info = data.status
-            is_running = getattr(status_info, 'running', False)
+            is_running = getattr(status_info, "running", False)
 
             # Add daemon information with enhanced formatting
             status_icon = "🟢" if is_running else "🔴"
-            status_text = f"{status_icon} [green]Running[/green]" if is_running else f"{status_icon} [red]Stopped[/red]"
+            status_text = (
+                f"{status_icon} [green]Running[/green]"
+                if is_running
+                else f"{status_icon} [red]Stopped[/red]"
+            )
             table.add_row("Status", status_text)
 
             if is_running:
-                if hasattr(status_info, 'pid') and status_info.pid:
+                if hasattr(status_info, "pid") and status_info.pid:
                     table.add_row("Process ID", f"[bold]{status_info.pid}[/bold]")
-                if hasattr(status_info, 'uptime_seconds') and status_info.uptime_seconds:
-                    table.add_row("Uptime", f"[green]{format_uptime(status_info.uptime_seconds)}[/green]")
-                if hasattr(status_info, 'active_services'):
+                if (
+                    hasattr(status_info, "uptime_seconds")
+                    and status_info.uptime_seconds
+                ):
+                    table.add_row(
+                        "Uptime",
+                        f"[green]{format_uptime(status_info.uptime_seconds)}[/green]",
+                    )
+                if hasattr(status_info, "active_services"):
                     service_count = status_info.active_services or 0
                     service_icon = "🚀" if service_count > 0 else "💤"
-                    table.add_row("Active Services", f"{service_icon} [bold]{service_count}[/bold]")
-                
+                    table.add_row(
+                        "Active Services",
+                        f"{service_icon} [bold]{service_count}[/bold]",
+                    )
+
                 # Add helpful management commands
                 table.add_row("", "")  # Spacer
                 table.add_row("[dim]Management[/dim]", "[dim]Commands[/dim]")
@@ -344,9 +377,9 @@ class FormatRouter:
             # Fallback - show basic status based on success
             status_icon = "🔴"
             table.add_row("Status", f"{status_icon} [red]Stopped[/red]")
-            message = getattr(data, 'message', 'Daemon is not running')
+            message = getattr(data, "message", "Daemon is not running")
             table.add_row("Message", f"[dim]{message}[/dim]")
-            
+
             # Add helpful start commands
             table.add_row("", "")  # Spacer
             table.add_row("[dim]Quick Start[/dim]", "[dim]Commands[/dim]")
@@ -369,12 +402,14 @@ class FormatRouter:
             Rich table markup string
         """
         # For now, return a simple success/failure message
-        if hasattr(data, 'success'):
+        if hasattr(data, "success"):
             if data.success:
-                message = getattr(data, 'message', f'Daemon {command_name} completed successfully')
+                message = getattr(
+                    data, "message", f"Daemon {command_name} completed successfully"
+                )
                 return f"✓ {message}"
             else:
-                error = getattr(data, 'error', 'Unknown error')
+                error = getattr(data, "error", "Unknown error")
                 return f"✗ Daemon {command_name} failed: {error}"
         else:
             return f"Daemon {command_name} operation completed"

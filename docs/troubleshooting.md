@@ -1,615 +1,362 @@
 # Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with LocalPort using the comprehensive service logging and diagnostic capabilities.
+This guide helps you diagnose and resolve issues with LocalPort using its service logging
+and diagnostic capabilities.
 
 ## Quick Diagnostic Commands
 
-When something isn't working, start with these commands:
+When something isn't working, start here:
 
 ```bash
-# Check service status
-localport status
-
-# List available service logs
-localport logs --list
-
-# Validate configuration
-localport config validate
-
-# Check daemon status (if using daemon mode)
-localport daemon status
+localport status              # service status
+localport logs --list         # available service logs
+localport config validate     # configuration errors
+localport daemon status       # daemon state (if using daemon mode)
 ```
+
+## Understanding Error Output
+
+LocalPort formats errors with concise, actionable messages and hides sensitive details by
+default. Increase verbosity when you need more:
+
+- **Default** — a short message with a suggested fix.
+- **`--verbose` / `-v`** — adds service context and sanitized configuration details.
+- **`--debug` / `-vv`** — full technical details: complete file paths, error type, and
+  stack traces.
+
+```bash
+localport start database-service              # concise
+localport start database-service --verbose    # more context
+localport start database-service --debug       # everything
+```
+
+A typical concise error:
+
+```
+┌─ SSH Key Missing ─────────────────────────────────────────┐
+│ ❌ SSH key file not found: ~/.ssh/project_key.pem         │
+│                                                            │
+│ 💡 Quick Fix:                                             │
+│    • Generate SSH key: ssh-keygen -t rsa -f ~/.ssh/...    │
+│    • Update config to point to the correct SSH key path   │
+│                                                            │
+│ Use --verbose for technical details.                      │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Privacy in error messages
+
+Error output is sanitized so configs are safe to share:
+
+- User paths are shortened: `/Users/johndoe/.ssh/key.pem` → `~/.ssh/key.pem` (non-home
+  paths show the filename only).
+- Passwords, secrets, and SSH key contents are never logged or displayed.
+- Full file paths appear only in `--debug` mode.
 
 ## Service Logging Overview
 
-LocalPort v0.3.4+ includes comprehensive service logging that captures raw output from kubectl and SSH processes, making troubleshooting much more effective.
-
-### Log Locations
+LocalPort captures raw output from kubectl and SSH processes, making troubleshooting far
+more effective.
 
 ```bash
-# Show log directory locations
-localport logs --location
-
-# Default locations:
-# Service logs: ~/.local/share/localport/logs/services/
-# Daemon logs:  ~/.local/share/localport/logs/daemon.log
+localport logs --location    # show log directories
 ```
 
-### Log File Format
+Default locations:
 
-Service logs are named: `<service-name>_<unique-id>.log`
+- Service logs: `~/.local/share/localport/logs/services/`
+- Daemon log: `~/.local/share/localport/logs/daemon.log`
 
-Each log file contains:
-- **Metadata headers** with service configuration
-- **Raw subprocess output** from kubectl/ssh
-- **Connection events** and error messages
-- **Platform-specific diagnostic information**
+Service logs are named `<service-name>_<unique-id>.log` and contain metadata headers, raw
+subprocess output, connection events, and error messages.
 
 ## Common Issues and Solutions
 
-### 1. Service Won't Start
+### 1. Service won't start
 
-**Symptoms:**
-- Service shows "Failed" status
-- Error messages about port conflicts or connection failures
-
-**Diagnostic Steps:**
+**Symptoms:** service shows "Failed"; errors about port conflicts or connection failures.
 
 ```bash
-# Check service status
 localport status
-
-# View service logs for detailed error information
 localport logs --service <service-name>
-
-# Look for specific error patterns
 localport logs --service <service-name> --grep "error\|failed\|refused"
-
-# Validate configuration
 localport config validate
 ```
 
-**Common Causes and Solutions:**
+#### Port already in use
 
-#### Port Already in Use
 ```bash
-# Check what's using the port
-lsof -i :<port-number>
-
-# Example: Check port 5432
-lsof -i :5432
-
-# Kill the conflicting process (if safe)
-kill -9 <PID>
-
-# Or change the local port in your configuration
+lsof -i :<port-number>       # find the process holding the port
+kill -9 <PID>                # stop it (if safe), or change local_port in your config
 ```
 
-#### Kubernetes Resource Not Found
+#### Kubernetes resource not found
+
 ```bash
-# Check if the resource exists
-kubectl get service <service-name> -n <namespace>
-kubectl get deployment <deployment-name> -n <namespace>
-kubectl get pod <pod-name> -n <namespace>
-
-# Check your kubectl context
+kubectl get service <name> -n <namespace>
 kubectl config current-context
-kubectl config get-contexts
-
-# Verify namespace
 kubectl get namespaces
 ```
 
-#### SSH Connection Issues
-```bash
-# Test SSH connectivity manually
-ssh -i ~/.ssh/id_rsa user@host
-
-# Check SSH key permissions
-ls -la ~/.ssh/id_rsa
-chmod 600 ~/.ssh/id_rsa
-
-# Test SSH with verbose output
-ssh -v -i ~/.ssh/id_rsa user@host
-```
-
-### 2. Service Starts But Connection Fails
-
-**Symptoms:**
-- Service shows "Running" status
-- Cannot connect to local port
-- Connection refused errors
-
-**Diagnostic Steps:**
+#### SSH connection issues
 
 ```bash
-# Check if the port is actually bound
-netstat -tlnp | grep <port-number>
-# or
-ss -tlnp | grep <port-number>
-
-# View recent service logs
-localport logs --service <service-name> | tail -50
-
-# Look for connection-related errors
-localport logs --service <service-name> --grep "connection\|bind\|listen"
+ssh -i ~/.ssh/id_rsa user@host      # test manually
+chmod 600 ~/.ssh/id_rsa             # fix key permissions
+ssh -v -i ~/.ssh/id_rsa user@host   # verbose output
 ```
 
-**Common Solutions:**
+See the [SSH Setup Guide](ssh-setup.md) for authentication specifics.
 
-#### Port Forward Process Died
-```bash
-# Check service logs for process termination
-localport logs --service <service-name> --grep "exit\|terminated\|killed"
+### 2. Service starts but connection fails
 
-# Restart the service
-localport stop <service-name>
-localport start <service-name>
-```
-
-#### Wrong Target Configuration
-```bash
-# Verify the remote service is accessible
-kubectl port-forward service/<service-name> <local-port>:<remote-port> -n <namespace>
-
-# Check service endpoints
-kubectl get endpoints <service-name> -n <namespace>
-```
-
-### 3. Health Check Failures
-
-**Symptoms:**
-- Service shows "Unhealthy" status
-- Frequent restarts
-- Health check timeout errors
-
-**Diagnostic Steps:**
+**Symptoms:** service shows "Running" but you can't connect to the local port.
 
 ```bash
-# Check health check configuration
-localport config export --service <service-name>
-
-# View health check logs
-localport logs --service <service-name> --grep "health\|check\|timeout"
-
-# Test connectivity manually
-telnet localhost <port>  # For TCP health checks
-curl http://localhost:<port>/health  # For HTTP health checks
+ss -tlnp | grep <port-number>                 # confirm the port is bound
+localport logs --service <name> | tail -50
+localport logs --service <name> --grep "connection\|bind\|listen"
 ```
 
-**Common Solutions:**
+If the forward process died, restart it:
 
-#### Health Check Too Aggressive
+```bash
+localport stop <name>
+localport start <name>
+```
+
+Verify the target is reachable directly:
+
+```bash
+kubectl port-forward service/<name> <local-port>:<remote-port> -n <namespace>
+kubectl get endpoints <name> -n <namespace>
+```
+
+### 3. Health check failures
+
+**Symptoms:** service shows "Unhealthy" or restarts frequently.
+
+```bash
+localport config export --service <name>
+localport logs --service <name> --grep "health\|check\|timeout"
+telnet localhost <port>                 # TCP checks
+curl http://localhost:<port>/health     # HTTP checks
+```
+
+If the check is too aggressive, relax it:
+
 ```yaml
-# Adjust health check settings in configuration
 health_check:
   type: tcp
-  interval: 60        # Increase interval
-  timeout: 10.0       # Increase timeout
-  failure_threshold: 5  # Allow more failures
+  interval: 60
+  timeout: 10.0
+  failure_threshold: 5
 ```
 
-#### PostgreSQL Health Check Authentication
-```bash
-# Ensure password is set
-export DB_PASSWORD=your-password
+PostgreSQL checks need a password (`export DB_PASSWORD=...`). For Kafka, prefer a TCP
+check with a longer interval and higher threshold. See the
+[Configuration Guide](configuration.md#health-checks) for all options.
 
-# Test database connection manually
-psql -h localhost -p <port> -U <user> -d <database>
-```
+### 4. Unnecessary restarts during cluster outages
 
-#### Kafka Health Check Issues
-```yaml
-# Use TCP health check instead for Kafka
-health_check:
-  type: tcp
-  interval: 45
-  timeout: 15.0
-  failure_threshold: 3
-```
+For kubectl services, LocalPort can monitor **cluster** health separately from service
+health. With `cluster_aware: true` on a health check (and a `cluster_health` section),
+LocalPort checks the cluster first and skips restarts when the cluster — not the service —
+is the problem. This avoids restart loops during temporary connectivity issues and is
+especially useful for Mac users hit by idle-state connection drops (see below). A 4-minute
+cluster keepalive interval works well as a default. Configure it in the
+[Configuration Guide](configuration.md#cluster-health-monitoring), and
+inspect cluster state with `localport cluster status`.
 
-### 4. Configuration Issues
+### 5. Configuration issues
 
-**Symptoms:**
-- Validation errors
-- Services not loading
-- Environment variable substitution failures
-
-**Diagnostic Steps:**
+**Symptoms:** validation errors, services not loading, or unresolved environment
+variables.
 
 ```bash
-# Validate configuration with detailed output
-localport config validate --strict
-
-# Check environment variables
-echo $VARIABLE_NAME
-
-# Export configuration to see resolved values
-localport config export
+localport config validate
+localport config export                  # see resolved values
+echo $VARIABLE_NAME                      # confirm a variable is set
 ```
 
-**Common Solutions:**
+Check YAML syntax and indentation (spaces, not tabs):
 
-#### YAML Syntax Errors
 ```bash
-# Use a YAML validator
 python -c "import yaml; yaml.safe_load(open('localport.yaml'))"
-
-# Check indentation (use spaces, not tabs)
-cat -A localport.yaml
 ```
 
-#### Missing Environment Variables
-```bash
-# Set required variables
-export KUBE_CONTEXT=my-cluster
-export DB_PASSWORD=secret
+Use defaults for optional variables: `namespace: ${KUBE_NAMESPACE:default}`.
 
-# Use default values in configuration
-connection:
-  namespace: ${KUBE_NAMESPACE:default}
-  context: ${KUBE_CONTEXT:minikube}
-```
+### 6. Daemon mode issues
 
-### 5. Daemon Mode Issues
-
-**Symptoms:**
-- Daemon won't start
-- Services not auto-starting
-- Configuration changes not applied
-
-**Diagnostic Steps:**
+**Symptoms:** daemon won't start, services don't auto-start, or config changes aren't
+applied.
 
 ```bash
-# Check daemon status
 localport daemon status
-
-# View daemon logs
-localport logs
-
-# Check for daemon process
+localport logs                    # daemon logs
 ps aux | grep localport
 ```
 
-**Common Solutions:**
+If a stale daemon is running, restart it:
 
-#### Daemon Already Running
 ```bash
-# Stop existing daemon
 localport daemon stop
-
-# Start fresh daemon
 localport daemon start --auto-start
 ```
 
-#### Permission Issues
-```bash
-# Check log directory permissions
-ls -la ~/.local/share/localport/logs/
+Check log-directory permissions if startup fails:
 
-# Create directories if missing
+```bash
+ls -la ~/.local/share/localport/logs/
 mkdir -p ~/.local/share/localport/logs/services/
 ```
 
-### 6. Platform-Specific Issues
+## Platform-Specific Issues
 
-#### macOS Issues
-
-##### Services Fail During Inactivity (Lunch Breaks, Overnight)
+### macOS: services fail during inactivity (lunch breaks, overnight)
 
 **Symptoms:**
-- Services work fine during active computer use
-- Services fail after periods of inactivity (lunch breaks, overnight)
-- Log shows "error: lost connection to pod" messages
-- Services restart automatically when you return to computer
 
-**Root Cause:**
-macOS aggressively manages network connections during idle periods to save power. When you step away from your computer, the system enters power-saving mode that can terminate kubectl port-forward processes.
+- Services work during active use but fail after periods of inactivity
+- Logs show "error: lost connection to pod"
+- Services restart automatically when you return to the computer
 
-**Diagnostic Steps:**
+**Root cause:** macOS aggressively manages network connections during idle periods to save
+power. When you step away, power-saving mode can terminate kubectl port-forward processes.
+macOS treats "user away" differently from "user present but idle", deprioritizing
+background network connections and throttling kubectl port-forwards.
+
+**Diagnostic steps:**
+
 ```bash
-# Check current power management settings
-pmset -g
-
-# Look for idle-related connection drops in logs
-localport logs --service <service-name> --grep "lost connection\|error.*connection"
-
-# Check if networkoversleep is disabled (this is the main culprit)
-pmset -g | grep networkoversleep
+pmset -g                                          # current power settings
+pmset -g | grep networkoversleep                  # the main culprit
+localport logs --service <name> --grep "lost connection\|error.*connection"
 ```
 
-**Solution - Fix Power Management Settings:**
-
-The most critical fix is to prevent network sleep during idle periods:
+**Solution — fix power management (the most effective fix):**
 
 ```bash
-# MOST IMPORTANT: Maintain network connections during idle (AC power)
+# MOST IMPORTANT: maintain network connections during idle (AC power)
 sudo pmset -c networkoversleep 1
 
-# Prevent display sleep from affecting network connections
-sudo pmset -c displaysleep 30  # Extend to 30 minutes, or 0 to disable
-
-# Disable disk sleep when plugged in
+# Reduce power-saving interference
+sudo pmset -c displaysleep 30    # extend, or 0 to disable
 sudo pmset -c disksleep 0
-
-# Ensure system doesn't sleep when plugged in
 sudo pmset -c sleep 0
-
-# Disable Power Nap which can interfere during idle periods
 sudo pmset -c powernap 0
 ```
 
-**Additional Network Stability Improvements:**
+Enable system-wide TCP keepalives:
 
 ```bash
-# Enable TCP keepalives system-wide (temporary - resets on reboot)
 sudo sysctl -w net.inet.tcp.always_keepalive=1
-
-# Make TCP keepalives permanent
-echo "net.inet.tcp.always_keepalive=1" | sudo tee -a /etc/sysctl.conf
+echo "net.inet.tcp.always_keepalive=1" | sudo tee -a /etc/sysctl.conf   # persist
 ```
 
-**Configuration Adjustments for Better Idle Tolerance:**
-
-Update your LocalPort configuration to be more tolerant of brief connection issues:
+Make your configuration more tolerant of brief drops:
 
 ```yaml
 defaults:
   health_check:
-    interval: 60        # Increase from 30 seconds
-    timeout: 10.0       # Increase timeout
-    failure_threshold: 5  # Allow more failures before restart
+    interval: 60
+    timeout: 10.0
+    failure_threshold: 5
   restart_policy:
-    max_attempts: 10    # Increase max restart attempts
-    initial_delay: 5    # Longer initial delay
-    backoff_multiplier: 1.5  # Gentler backoff
+    max_attempts: 10
+    initial_delay: 5
+    backoff_multiplier: 1.5
 ```
 
-**Testing the Fix:**
-1. Apply the power management changes above
-2. Start your services: `localport start --all`
-3. Leave your computer idle for 1-2 hours
-4. Return and check: `localport status`
-5. Services should still be running and healthy
+Also consider enabling cluster-aware health checking (see issue 4 above), which prevents
+restart churn when idle drops affect cluster connectivity.
 
-**Why This Happens:**
-- macOS treats "user away" differently than "user present but idle"
-- Network connections are deprioritized when no user activity is detected
-- Display sleep (after 10 minutes) triggers more aggressive power management
-- kubectl port-forward processes are seen as "background" and get throttled
+**Testing the fix:** apply the power settings, `localport start --all`, leave the machine
+idle for 1-2 hours, then check `localport status` — services should still be healthy.
 
-**Alternative Solutions:**
-If power management changes aren't suitable for your environment:
+**Alternatives** if power-management changes don't suit your environment: SSH tunnels
+(better built-in keepalive than kubectl), a VPN to the cluster network, ingress
+controllers with stable endpoints, or a dedicated always-on machine to hold the tunnels.
+These can be more resilient but may still be affected by idle-state management.
 
-1. **Use SSH tunnels with keepalive settings** (may be more resilient than kubectl):
-   ```yaml
-   technology: ssh
-   connection:
-     host: bastion.example.com
-     user: myuser
-     remote_host: internal-service
-     # SSH has better built-in keepalive mechanisms
-   ```
-   Note: SSH tunnels may still be affected by the same idle issues, but SSH has better built-in keepalive and reconnection mechanisms than kubectl port-forward.
+### macOS: general connection instability
 
-2. **Use a VPN connection** to your cluster network (most reliable for idle periods)
-
-3. **Set up ingress controllers** with stable external endpoints (eliminates port-forwarding entirely)
-
-4. **Use a dedicated always-on machine** (like a small server or Raspberry Pi) to maintain the tunnels
-
-**Important:** The power management fix above is the most effective solution. Alternative connection methods may still be affected by Mac's idle-state network management, though some (like VPN or ingress) can be more resilient.
-
-##### General macOS Connection Issues
-
-**Symptoms:**
-- Frequent connection drops during active use
-- Port forwarding instability
-- Network-related errors
-
-**Diagnostic Steps:**
 ```bash
-# Check for macOS-specific errors in logs
-localport logs --service <service-name> --grep "darwin\|macos\|network"
-
-# Monitor system logs for network issues
-log stream --predicate 'process == "kubectl"' --info
-
-# Check WiFi vs Ethernet connection stability
+localport logs --service <name> --grep "darwin\|macos\|network"
 networksetup -listallhardwareports
 ```
 
-**Solutions:**
+If on Wi-Fi, consider Ethernet for more stable connections, and check interface stats with
+`netstat -i`.
+
+### Linux: permission and network issues
+
 ```bash
-# If on WiFi, disable WiFi power management
-sudo /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport en0 prefs DisconnectOnLogout=NO
-
-# Consider using Ethernet for more stable connections
-# Check network interface statistics
-netstat -i
-```
-
-#### Ubuntu/Linux Issues
-
-**Symptoms:**
-- Permission denied errors
-- Network configuration issues
-
-**Diagnostic Steps:**
-```bash
-# Check for Linux-specific errors
-localport logs --service <service-name> --grep "linux\|permission\|network"
-
-# Check firewall settings
+localport logs --service <name> --grep "linux\|permission\|network"
 sudo ufw status
 sudo iptables -L
 ```
 
 ## Advanced Troubleshooting
 
-### Using External Tools with Service Logs
+### Using external tools with service logs
 
 ```bash
-# Follow logs in real-time
-tail -f $(localport logs --service <service-name> --path)
-
-# Search logs with advanced patterns
-grep -E "(error|failed|timeout)" $(localport logs --service <service-name> --path)
-
-# Analyze logs with awk
-awk '/error/ {print $0}' $(localport logs --service <service-name> --path)
-
-# View logs with less for easy navigation
-less $(localport logs --service <service-name> --path)
+tail -f "$(localport logs --service <name> --path)"
+grep -E "(error|failed|timeout)" "$(localport logs --service <name> --path)"
+less "$(localport logs --service <name> --path)"
 ```
 
-### Debugging Network Issues
+### Debugging network issues
 
 ```bash
-# Test local port binding
-nc -l <port>  # In one terminal
-nc localhost <port>  # In another terminal
-
-# Check routing
-netstat -rn
-
-# Test DNS resolution
-nslookup <hostname>
-dig <hostname>
+nc -l <port>            # listen in one terminal
+nc localhost <port>     # connect in another
+netstat -rn             # check routing
+dig <hostname>          # DNS resolution
 ```
 
-### Debugging Kubernetes Issues
+### Debugging Kubernetes issues
 
 ```bash
-# Check cluster connectivity
 kubectl cluster-info
-
-# View pod logs
 kubectl logs <pod-name> -n <namespace>
-
-# Check service endpoints
-kubectl describe service <service-name> -n <namespace>
-
-# Test port forward manually
-kubectl port-forward service/<service-name> <local-port>:<remote-port> -n <namespace>
+kubectl describe service <name> -n <namespace>
+kubectl port-forward service/<name> <local-port>:<remote-port> -n <namespace>
 ```
 
-### Debugging SSH Issues
+### Debugging SSH issues
 
 ```bash
-# Test SSH with maximum verbosity
-ssh -vvv -i ~/.ssh/id_rsa user@host
-
-# Check SSH agent
-ssh-add -l
-
-# Test SSH tunnel manually
-ssh -L <local-port>:localhost:<remote-port> -N user@host
+ssh -vvv -i ~/.ssh/id_rsa user@host       # maximum verbosity
+ssh-add -l                                # keys in the agent
+ssh -L <local-port>:localhost:<remote-port> -N user@host   # tunnel manually
 ```
 
-## Performance Troubleshooting
+### Managing log size
 
-### High CPU Usage
-
-```bash
-# Check process CPU usage
-top -p $(pgrep -f localport)
-
-# Monitor system resources
-htop
-
-# Check for excessive health checking
-localport logs --service <service-name> --grep "health.*check" | wc -l
-```
-
-### Memory Issues
+Logs auto-rotate at 10MB and are cleaned up after a few days. To remove old logs manually:
 
 ```bash
-# Check memory usage
-ps aux | grep localport
-
-# Monitor memory over time
-watch 'ps aux | grep localport'
-```
-
-### Log File Size Issues
-
-```bash
-# Check log file sizes
 du -sh ~/.local/share/localport/logs/services/*
-
-# Clean up old logs (logs auto-rotate at 10MB)
 find ~/.local/share/localport/logs/services/ -name "*.log" -mtime +3 -delete
 ```
 
 ## Getting Help
 
-### Information to Include in Bug Reports
+When reporting an issue, include:
 
-When reporting issues, include:
+1. LocalPort version: `localport --version`
+2. OS: `uname -a`
+3. Python version: `python --version`
+4. Sanitized config: `localport config export`
+5. Service status: `localport --output json status`
+6. Relevant logs: `localport logs --service <name>`
+7. Full error output with `--verbose`
 
-1. **LocalPort version**: `localport --version`
-2. **Operating system**: `uname -a`
-3. **Python version**: `python --version`
-4. **Configuration** (sanitized): `localport config export`
-5. **Service status**: `localport status --output json`
-6. **Relevant logs**: `localport logs --service <service-name>`
-7. **Error messages**: Full error output with `--verbose`
+Community support:
 
-### Verbose Mode
-
-Enable verbose mode for detailed debugging:
-
-```bash
-# Verbose output for all commands
-localport --verbose start --all
-localport --verbose status
-localport --verbose daemon start
-```
-
-### Log Analysis Tips
-
-1. **Start with recent logs**: `tail -100 <log-file>`
-2. **Look for error patterns**: `grep -i error <log-file>`
-3. **Check timestamps**: Look for timing patterns in failures
-4. **Compare working vs failing**: Use diff to compare logs
-5. **Check metadata headers**: Service configuration is logged at startup
-
-### Community Support
-
-- **GitHub Issues**: [Report bugs and request features](https://github.com/dawsonlp/localport/issues)
-- **Discussions**: [Ask questions and share tips](https://github.com/dawsonlp/localport/discussions)
-- **Documentation**: [Complete documentation](https://github.com/dawsonlp/localport/tree/main/docs)
-
-## Prevention Tips
-
-### Configuration Best Practices
-
-1. **Use health checks** for critical services
-2. **Set appropriate timeouts** based on service characteristics
-3. **Use environment variables** for sensitive data
-4. **Validate configuration** before deployment
-5. **Use tags** to organize services
-
-### Monitoring Best Practices
-
-1. **Check status regularly**: `localport status`
-2. **Monitor logs**: Set up log rotation and monitoring
-3. **Use daemon mode** for production deployments
-4. **Set up alerts** for service failures
-5. **Regular configuration backups**: `localport config export`
-
-### Maintenance Tasks
-
-```bash
-# Weekly maintenance
-localport config validate
-localport daemon reload  # If using daemon mode
-localport logs --location  # Check log sizes
-
-# Monthly maintenance
-localport config export --output backup-$(date +%Y%m%d).yaml
-# Clean up old logs if needed
-```
-
-This troubleshooting guide should help you quickly identify and resolve most issues with LocalPort. The comprehensive service logging in v0.3.4+ makes debugging much more effective than previous versions.
+- [GitHub Issues](https://github.com/dawsonlp/localport/issues) — bugs and feature requests
+- [GitHub Discussions](https://github.com/dawsonlp/localport/discussions) — questions and tips
+</content>

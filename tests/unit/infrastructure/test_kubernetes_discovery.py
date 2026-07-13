@@ -1,12 +1,10 @@
 """Tests for Kubernetes discovery infrastructure components."""
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from localport.infrastructure.repositories.yaml_config_repository import YamlConfigRepository
-from localport.domain.value_objects.discovery import KubernetesResource, DiscoveredPort
-from localport.domain.exceptions import KubernetesResourceNotFoundError
+from localport.infrastructure.repositories.yaml_config_repository import (
+    YamlConfigRepository,
+)
 
 
 class TestYamlConfigRepositoryExtensions:
@@ -26,16 +24,17 @@ class TestYamlConfigRepositoryExtensions:
                     "remote_port": 8080,
                     "connection": {
                         "resource_name": "existing-service",
-                        "namespace": "default"
-                    }
+                        "namespace": "default",
+                    },
                 }
-            ]
+            ],
         }
-        
+
         import yaml
-        with open(config_file, 'w') as f:
+
+        with open(config_file, "w") as f:
             yaml.dump(initial_config, f)
-        
+
         return config_file
 
     @pytest.fixture
@@ -48,7 +47,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test service_exists returns True for existing service."""
         # Act
         exists = await yaml_repo.service_exists("existing-service")
-        
+
         # Assert
         assert exists is True
 
@@ -57,7 +56,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test service_exists returns False for non-existing service."""
         # Act
         exists = await yaml_repo.service_exists("non-existent-service")
-        
+
         # Assert
         assert exists is False
 
@@ -66,7 +65,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test getting list of service names."""
         # Act
         service_names = await yaml_repo.get_service_names()
-        
+
         # Assert
         assert service_names == ["existing-service"]
 
@@ -79,15 +78,12 @@ class TestYamlConfigRepositoryExtensions:
             "technology": "ssh",
             "local_port": 5433,
             "remote_port": 5432,
-            "connection": {
-                "host": "db.example.com",
-                "user": "dbuser"
-            }
+            "connection": {"host": "db.example.com", "user": "dbuser"},
         }
-        
+
         # Act
         await yaml_repo.add_service_config(new_service)
-        
+
         # Assert
         service_names = await yaml_repo.get_service_names()
         assert "new-service" in service_names
@@ -98,7 +94,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test removing an existing service configuration."""
         # Act
         removed = await yaml_repo.remove_service_config("existing-service")
-        
+
         # Assert
         assert removed is True
         service_names = await yaml_repo.get_service_names()
@@ -110,7 +106,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test removing a non-existent service returns False."""
         # Act
         removed = await yaml_repo.remove_service_config("non-existent")
-        
+
         # Assert
         assert removed is False
 
@@ -119,7 +115,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test getting configuration for a specific service."""
         # Act
         service_config = await yaml_repo.get_service_config("existing-service")
-        
+
         # Assert
         assert service_config is not None
         assert service_config["name"] == "existing-service"
@@ -131,7 +127,7 @@ class TestYamlConfigRepositoryExtensions:
         """Test getting configuration for a non-existent service."""
         # Act
         service_config = await yaml_repo.get_service_config("non-existent")
-        
+
         # Assert
         assert service_config is None
 
@@ -141,21 +137,23 @@ class TestYamlConfigRepositoryExtensions:
         # Arrange
         updated_service = {
             "name": "existing-service",
-            "technology": "kubectl", 
+            "technology": "kubectl",
             "local_port": 9090,  # Changed port
             "remote_port": 8080,
             "connection": {
                 "resource_name": "existing-service",
-                "namespace": "production"  # Changed namespace
-            }
+                "namespace": "production",  # Changed namespace
+            },
         }
-        
+
         # Act
-        updated = await yaml_repo.update_service_config("existing-service", updated_service)
-        
+        updated = await yaml_repo.update_service_config(
+            "existing-service", updated_service
+        )
+
         # Assert
         assert updated is True
-        
+
         # Verify the update
         service_config = await yaml_repo.get_service_config("existing-service")
         assert service_config["local_port"] == 9090
@@ -170,12 +168,12 @@ class TestYamlConfigRepositoryExtensions:
             "technology": "ssh",
             "local_port": 8080,
             "remote_port": 80,
-            "connection": {"host": "server.com"}
+            "connection": {"host": "server.com"},
         }
-        
+
         # Act
         updated = await yaml_repo.update_service_config("non-existent", service_config)
-        
+
         # Assert
         assert updated is False
 
@@ -184,13 +182,14 @@ class TestYamlConfigRepositoryExtensions:
         """Test creating a configuration backup."""
         # Act
         backup_path = await yaml_repo.backup_configuration()
-        
+
         # Assert
         assert backup_path is not None
         assert "backup_" in backup_path
-        
+
         # Verify backup file exists
         from pathlib import Path
+
         assert Path(backup_path).exists()
 
     @pytest.mark.asyncio
@@ -198,15 +197,15 @@ class TestYamlConfigRepositoryExtensions:
         """Test that operations are atomic with backup/rollback."""
         # This test would need more complex mocking to simulate failures
         # For now, we test that the backup functionality works
-        
+
         # Act
         original_config = await yaml_repo.load_configuration()
         backup_path = await yaml_repo.backup_configuration()
-        
+
         # Assert backup contains the same data
         backup_repo = YamlConfigRepository(backup_path)
         backup_config = await backup_repo.load_configuration()
-        
+
         assert backup_config["services"] == original_config["services"]
 
     @pytest.mark.asyncio
@@ -218,18 +217,20 @@ class TestYamlConfigRepositoryExtensions:
             "technology": "kubectl",
             "local_port": 3000,
             "remote_port": 3000,
-            "connection": {"resource_name": "test", "namespace": "default"}
+            "connection": {"resource_name": "test", "namespace": "default"},
         }
-        
+
         await yaml_repo.add_service_config(new_service)
         config = await yaml_repo.load_configuration()
-        
+
         # Assert - Original structure is maintained
         assert "version" in config
         assert config["version"] == "1.0"
         assert "services" in config
         assert len(config["services"]) == 2
-        
+
         # Find the added service
-        added_service = next(s for s in config["services"] if s["name"] == "test-preservation")
+        added_service = next(
+            s for s in config["services"] if s["name"] == "test-preservation"
+        )
         assert added_service["technology"] == "kubectl"

@@ -2,13 +2,12 @@
 
 import pytest
 
+from localport.domain.entities.service import Service
+from localport.domain.enums import ForwardingTechnology
 from localport.domain.value_objects.discovery import (
     DiscoveredPort,
     KubernetesResource,
 )
-from localport.domain.entities.service import Service
-from localport.domain.enums import ForwardingTechnology
-from localport.domain.value_objects.connection_info import ConnectionInfo
 
 
 class TestDiscoveredPortValueObject:
@@ -56,7 +55,9 @@ class TestKubernetesResourceValueObject:
             name="postgres",
             namespace="default",
             resource_type="service",
-            available_ports=[DiscoveredPort(port=5432, protocol="tcp", name="postgresql")]
+            available_ports=[
+                DiscoveredPort(port=5432, protocol="tcp", name="postgresql")
+            ],
         )
         assert resource.name == "postgres"
         assert resource.namespace == "default"
@@ -72,7 +73,7 @@ class TestKubernetesResourceValueObject:
             available_ports=[
                 DiscoveredPort(port=80, protocol="tcp", name="http"),
                 DiscoveredPort(port=443, protocol="tcp", name="https"),
-            ]
+            ],
         )
         assert len(resource.available_ports) == 2
 
@@ -87,7 +88,7 @@ class TestServiceDiscoveryFactories:
             namespace="default",
             local_port=5433,
             remote_port=5432,
-            service_name="postgres"
+            service_name="postgres",
         )
         assert service.name == "postgres"
         assert service.technology == ForwardingTechnology.KUBECTL
@@ -101,15 +102,17 @@ class TestServiceDiscoveryFactories:
             namespace="production",
             local_port=8080,
             remote_port=80,
-            service_name="web-app"
+            service_name="web-app",
         )
         assert service.local_port == 8080
         assert service.remote_port == 80
 
     def test_from_ssh_config_basic(self):
         """Test creating a Service from SSH configuration."""
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        import os
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             os.chmod(f.name, 0o600)
             key_path = f.name
@@ -120,7 +123,7 @@ class TestServiceDiscoveryFactories:
                 user="ec2-user",
                 key_file=key_path,
                 local_port=5433,
-                remote_port=5432
+                remote_port=5432,
             )
             assert service.name == "rds-tunnel"
             assert service.technology == ForwardingTechnology.SSH
@@ -135,15 +138,17 @@ class TestServiceDiscoveryFactories:
             service_name="simple-ssh",
             host="example.com",
             local_port=3306,
-            remote_port=3306
+            remote_port=3306,
         )
         assert service.name == "simple-ssh"
         assert service.technology == ForwardingTechnology.SSH
 
     def test_from_ssh_config_with_bastion(self):
         """Test creating a Service from SSH config with bastion host."""
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+        import os
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write("fake-key")
             os.chmod(f.name, 0o600)
             key_path = f.name
@@ -155,10 +160,13 @@ class TestServiceDiscoveryFactories:
                 key_file=key_path,
                 local_port=5433,
                 remote_port=5432,
-                remote_host="internal-db.rds.amazonaws.com"
+                remote_host="internal-db.rds.amazonaws.com",
             )
             assert service.name == "rds-via-bastion"
-            assert service.connection_info.get_ssh_remote_host() == "internal-db.rds.amazonaws.com"
+            assert (
+                service.connection_info.get_ssh_remote_host()
+                == "internal-db.rds.amazonaws.com"
+            )
         finally:
             os.unlink(key_path)
 
@@ -169,8 +177,6 @@ class TestDomainExceptions:
     def test_no_ports_available_error(self):
         """Test NoPortsAvailableError can be raised."""
         from localport.domain.exceptions import NoPortsAvailableError
+
         with pytest.raises(NoPortsAvailableError):
-            raise NoPortsAvailableError(
-                resource_name="postgres",
-                namespace="default"
-            )
+            raise NoPortsAvailableError(resource_name="postgres", namespace="default")

@@ -14,6 +14,7 @@ logger = structlog.get_logger()
 
 class AdapterType(str, Enum):
     """Supported adapter types."""
+
     KUBECTL = "kubectl"
     SSH = "ssh"
 
@@ -48,9 +49,11 @@ class AdapterFactory:
             return self._adapter_instances[adapter_type]
 
         if adapter_type not in self._adapters:
-            logger.error("Unsupported adapter type",
-                        type=adapter_type,
-                        supported_types=list(self._adapters.keys()))
+            logger.error(
+                "Unsupported adapter type",
+                type=adapter_type,
+                supported_types=list(self._adapters.keys()),
+            )
             return None
 
         adapter_class = self._adapters[adapter_type]
@@ -69,21 +72,25 @@ class AdapterFactory:
             # Cache the instance
             self._adapter_instances[adapter_type] = adapter
 
-            logger.info("Created adapter instance",
-                       type=adapter_type,
-                       name=adapter.get_adapter_name())
+            logger.info(
+                "Created adapter instance",
+                type=adapter_type,
+                name=adapter.get_adapter_name(),
+            )
 
             return adapter
 
         except Exception as e:
-            logger.error("Failed to create adapter instance",
-                        type=adapter_type,
-                        error=str(e))
+            logger.error(
+                "Failed to create adapter instance", type=adapter_type, error=str(e)
+            )
             if isinstance(e, AdapterNotAvailableError):
                 raise
             return None
 
-    async def get_adapter(self, technology: ForwardingTechnology) -> PortForwardingAdapter | None:
+    async def get_adapter(
+        self, technology: ForwardingTechnology
+    ) -> PortForwardingAdapter | None:
         """Get an adapter for a specific forwarding technology.
 
         Args:
@@ -95,7 +102,9 @@ class AdapterFactory:
         adapter_type = technology.value
         return await self.create_adapter(adapter_type)
 
-    def register_adapter(self, adapter_type: str, adapter_class: type[PortForwardingAdapter]) -> None:
+    def register_adapter(
+        self, adapter_type: str, adapter_class: type[PortForwardingAdapter]
+    ) -> None:
         """Register a new adapter type.
 
         Args:
@@ -104,9 +113,11 @@ class AdapterFactory:
         """
         adapter_type = adapter_type.lower()
 
-        logger.info("Registering adapter type",
-                   type=adapter_type,
-                   class_name=adapter_class.__name__)
+        logger.info(
+            "Registering adapter type",
+            type=adapter_type,
+            class_name=adapter_class.__name__,
+        )
 
         self._adapters[adapter_type] = adapter_class
 
@@ -146,15 +157,19 @@ class AdapterFactory:
                 available = await adapter.check_prerequisites()
                 results[adapter_type] = available
 
-                logger.debug("Adapter availability check",
-                           type=adapter_type,
-                           available=available,
-                           required_tools=adapter.get_required_tools())
+                logger.debug(
+                    "Adapter availability check",
+                    type=adapter_type,
+                    available=available,
+                    required_tools=adapter.get_required_tools(),
+                )
 
             except Exception as e:
-                logger.error("Failed to check adapter prerequisites",
-                           type=adapter_type,
-                           error=str(e))
+                logger.error(
+                    "Failed to check adapter prerequisites",
+                    type=adapter_type,
+                    error=str(e),
+                )
                 results[adapter_type] = False
 
         return results
@@ -166,7 +181,11 @@ class AdapterFactory:
             List of available adapter type names
         """
         availability = await self.check_all_adapters()
-        return [adapter_type for adapter_type, available in availability.items() if available]
+        return [
+            adapter_type
+            for adapter_type, available in availability.items()
+            if available
+        ]
 
     async def cleanup_all_adapters(self) -> int:
         """Clean up dead processes from all adapter instances.
@@ -181,13 +200,17 @@ class AdapterFactory:
                 cleaned = await adapter.cleanup_dead_processes()
                 total_cleaned += cleaned
             except Exception as e:
-                logger.error("Failed to cleanup adapter processes",
-                           adapter=adapter.get_adapter_name(),
-                           error=str(e))
+                logger.error(
+                    "Failed to cleanup adapter processes",
+                    adapter=adapter.get_adapter_name(),
+                    error=str(e),
+                )
 
         if total_cleaned > 0:
-            logger.info("Cleaned up dead processes from all adapters",
-                       total_cleaned=total_cleaned)
+            logger.info(
+                "Cleaned up dead processes from all adapters",
+                total_cleaned=total_cleaned,
+            )
 
         return total_cleaned
 
@@ -197,9 +220,7 @@ class AdapterFactory:
         logger.debug("Cleared adapter instance cache")
 
     async def validate_connection_info(
-        self,
-        adapter_type: str,
-        connection_info: dict[str, any]
+        self, adapter_type: str, connection_info: dict[str, any]
     ) -> list[str]:
         """Validate connection information for a specific adapter type.
 
@@ -220,9 +241,11 @@ class AdapterFactory:
         except AdapterNotAvailableError as e:
             return [str(e)]
         except Exception as e:
-            logger.error("Failed to validate connection info",
-                        adapter_type=adapter_type,
-                        error=str(e))
+            logger.error(
+                "Failed to validate connection info",
+                adapter_type=adapter_type,
+                error=str(e),
+            )
             return [f"Validation failed: {str(e)}"]
 
 
@@ -242,7 +265,9 @@ async def create_adapter(adapter_type: str) -> PortForwardingAdapter | None:
     return await _default_factory.create_adapter(adapter_type)
 
 
-async def get_adapter_for_technology(technology: ForwardingTechnology) -> PortForwardingAdapter | None:
+async def get_adapter_for_technology(
+    technology: ForwardingTechnology,
+) -> PortForwardingAdapter | None:
     """Get an adapter for a specific forwarding technology.
 
     Args:
@@ -254,7 +279,9 @@ async def get_adapter_for_technology(technology: ForwardingTechnology) -> PortFo
     return await _default_factory.get_adapter(technology)
 
 
-def register_adapter(adapter_type: str, adapter_class: type[PortForwardingAdapter]) -> None:
+def register_adapter(
+    adapter_type: str, adapter_class: type[PortForwardingAdapter]
+) -> None:
     """Register a new adapter type with the default factory.
 
     Args:

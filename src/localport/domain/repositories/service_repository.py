@@ -135,6 +135,7 @@ class ServiceRepository(ABC):
 
 class RepositoryError(Exception):
     """Base exception for repository errors."""
+
     pass
 
 

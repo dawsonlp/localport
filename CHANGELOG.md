@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-13
+
+### Removed
+- **`cluster events` and `cluster pods` commands**: these were never functional — they queried the daemon's in-memory monitor state, which a standalone CLI process cannot reach, and one was an explicit stub. Removed the commands and the now-dead public `get_cluster_events` API they relied on. `cluster status` (which queries kubectl directly) is unaffected.
+
+### Fixed
+- **Hot reload crash**: Health monitoring registered each service loop with both the `TaskManager` and the `CooperativeTask`, running two loops per service and leaving a task name that was never released — so the second monitoring start (config hot reload) raised `ValueError: Task already exists`. The `CooperativeTask` now solely owns its loop; hot reload works and each service is health-checked once per interval.
+- **`enabled: false` ignored**: The YAML loader validated the `enabled` field but never propagated it to the `Service` entity, so disabled services were still auto-started. The flag is now honored.
+- **Dead kubectl forwards reported as running**: liveness used `psutil.pid_exists`, which is true for zombie processes; kubectl forwards (not reaped in the daemon) lingered as zombies and were reported healthy. Zombie/dead processes are now treated as not alive, consistent with SSH forwards.
+- **Daemon PID reuse**: daemon status/stop/reload trusted a bare PID from the PID file with no identity check, so a stale PID reused by another process could be signalled or killed. The PID is now verified to be a LocalPort daemon first.
+- **`statefulset` resource type**: the domain validator rejected `statefulset` at config load while the kubectl adapter accepted it; both now allow it.
+- **Repeated `daemon reload` dropped**: the signal handler's deduplication set was never cleared for recurring signals, so only the first `SIGUSR1` reload was delivered. Deduplication now applies only to one-shot shutdown signals; reload/status signals are re-deliverable.
+- **`localport logs` JSON output crashed**: three JSON error paths referenced `json` without importing it (`NameError`); `json` is now imported once at module level.
+- **`HealthCheckResult.error`**: a classmethod named `error` shadowed the `error` field, so a healthy result's `.error` returned a bound method instead of `None` (making `if result.error:` wrongly truthy). The factory is renamed `errored()`.
+
+### Changed
+- **Linting/formatting enforced, mypy dropped from CI**: the codebase is now formatted with `black` and clean under `ruff` (CI had been red for ~a year on ~2,800 findings). `ruff` + `black` are the enforced CI gates; `mypy` is kept as an optional local tool (`uv run mypy src/`) but is no longer run in CI, where it produced release friction without surfacing real bugs.
+- **Single signal-handling subsystem**: the daemon ran two competing signal subsystems (`AsyncSignalHandler` plus `signal.signal` handlers installed by `DaemonManager`) that both grabbed SIGTERM/SIGUSR1. `DaemonManager` no longer installs OS signal handlers; the daemon process owns signals via `AsyncSignalHandler`/`ShutdownCoordinator`.
+- **Documentation reconciled with the shipped release**: removed stale "ALPHA/BETA 0.3.x" banners (README, CLI, getting-started), corrected SSH status everywhere (SSH and bastion hosts are shipped, not "planned for v0.4.0"), rewrote the CLI reference against the real command signatures, and fixed the documented Python minimum (3.11+).
+
+### Removed
+- **Dead code**: orphaned modules (`health_monitor.py`, `version_command.py`, `kubectl_capabilities.py`), unused DTOs/exceptions/shutdown helpers, and unused imports.
+- **Unused dependencies**: `tenacity` and the redundant explicit `click` (provided transitively by `typer`).
+- **Stale files**: superseded release notes, agent-evaluation reports, a design doc for an already-shipped feature, and stray root test configs.
+
 ### 🎯 Improved
 - **User-Friendly Error Messages**: Replaced verbose technical error messages with concise, actionable feedback
   - SSH key not found errors now show safe paths (`~/.ssh/key.pem`) instead of full system paths

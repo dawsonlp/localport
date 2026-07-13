@@ -19,27 +19,20 @@ class ServiceStartResult:
 
     @classmethod
     def success_result(
-        cls,
-        service_name: str,
-        process_id: int,
-        started_at: datetime | None = None
+        cls, service_name: str, process_id: int, started_at: datetime | None = None
     ) -> "ServiceStartResult":
         """Create a successful start result."""
         return cls(
             service_name=service_name,
             success=True,
             process_id=process_id,
-            started_at=started_at or datetime.now()
+            started_at=started_at or datetime.now(),
         )
 
     @classmethod
     def failure_result(cls, service_name: str, error: str) -> "ServiceStartResult":
         """Create a failed start result."""
-        return cls(
-            service_name=service_name,
-            success=False,
-            error=error
-        )
+        return cls(service_name=service_name, success=False, error=error)
 
 
 @dataclass
@@ -53,25 +46,19 @@ class ServiceStopResult:
 
     @classmethod
     def success_result(
-        cls,
-        service_name: str,
-        stopped_at: datetime | None = None
+        cls, service_name: str, stopped_at: datetime | None = None
     ) -> "ServiceStopResult":
         """Create a successful stop result."""
         return cls(
             service_name=service_name,
             success=True,
-            stopped_at=stopped_at or datetime.now()
+            stopped_at=stopped_at or datetime.now(),
         )
 
     @classmethod
     def failure_result(cls, service_name: str, error: str) -> "ServiceStopResult":
         """Create a failed stop result."""
-        return cls(
-            service_name=service_name,
-            success=False,
-            error=error
-        )
+        return cls(service_name=service_name, success=False, error=error)
 
 
 @dataclass
@@ -97,33 +84,6 @@ class ServiceStatusInfo:
         """Initialize default values after dataclass creation."""
         if self.tags is None:
             self.tags = []
-
-
-@dataclass
-class HealthCheckInfo:
-    """Health check information."""
-
-    service_name: str
-    check_type: str
-    status: str
-    last_check: datetime | None = None
-    last_success: datetime | None = None
-    consecutive_failures: int = 0
-    failure_threshold: int = 3
-    response_time_ms: float | None = None
-    error_message: str | None = None
-
-    @property
-    def is_healthy(self) -> bool:
-        """Check if the health check is currently healthy."""
-        return self.status == "healthy"
-
-    @property
-    def failure_rate(self) -> float:
-        """Get the current failure rate as a percentage."""
-        if self.failure_threshold == 0:
-            return 0.0
-        return (self.consecutive_failures / self.failure_threshold) * 100
 
 
 @dataclass
@@ -184,34 +144,6 @@ class DaemonStatusInfo:
 
 
 @dataclass
-class ServiceMetrics:
-    """Service performance metrics."""
-
-    service_name: str
-    total_starts: int = 0
-    total_stops: int = 0
-    total_restarts: int = 0
-    total_failures: int = 0
-    average_startup_time_ms: float | None = None
-    average_response_time_ms: float | None = None
-    uptime_percentage: float = 0.0
-    last_failure: datetime | None = None
-    last_restart: datetime | None = None
-
-    @property
-    def reliability_score(self) -> float:
-        """Calculate a reliability score (0-100)."""
-        if self.total_starts == 0:
-            return 0.0
-
-        failure_rate = self.total_failures / self.total_starts
-        reliability = max(0.0, 1.0 - failure_rate) * 100
-
-        # Factor in uptime percentage
-        return (reliability + self.uptime_percentage) / 2
-
-
-@dataclass
 class BulkOperationResult:
     """Result of a bulk operation on multiple services."""
 
@@ -250,49 +182,9 @@ class BulkOperationResult:
 
 
 @dataclass
-class ConfigValidationResult:
-    """Result of configuration validation."""
-
-    is_valid: bool
-    errors: list[str]
-    warnings: list[str]
-    services_count: int = 0
-
-    @property
-    def has_errors(self) -> bool:
-        """Check if there are validation errors."""
-        return len(self.errors) > 0
-
-    @property
-    def has_warnings(self) -> bool:
-        """Check if there are validation warnings."""
-        return len(self.warnings) > 0
-
-    def add_error(self, error: str) -> None:
-        """Add a validation error."""
-        self.errors.append(error)
-        self.is_valid = False
-
-    def add_warning(self, warning: str) -> None:
-        """Add a validation warning."""
-        self.warnings.append(warning)
-
-
-@dataclass
-class ServiceMonitorResult:
-    """Result of service monitoring operation."""
-    service_name: str
-    is_healthy: bool
-    last_check: datetime
-    failure_count: int
-    restart_attempted: bool = False
-    restart_success: bool = False
-    error: str | None = None
-
-
-@dataclass
 class DaemonStatusResult:
     """Result of daemon status check."""
+
     running: bool
     pid: int | None = None
     uptime_seconds: float | None = None
@@ -318,6 +210,7 @@ class DaemonStatusResult:
 @dataclass
 class DaemonOperationResult:
     """Result of daemon operation."""
+
     command: str
     success: bool
     pid: int | None = None
@@ -327,24 +220,12 @@ class DaemonOperationResult:
 
     @classmethod
     def success_result(
-        cls,
-        command: str,
-        message: str,
-        pid: int | None = None
+        cls, command: str, message: str, pid: int | None = None
     ) -> "DaemonOperationResult":
         """Create a successful operation result."""
-        return cls(
-            command=command,
-            success=True,
-            message=message,
-            pid=pid
-        )
+        return cls(command=command, success=True, message=message, pid=pid)
 
     @classmethod
     def failure_result(cls, command: str, error: str) -> "DaemonOperationResult":
         """Create a failed operation result."""
-        return cls(
-            command=command,
-            success=False,
-            error=error
-        )
+        return cls(command=command, success=False, error=error)

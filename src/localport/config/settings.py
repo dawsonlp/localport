@@ -15,25 +15,12 @@ class Settings(BaseSettings):
 
     # CLI Configuration
     config_file: str | None = Field(
-        default=None,
-        description="Path to configuration file"
+        default=None, description="Path to configuration file"
     )
-    log_level: str = Field(
-        default="INFO",
-        description="Logging level"
-    )
-    verbose: bool = Field(
-        default=False,
-        description="Enable verbose output"
-    )
-    quiet: bool = Field(
-        default=False,
-        description="Suppress non-essential output"
-    )
-    no_color: bool = Field(
-        default=False,
-        description="Disable colored output"
-    )
+    log_level: str = Field(default="INFO", description="Logging level")
+    verbose: bool = Field(default=False, description="Enable verbose output")
+    quiet: bool = Field(default=False, description="Suppress non-essential output")
+    no_color: bool = Field(default=False, description="Disable colored output")
 
     # Configuration file discovery paths
     config_search_paths: list[str] = Field(
@@ -43,41 +30,37 @@ class Settings(BaseSettings):
             "~/.config/localport/config.yaml",
             "~/.config/localport/config.yml",
             "/etc/localport/config.yaml",
-            "/etc/localport/config.yml"
+            "/etc/localport/config.yml",
         ],
-        description="Paths to search for configuration files"
+        description="Paths to search for configuration files",
     )
 
     # Runtime directories
     runtime_dir: str | None = Field(
-        default=None,
-        description="Runtime directory for PID files, logs, etc."
+        default=None, description="Runtime directory for PID files, logs, etc."
     )
 
     # Service Logging Configuration
     service_logging_enabled: bool = Field(
-        default=True,
-        description="Enable service logging (captures kubectl/ssh output)"
+        default=True, description="Enable service logging (captures kubectl/ssh output)"
     )
     service_log_retention_days: int = Field(
-        default=3,
-        description="Number of days to retain service logs"
+        default=3, description="Number of days to retain service logs"
     )
     service_log_rotation_size_mb: int = Field(
-        default=10,
-        description="Size in MB at which to rotate service logs"
+        default=10, description="Size in MB at which to rotate service logs"
     )
     service_log_directory: str | None = Field(
         default=None,
-        description="Custom directory for service logs (default: runtime_dir/logs/services)"
+        description="Custom directory for service logs (default: runtime_dir/logs/services)",
     )
     service_log_buffer_size: int = Field(
-        default=8192,
-        description="Buffer size for service log writes (bytes)"
+        default=8192, description="Buffer size for service log writes (bytes)"
     )
 
     class Config:
         """Pydantic configuration."""
+
         env_prefix = "LOCALPORT_"
         env_file = ".env"
         case_sensitive = False
@@ -95,24 +78,28 @@ class Settings(BaseSettings):
         runtime_path = Path(self.runtime_dir)
         runtime_path.mkdir(parents=True, exist_ok=True)
 
-        logger.debug("Settings initialized",
-                    config_file=self.config_file,
-                    log_level=self.log_level,
-                    runtime_dir=self.runtime_dir)
+        logger.debug(
+            "Settings initialized",
+            config_file=self.config_file,
+            log_level=self.log_level,
+            runtime_dir=self.runtime_dir,
+        )
 
     def _get_default_runtime_dir(self) -> str:
         """Get the default runtime directory based on the platform."""
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             # Use AppData/Local for Windows
-            app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~\\AppData\\Local'))
-            return os.path.join(app_data, 'LocalPort')
+            app_data = os.environ.get(
+                "LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local")
+            )
+            return os.path.join(app_data, "LocalPort")
         else:  # Unix-like systems
             # Use XDG_RUNTIME_DIR if available, otherwise ~/.local/share
-            xdg_runtime = os.environ.get('XDG_RUNTIME_DIR')
+            xdg_runtime = os.environ.get("XDG_RUNTIME_DIR")
             if xdg_runtime:
-                return os.path.join(xdg_runtime, 'localport')
+                return os.path.join(xdg_runtime, "localport")
             else:
-                return os.path.expanduser('~/.local/share/localport')
+                return os.path.expanduser("~/.local/share/localport")
 
     def get_config_file_path(self) -> Path | None:
         """Get the configuration file path, searching default locations if not specified."""

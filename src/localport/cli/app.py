@@ -10,8 +10,33 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from ..config.settings import Settings
 from ..config.config_path_manager import ConfigPathManager
+from ..config.settings import Settings
+from .commands.cluster_commands import cluster_status_sync
+from .commands.config_commands import (
+    add_connection_sync,
+    export_config_sync,
+    list_connections_sync,
+    remove_connection_sync,
+    validate_config_sync,
+)
+from .commands.daemon_commands import (
+    reload_daemon_sync,
+    restart_daemon_sync,
+    start_daemon_sync,
+    status_daemon_sync,
+    stop_daemon_sync,
+)
+from .commands.log_commands import logs_sync
+from .commands.service_commands import (
+    start_services_sync,
+    status_services_sync,
+    stop_services_sync,
+)
+from .commands.ssh_commands import (
+    test_ssh_connectivity_sync,
+    validate_ssh_config_sync,
+)
 from .formatters.output_format import OutputFormat
 from .utils.rich_utils import setup_rich_logging
 
@@ -22,11 +47,11 @@ logger = structlog.get_logger()
 # Create main Typer app
 app = typer.Typer(
     name="localport",
-    help="[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring\n\n[bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues\n[blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]",
+    help="[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring\n\n[blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]\n[blue]🐛 Report issues: https://github.com/dawsonlp/localport/issues[/blue]",
     rich_markup_mode="rich",
     no_args_is_help=False,
     add_completion=False,
-    context_settings={"help_option_names": ["-h", "--help"]}
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 # Global settings instance
@@ -47,7 +72,7 @@ def version_callback(value: bool):
             version_text,
             title="[bold]Version Information[/bold]",
             border_style="blue",
-            padding=(1, 2)
+            padding=(1, 2),
         )
 
         console.print(panel)
@@ -63,57 +88,42 @@ def main(
         "-V",
         callback=version_callback,
         is_eager=True,
-        help="Show version information and exit"
+        help="Show version information and exit",
     ),
     config_file: str | None = typer.Option(
-        None,
-        "--config",
-        "-c",
-        help="Path to configuration file",
-        metavar="PATH"
+        None, "--config", "-c", help="Path to configuration file", metavar="PATH"
     ),
     verbose: int = typer.Option(
         0,
         "--verbose",
         "-v",
         count=True,
-        help="Increase verbosity (-v for info, -vv for debug)"
+        help="Increase verbosity (-v for info, -vv for debug)",
     ),
     debug: bool = typer.Option(
-        False,
-        "--debug",
-        help="Enable debug logging (equivalent to -vv)"
+        False, "--debug", help="Enable debug logging (equivalent to -vv)"
     ),
     quiet: bool = typer.Option(
-        False,
-        "--quiet",
-        "-q",
-        help="Suppress non-essential output"
+        False, "--quiet", "-q", help="Suppress non-essential output"
     ),
     log_level: str = typer.Option(
         "INFO",
         "--log-level",
         help="Set log level",
         metavar="LEVEL",
-        case_sensitive=False
+        case_sensitive=False,
     ),
-    no_color: bool = typer.Option(
-        False,
-        "--no-color",
-        help="Disable colored output"
-    ),
+    no_color: bool = typer.Option(False, "--no-color", help="Disable colored output"),
     output: str = typer.Option(
         "table",
         "--output",
         "-o",
         help="Output format (table, json, text)",
-        metavar="FORMAT"
-    )
+        metavar="FORMAT",
+    ),
 ):
     """
     [bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring.
-
-    [bold red]⚠️  ALPHA SOFTWARE[/bold red] - Core functionality works, but expect breaking changes.
 
     LocalPort provides a unified interface for managing port forwards across different
     technologies (kubectl, SSH) with automatic health monitoring and restart capabilities.
@@ -159,12 +169,14 @@ def main(
         os.environ["NO_COLOR"] = "1"
 
     # Resolve verbosity level from flags
-    def resolve_verbosity_level(verbosity_count: int, debug_flag: bool, quiet_flag: bool) -> int:
+    def resolve_verbosity_level(
+        verbosity_count: int, debug_flag: bool, quiet_flag: bool
+    ) -> int:
         """Resolve final verbosity level from flags."""
         if quiet_flag:
             return -1  # Quiet mode: errors only
         if debug_flag:
-            return 2   # Debug level
+            return 2  # Debug level
         return min(verbosity_count, 2)  # Cap at debug level
 
     verbosity_level = resolve_verbosity_level(verbose, debug, quiet)
@@ -186,15 +198,14 @@ def main(
     # Validate output format
     try:
         output_format = OutputFormat.from_string(output)
-    except ValueError as e:
-        console.print(f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: table, json, text")
-        raise typer.Exit(1)
+    except ValueError:
+        console.print(
+            f"[red]Error:[/red] Invalid log level '{log_level}'. Valid levels: table, json, text"
+        )
+        raise typer.Exit(1) from None
 
     # Setup logging with verbosity level
-    setup_rich_logging(
-        verbosity_level=verbosity_level,
-        console=console
-    )
+    setup_rich_logging(verbosity_level=verbosity_level, console=console)
 
     # Initialize settings
     try:
@@ -202,71 +213,41 @@ def main(
             config_file=config_file,
             log_level=log_level.upper(),
             verbose=verbose_bool,
-            quiet=quiet
+            quiet=quiet,
         )
 
         # Store in context for commands
-        ctx.obj.update({
-            'settings': settings,
-            'console': console,
-            'config_file': config_file,
-            'verbose': verbose_bool,  # Backward compatibility
-            'verbosity_level': verbosity_level,  # New verbosity system
-            'quiet': quiet,
-            'log_level': log_level.upper(),
-            'no_color': no_color,
-            'output_format': output_format
-        })
+        ctx.obj.update(
+            {
+                "settings": settings,
+                "console": console,
+                "config_file": config_file,
+                "verbose": verbose_bool,  # Backward compatibility
+                "verbosity_level": verbosity_level,  # New verbosity system
+                "quiet": quiet,
+                "log_level": log_level.upper(),
+                "no_color": no_color,
+                "output_format": output_format,
+            }
+        )
 
-        logger.debug("CLI initialized",
-                    config_file=config_file,
-                    log_level=log_level,
-                    verbosity_level=verbosity_level,
-                    verbose=verbose_bool,
-                    quiet=quiet)
+        logger.debug(
+            "CLI initialized",
+            config_file=config_file,
+            log_level=log_level,
+            verbosity_level=verbosity_level,
+            verbose=verbose_bool,
+            quiet=quiet,
+        )
 
     except Exception as e:
         console.print(f"[red]Error initializing LocalPort:[/red] {e}")
         if verbose:
             console.print_exception()
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
-# Import command implementations
-from .commands.config_commands import (
-    export_config_sync, 
-    validate_config_sync,
-    add_connection_sync,
-    remove_connection_sync,
-    list_connections_sync
-)
-from .commands.daemon_commands import (
-    reload_daemon_sync,
-    restart_daemon_sync,
-    start_daemon_sync,
-    status_daemon_sync,
-    stop_daemon_sync,
-)
-from .commands.log_commands import (
-    list_service_logs_sync,
-    logs_sync,
-    show_log_location_sync,
-    show_service_log_sync,
-)
-from .commands.service_commands import (
-    start_services_sync,
-    status_services_sync,
-    stop_services_sync,
-)
-from .commands.ssh_commands import (
-    test_ssh_connectivity_sync,
-    validate_ssh_config_sync,
-)
-from .commands.cluster_commands import (
-    cluster_status_sync,
-    cluster_events_sync,
-    cluster_pods_sync,
-)
+# Register command implementations
 
 # Service management commands
 app.command(name="start")(start_services_sync)
@@ -277,9 +258,7 @@ app.command(name="logs")(logs_sync)
 
 # Daemon command group
 daemon_app = typer.Typer(
-    name="daemon",
-    help="Daemon management commands",
-    no_args_is_help=True
+    name="daemon", help="Daemon management commands", no_args_is_help=True
 )
 
 # Add daemon commands
@@ -295,9 +274,7 @@ app.add_typer(daemon_app, name="daemon")
 
 # Config command group
 config_app = typer.Typer(
-    name="config",
-    help="Configuration management commands",
-    no_args_is_help=True
+    name="config", help="Configuration management commands", no_args_is_help=True
 )
 
 # Add config commands
@@ -312,11 +289,7 @@ app.add_typer(config_app, name="config")
 
 
 # SSH command group
-ssh_app = typer.Typer(
-    name="ssh",
-    help="SSH-specific commands",
-    no_args_is_help=True
-)
+ssh_app = typer.Typer(name="ssh", help="SSH-specific commands", no_args_is_help=True)
 
 # Add SSH commands
 ssh_app.command(name="test")(test_ssh_connectivity_sync)
@@ -328,15 +301,11 @@ app.add_typer(ssh_app, name="ssh")
 
 # Cluster command group
 cluster_app = typer.Typer(
-    name="cluster",
-    help="Cluster health monitoring commands",
-    no_args_is_help=True
+    name="cluster", help="Cluster health monitoring commands", no_args_is_help=True
 )
 
 # Add cluster commands
 cluster_app.command(name="status")(cluster_status_sync)
-cluster_app.command(name="events")(cluster_events_sync)
-cluster_app.command(name="pods")(cluster_pods_sync)
 
 # Add cluster subcommand
 app.add_typer(cluster_app, name="cluster")
@@ -362,22 +331,23 @@ def cli_main():
                 config_status = asyncio.run(get_config_status_display())
             except Exception:
                 config_status = "\n[bold]Configuration:[/bold]\n  Use 'localport config --help' for configuration options"
-            
-            # Display help with dynamic configuration status
-            console.print(f"""[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring
 
-[bold red]⚠️  ALPHA SOFTWARE[/bold red] - Report issues: https://github.com/dawsonlp/localport/issues
+            # Display help with dynamic configuration status
+            console.print(
+                f"""[bold blue]LocalPort[/bold blue] - Universal port forwarding manager with health monitoring
+
 [blue]📖 Documentation: https://github.com/dawsonlp/localport#readme[/blue]
 
 [bold]Usage:[/bold] localport [OPTIONS] COMMAND [ARGS]...{config_status}
 
 [bold]Commands:[/bold]
   [cyan]start[/cyan]    Start port forwarding services
-  [cyan]stop[/cyan]     Stop port forwarding services  
+  [cyan]stop[/cyan]     Stop port forwarding services
   [cyan]status[/cyan]   Show service status
   [cyan]logs[/cyan]     View service logs
   [cyan]daemon[/cyan]   Daemon management commands
   [cyan]config[/cyan]   Configuration management commands
+  [cyan]ssh[/cyan]      SSH connectivity commands
   [cyan]cluster[/cyan]  Cluster health monitoring commands
 
 [bold]Options:[/bold]
@@ -395,7 +365,8 @@ def cli_main():
 
 [bold]Get Started:[/bold]
   [blue]https://github.com/dawsonlp/localport/blob/main/docs/getting-started.md[/blue]
-""")
+"""
+            )
             sys.exit(0)
         else:
             app()

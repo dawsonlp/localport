@@ -16,7 +16,8 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -34,8 +35,6 @@ dependencies = [
     "aiohttp>=3.9.0",
     "psutil>=5.9.0",
     "structlog>=24.1.0",
-    "tenacity>=8.2.0",
-    "click>=8.1.0",
     "watchdog>=3.0.0",
 ]
 
@@ -45,8 +44,8 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.12.0",
-    "black>=24.0.0",
-    "ruff>=0.5.0",
+    "black==25.1.0",
+    "ruff==0.12.11",
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
     "pytest-xdist>=3.5.0",
@@ -103,19 +102,16 @@ target-version = "py311"
 line-length = 88
 
 [tool.ruff.lint]
+# Focused on high-signal rules that catch real bugs. Formatting is owned by
+# black; pycodestyle (E/W), pyupgrade (UP), and comprehension (C4) style rules
+# are intentionally left out to keep the linter a bug-catcher, not a style nag.
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
+    "F",  # pyflakes — undefined names, unused imports, real errors
+    "B",  # flake8-bugbear — likely bugs and gotchas
+    "I",  # isort — import ordering
 ]
 ignore = [
-    "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -183,8 +179,8 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.12.0",
     "pytest-xdist>=3.5.0",
-    "black>=24.0.0",
-    "ruff>=0.5.0",
+    "black==25.1.0",
+    "ruff==0.12.11",
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
     "pip-audit>=2.6.0",
