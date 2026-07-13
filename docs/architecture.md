@@ -1,10 +1,13 @@
 # LocalPort Architecture
 
-This document provides a comprehensive overview of LocalPort's architecture, designed to help developers understand the system design and contribute effectively.
+This document describes LocalPort's system design to help developers understand
+and extend it.
 
 ## Overview
 
-LocalPort is built using **Hexagonal Architecture** (also known as Ports and Adapters), which provides clean separation of concerns, testability, and extensibility. The architecture ensures that business logic is isolated from external dependencies, making the system maintainable and adaptable.
+LocalPort uses **Hexagonal Architecture** (Ports and Adapters). Business logic
+is isolated from external systems, so the core is testable and the edges are
+swappable.
 
 ## Hexagonal Architecture
 
@@ -17,15 +20,15 @@ graph TB
         FS[File System]
         PROC[Processes]
     end
-    
+
     subgraph "Infrastructure Layer (Adapters)"
         KCLI[kubectl Adapter]
         SSHA[SSH Adapter]
-        FCONF[File Config Adapter]
-        PROCA[Process Adapter]
+        FCONF[YAML Config Repository]
+        PROCA[Process Management]
         HCHK[Health Check Adapters]
     end
-    
+
     subgraph "Application Layer (Use Cases)"
         START[Start Services]
         STOP[Stop Services]
@@ -35,7 +38,7 @@ graph TB
         HMON[Health Monitor]
         DMGR[Daemon Manager]
     end
-    
+
     subgraph "Domain Layer (Business Logic)"
         SVC[Service Entity]
         PF[Port Forward Entity]
@@ -43,25 +46,25 @@ graph TB
         REPO[Repository Interfaces]
         DOMAIN[Domain Services]
     end
-    
+
     CLI --> START
     CLI --> STOP
     CLI --> MONITOR
     CLI --> DAEMON
-    
+
     START --> SVCMGR
     STOP --> SVCMGR
     MONITOR --> HMON
     DAEMON --> DMGR
-    
+
     SVCMGR --> SVC
     HMON --> HC
     DMGR --> SVC
-    
+
     SVCMGR --> KCLI
     SVCMGR --> SSHA
     HMON --> HCHK
-    
+
     KCLI --> K8S
     SSHA --> SSH
     FCONF --> FS
@@ -70,85 +73,118 @@ graph TB
 
 ## Layer Responsibilities
 
-### 1. Domain Layer (Core Business Logic)
+### 1. Domain Layer
 
-The innermost layer contains pure business logic with no external dependencies.
+Pure business logic, no external dependencies (`src/localport/domain/`).
 
-#### Entities
-- **Service**: Represents a port forwarding service with its configuration
-- **PortForward**: Represents an active port forwarding process
-- **HealthCheck**: Represents health monitoring configuration and state
+- **Entities** (`domain/entities/`): `service`, `port_forward`, `health_check`,
+  and the cluster health model (`cluster_info`, `cluster_health`,
+  `cluster_event`, `resource_status`).
+- **Value Objects** (`domain/value_objects/`): `port`, `connection_info`,
+  `discovery`.
+- **Enums** (`domain/enums.py`): `ServiceStatus`, `ForwardingTechnology`.
+- **Repository interfaces** (`domain/repositories/`): `ServiceRepository`,
+  `ConfigRepository`, `DiscoveryRepository`.
+- **Domain services** (`domain/services/`): cross-entity rules and the cluster
+  health provider.
 
-#### Value Objects
-- **Port**: Encapsulates port number validation and behavior
-- **ConnectionInfo**: Encapsulates connection details for different technologies
+### 2. Application Layer
 
-#### Repository Interfaces
-- **ServiceRepository**: Interface for service persistence
-- **ConfigRepository**: Interface for configuration management
+Orchestrates domain objects into use cases (`src/localport/application/`).
 
-#### Domain Services
-- Business rules that don't belong to a specific entity
-- Cross-entity operations and validations
+- **Use cases**: start services, stop services, monitor services, manage daemon.
+- **Application services**: `ServiceManager` (lifecycle/coordination),
+  `HealthMonitor` (checking and restart logic), `DaemonManager` (background
+  daemon), configuration management.
+- **DTOs**: data structures passed between layers.
 
-### 2. Application Layer (Use Cases & Services)
+### 3. Infrastructure Layer
 
-Orchestrates domain objects to fulfill specific use cases.
+Implements inner-layer interfaces and talks to external systems
+(`src/localport/infrastructure/`).
 
-#### Use Cases
-- **StartServicesUseCase**: Coordinates starting multiple services
-- **StopServicesUseCase**: Coordinates stopping services gracefully
-- **MonitorServicesUseCase**: Manages health monitoring workflows
-- **ManageDaemonUseCase**: Controls daemon lifecycle operations
+- **Port forwarding adapters** (`adapters/`): `KubectlAdapter`, `SSHAdapter`,
+  `KubernetesDiscoveryAdapter`, and `AdapterFactory`.
+- **Health check adapters** (`health_checks/`): `TCPHealthCheck`,
+  `HTTPHealthCheck`, plus optional `KafkaHealthCheck` and
+  `PostgreSQLHealthCheck` (loaded only if their extras are installed), created
+  by `HealthCheckFactory`.
+- **Repository implementations** (`repositories/`): `MemoryServiceRepository`,
+  `YamlConfigRepository`.
 
-#### Application Services
-- **ServiceManager**: Manages service lifecycle and coordination
-- **HealthMonitor**: Handles health checking and restart logic
-- **DaemonManager**: Manages background daemon operations
-- **ConfigurationManager**: Handles configuration hot-reloading
+### 4. CLI Layer
 
-#### DTOs (Data Transfer Objects)
-- **ServiceDTO**: Data structures for service information transfer
-- **HealthDTO**: Data structures for health status information
+Command-line interface built on Typer and Rich (`src/localport/cli/`).
 
-### 3. Infrastructure Layer (Adapters)
+- **Commands** (`cli/commands/`): service (`start`, `stop`, `status`, `logs`),
+  `daemon` (`start`, `stop`, `restart`, `status`, `reload`), `config`
+  (`export`, `validate`, `add`, `remove`, `list`), `ssh` (`test`, `validate`),
+  `cluster` (`status`).
+- **Output formatting** (`cli/formatters/`): `output_format` defines the
+  `OutputFormat` enum; `format_router` routes to the right renderer;
+  `json_formatter` produces machine-readable output; `connection_formatter`
+  renders connection details.
 
-Implements interfaces defined by inner layers and handles external system integration.
+## Repositories
 
-#### Port Forwarding Adapters
-- **KubectlAdapter**: Implements kubectl port-forward operations
-- **SSHAdapter**: Implements SSH tunnel management
-- **AdapterFactory**: Creates appropriate adapters based on technology
+LocalPort abstracts data access behind repository interfaces in the domain
+layer; the infrastructure layer provides concrete implementations.
 
-#### Health Check Adapters
-- **TCPHealthCheck**: Basic connectivity testing
-- **HTTPHealthCheck**: Web service health endpoints
-- **PostgreSQLHealthCheck**: Database-specific health checking
-- **KafkaHealthCheck**: Message broker connectivity testing
+### Interfaces
 
-#### Repository Implementations
-- **YamlConfigRepository**: File-based configuration storage
-- **MemoryServiceRepository**: In-memory service state management
+`ServiceRepository` (`domain/repositories/service_repository.py`) — all methods
+async:
 
-#### External Integrations
-- **ProcessAdapter**: System process management
-- **FileSystemAdapter**: Configuration file operations
+```python
+class ServiceRepository(ABC):
+    async def save(self, service: Service) -> None: ...
+    async def find_by_id(self, service_id: UUID) -> Service | None: ...
+    async def find_by_name(self, name: str) -> Service | None: ...
+    async def find_all(self) -> list[Service]: ...
+    async def find_by_tags(self, tags: list[str]) -> list[Service]: ...
+    async def find_enabled(self) -> list[Service]: ...
+    async def delete(self, service_id: UUID) -> bool: ...
+    async def exists(self, service_id: UUID) -> bool: ...
+    async def count(self) -> int: ...
+```
 
-### 4. CLI Layer (User Interface)
+`ConfigRepository` (`domain/repositories/config_repository.py`) loads and
+manages YAML configuration. Key methods:
 
-Provides command-line interface using Typer and Rich for beautiful output.
+```python
+class ConfigRepository(ABC):
+    async def load_configuration(self, config_path: Path | None = None) -> dict[str, Any]: ...
+    async def load_services(self, config_path: Path | None = None) -> list[Service]: ...
+    async def validate_configuration(self, config: dict[str, Any]) -> bool: ...
+    async def get_default_config_paths(self) -> list[Path]: ...
+    async def substitute_environment_variables(self, config: dict[str, Any]) -> dict[str, Any]: ...
+    # plus service-config CRUD: add/remove/update/get_service_config,
+    # get_service_names, service_exists, backup_configuration, ...
+```
 
-#### Command Structure
-- **ServiceCommands**: start, stop, status, logs
-- **DaemonCommands**: daemon start, stop, restart, status, reload
-- **ConfigCommands**: validate, export, add, remove, list
-- **SSHCommands**: ssh test, ssh validate
-- **ClusterCommands**: cluster status, events, pods
+### Implementations
 
-#### Output Formatting
-- **TableFormatter**: Human-readable tabular output
-- **JSONFormatter**: Machine-readable JSON output
-- **TextFormatter**: Simple text output for scripting
+- **`MemoryServiceRepository`** — in-memory `ServiceRepository`. Fast,
+  asyncio-safe, no persistence across restart. Holds the daemon's live service
+  state.
+- **`YamlConfigRepository`** — file-based `ConfigRepository`. Human-readable
+  YAML, environment-variable substitution, configuration validation.
+
+### Dependency Injection and Contract Testing
+
+Repositories are injected into use cases and services via their constructors,
+so the domain and application layers depend only on the interfaces:
+
+```python
+class StartServicesUseCase:
+    def __init__(self, service_repository: ServiceRepository):
+        self._service_repository = service_repository
+```
+
+`ServiceRepositoryContractTest` and `ConfigRepositoryContractTest`
+(`tests/unit/domain/test_repository_contracts.py`) define the behavior every
+implementation must satisfy. A new implementation subclasses the relevant
+contract test and supplies its instance via a `repository` fixture.
 
 ## Component Interactions
 
@@ -162,7 +198,7 @@ sequenceDiagram
     participant KubectlAdapter
     participant HealthMonitor
     participant Service
-    
+
     CLI->>StartUseCase: execute(command)
     StartUseCase->>ServiceManager: start_service(service)
     ServiceManager->>KubectlAdapter: start_port_forward()
@@ -179,7 +215,7 @@ sequenceDiagram
     participant HealthChecker
     participant Service
     participant ServiceManager
-    
+
     loop Every interval
         HealthMonitor->>HealthChecker: check_health()
         HealthChecker-->>HealthMonitor: health_result
@@ -204,7 +240,7 @@ sequenceDiagram
     participant ConfigDiffer
     participant DaemonManager
     participant ServiceManager
-    
+
     FileWatcher->>ConfigManager: file_changed()
     ConfigManager->>ConfigManager: validate_config()
     ConfigManager->>ConfigDiffer: analyze_changes()
@@ -215,602 +251,168 @@ sequenceDiagram
 
 ## Design Patterns
 
-### 1. Repository Pattern
-Abstracts data access and provides a uniform interface for data operations.
-
-```python
-class ServiceRepository(ABC):
-    @abstractmethod
-    async def save(self, service: Service) -> None: ...
-    
-    @abstractmethod
-    async def find_by_id(self, service_id: UUID) -> Optional[Service]: ...
-```
-
-### 2. Factory Pattern
-Creates objects without specifying their concrete classes.
-
-```python
-class AdapterFactory:
-    def create_adapter(self, technology: ForwardingTechnology) -> BaseAdapter:
-        return self._adapters[technology]()
-```
-
-### 3. Strategy Pattern
-Defines a family of algorithms and makes them interchangeable.
-
-```python
-class HealthCheckFactory:
-    def create_health_checker(self, check_type: str) -> HealthChecker:
-        return self._health_checkers[check_type]()
-```
-
-### 4. Observer Pattern
-Allows objects to notify other objects about changes in their state.
-
-```python
-class HealthMonitor:
-    async def _notify_health_change(self, service: Service, status: HealthStatus):
-        for observer in self._observers:
-            await observer.on_health_change(service, status)
-```
-
-### 5. Command Pattern
-Encapsulates requests as objects, allowing parameterization and queuing.
-
-```python
-@dataclass
-class StartServicesCommand:
-    service_names: Optional[List[str]] = None
-    tags: Optional[List[str]] = None
-    all_services: bool = False
-```
+- **Repository** — abstracts data access behind the interfaces above.
+- **Factory** — `AdapterFactory` and `HealthCheckFactory` create concrete
+  adapters/checkers keyed by type, and support runtime registration.
+- **Strategy** — health checkers are interchangeable behind the `HealthChecker`
+  interface; the scheduler calls them polymorphically.
+- **Command** — CLI requests are modeled as command dataclasses (e.g.
+  `StartServicesCommand`) passed to use cases.
 
 ## Technology Stack
 
-### Core Dependencies
-- **Python 3.11+**: Modern Python with typing and asyncio features
-- **Typer**: Modern CLI framework with Rich integration
-- **Rich**: Beautiful terminal output and formatting
-- **Pydantic**: Data validation and settings management
-- **PyYAML**: YAML configuration parsing
-- **asyncio**: Asynchronous programming support
+**Core:** Python 3.11+, Typer (CLI), Rich (output), Pydantic (validation),
+PyYAML, `structlog`, `psutil`, `watchdog`, asyncio.
 
-### Optional Dependencies
-- **kafka-python**: Kafka health check support
-- **psycopg**: PostgreSQL health check support
-- **aiohttp**: HTTP health check support
-- **watchdog**: File system monitoring for hot reload
+**Optional extras:** `kafka-python` (Kafka health checks), `psycopg`
+(PostgreSQL health checks). `aiohttp` ships as a core dependency for HTTP
+health checks.
 
-### Development Dependencies
-- **pytest**: Testing framework with async support
-- **black**: Code formatting
-- **ruff**: Fast Python linter
-- **mypy**: Static type checking
-- **pre-commit**: Git hooks for code quality
+**Development:** `pytest` (+ `pytest-asyncio`, `pytest-cov`, `pytest-mock`,
+`pytest-xdist`), `black`, `ruff`, `mypy`, `pre-commit`. `ruff` and `black` are
+the enforced CI gates; `mypy` is strict but local-only (see
+[CONTRIBUTING.md](../CONTRIBUTING.md#quality-gates)).
 
 ## Extension Points
 
-### 1. Adding New Adapters
+### Add a port forwarding adapter
 
-To add support for a new port forwarding technology:
+1. Implement `PortForwardingAdapter`
+   (`infrastructure/adapters/base_adapter.py`): `start_port_forward`,
+   `stop_port_forward`, `is_port_forward_running`, `validate_connection_info`,
+   `get_adapter_name`, `get_required_tools`.
+2. Add the technology to `ForwardingTechnology` in `domain/enums.py`.
+3. Register it:
 
-1. **Create Adapter Class**:
 ```python
-class NewTechnologyAdapter(BaseAdapter):
-    async def start_port_forward(self, local_port: int, remote_port: int, 
-                                connection_info: Dict[str, Any]) -> int:
-        # Implementation
-        pass
+factory.register_adapter("newtech", NewTechAdapter)
 ```
 
-2. **Register in Factory**:
+### Add a health check
+
+1. Implement `HealthChecker`
+   (`infrastructure/health_checks/base_health_checker.py`):
+
 ```python
-# In adapter_factory.py
-self._adapters[ForwardingTechnology.NEW_TECH] = NewTechnologyAdapter
+class NewHealthCheck(HealthChecker):
+    async def check_health(self, config: dict[str, Any]) -> HealthCheckResult: ...
+    def validate_config(self, config: dict[str, Any]) -> bool: ...
+    def get_default_config(self) -> dict[str, Any]: ...
 ```
 
-3. **Update Configuration Schema**:
+2. Register it with the factory:
+
 ```python
-# In domain/entities/service.py
-class ForwardingTechnology(Enum):
-    NEW_TECH = "new_tech"
+factory.register_health_checker("newtype", NewHealthCheck)
 ```
 
-### 2. Adding New Health Checks
+Checkers with heavy or optional dependencies are registered lazily in
+`HealthCheckFactory._register_optional_health_checkers()` so a missing extra
+degrades gracefully instead of failing import.
 
-To add a new health check type:
+### Add a CLI command
 
-1. **Create Health Checker**:
+Write the command function in `cli/commands/`, then register it in
+`cli/app.py` — either on the top-level app or a sub-`Typer`:
+
 ```python
-class CustomHealthCheck:
-    async def check(self, **kwargs) -> bool:
-        # Implementation
-        pass
+app.command(name="new")(new_command)
+# or, for a command group:
+app.add_typer(group_app, name="group")
 ```
 
-2. **Register in Factory**:
-```python
-# In health_check_factory.py
-self._health_checkers['custom'] = CustomHealthCheck
-```
+### Add an output formatter
 
-### 3. Adding New Output Formatters
+Add the format to the `OutputFormat` enum
+(`cli/formatters/output_format.py`) and handle it in `FormatRouter`
+(`cli/formatters/format_router.py`).
 
-To add a new output format:
+## Error Handling
 
-1. **Create Formatter**:
-```python
-class XMLFormatter:
-    def format_services(self, services: List[Service]) -> str:
-        # Implementation
-        pass
-```
-
-2. **Register in Router**:
-```python
-# In format_router.py
-self._formatters[OutputFormat.XML] = XMLFormatter()
-```
-
-## Error Handling Strategy
-
-### 1. Domain Layer
-- Raises domain-specific exceptions
-- Pure business rule violations
-- No external system dependencies
-
-### 2. Application Layer
-- Catches and translates domain exceptions
-- Handles use case orchestration errors
-- Provides meaningful error context
-
-### 3. Infrastructure Layer
-- Handles external system failures
-- Implements retry logic and circuit breakers
-- Logs technical details for debugging
-
-### 4. CLI Layer
-- Presents user-friendly error messages
-- Provides actionable guidance
-- Maintains consistent error formatting
+- **Domain**: raises domain-specific exceptions for business-rule violations.
+- **Application**: catches and translates domain exceptions, adds use-case
+  context.
+- **Infrastructure**: handles external failures, retries, and logs technical
+  detail.
+- **CLI**: presents user-friendly messages and actionable guidance.
 
 ## Logging and Observability
 
-### Structured Logging
-LocalPort uses structured logging with consistent fields:
+LocalPort uses `structlog` with consistent structured fields:
 
 ```python
-logger.info("Service started", 
-           service_name=service.name,
-           local_port=service.local_port,
-           technology=service.technology.value,
-           process_id=process_id)
+logger.info("Service started",
+            service_name=service.name,
+            local_port=service.local_port,
+            technology=service.technology.value,
+            process_id=process_id)
 ```
 
-### Log Levels
-- **DEBUG**: Detailed debugging information
-- **INFO**: General operational information
-- **WARN**: Warning conditions that should be noted
-- **ERROR**: Error conditions that need attention
-
-### Metrics and Monitoring
-- Service health status tracking
-- Restart count monitoring
-- Performance metrics collection
-- Configuration change auditing
+Log levels follow the standard DEBUG/INFO/WARN/ERROR scheme. The daemon tracks
+service health status and restart counts and audits configuration changes.
 
 ## Security Considerations
 
-### 1. Credential Management
-- No credentials stored in plain text
-- Environment variable substitution for secrets
-- Secure key file handling for SSH
-
-### 2. Process Isolation
-- Port forwards run in separate processes
-- Proper process cleanup on termination
-- Resource limit enforcement
-
-### 3. Input Validation
-- All external inputs validated using Pydantic
-- Configuration schema enforcement
-- Port range and permission validation
-
-### 4. Network Security
-- Local-only port binding by default
-- Configurable bind addresses
-- Connection timeout enforcement
+- No credentials in plain text; environment-variable substitution for secrets;
+  secure SSH key-file handling.
+- Port forwards run in isolated processes with proper cleanup on termination.
+- All external input validated via Pydantic and configuration-schema
+  enforcement.
+- Local-only port binding by default, with configurable bind addresses and
+  connection timeouts.
 
 ## Performance Considerations
 
-### 1. Asynchronous Operations
-- Non-blocking I/O for all network operations
-- Concurrent health checking
-- Parallel service startup/shutdown
-
-### 2. Resource Management
-- Efficient process management
-- Memory-conscious data structures
-- Configurable resource limits
-
-### 3. Caching and Optimization
-- Configuration caching
-- Health check result caching
-- Efficient file watching
+- Non-blocking asyncio I/O for all network operations; concurrent health checks
+  and parallel start/shutdown.
+- Efficient process management and memory-conscious data structures.
+- Configuration caching and efficient file watching for hot reload.
 
 ## Testing Strategy
 
-### 1. Unit Tests
-- Domain logic testing with no external dependencies
-- Mock external systems for isolation
-- High coverage of business rules
+Unit tests cover domain and application logic in isolation; integration and
+e2e tests exercise adapters and full workflows; contract tests enforce
+repository-interface compliance. See
+[CONTRIBUTING.md](../CONTRIBUTING.md#testing) for layout, markers, and how to
+run the suite.
 
-### 2. Integration Tests
-- Test adapter implementations with real systems
-- End-to-end workflow testing
-- Configuration validation testing
+## Shutdown Infrastructure
 
-### 3. Contract Tests
-- Repository interface compliance
-- Adapter interface compliance
-- Health checker interface compliance
+The daemon uses a coordinated, multi-phase graceful shutdown to eliminate race
+conditions and cleanly stop background work (this resolved Mac service
+stability issues).
 
-## Shutdown Infrastructure Architecture (v0.3.7)
-
-LocalPort v0.3.7 introduces enterprise-grade shutdown infrastructure that eliminates race conditions and provides graceful shutdown capabilities. This section details the shutdown architecture that resolves Mac service stability issues.
-
-### Shutdown Infrastructure Overview
+Signals (`SIGTERM`, `SIGINT`, and reload/status signals) and the CLI stop
+command feed an `AsyncSignalHandler`, which deduplicates them and hands off to a
+`ShutdownCoordinator`. The coordinator drives a `TaskManager` that owns the
+`CooperativeTask` instances (e.g. per-service health monitors), giving each a
+chance to finish or cancel cleanly before force cleanup.
 
 ```mermaid
 graph TB
-    subgraph "Signal Sources"
-        SIGTERM[SIGTERM Signal]
-        SIGINT[SIGINT Signal]
-        SIGUSR1[SIGUSR1 Signal]
-        SIGHUP[SIGHUP Signal]
-        CLI_STOP[CLI Stop Command]
-    end
-    
-    subgraph "Shutdown Infrastructure"
-        ASH[AsyncSignalHandler]
-        TM[TaskManager]
-        SC[ShutdownCoordinator]
-        GSM[GracefulShutdownMixin]
-        CT[CooperativeTask]
-    end
-    
-    subgraph "Daemon Components"
-        LD[LocalPortDaemon]
-        HMS[HealthMonitorScheduler]
-        SHMT[ServiceHealthMonitorTask]
-        SM[ServiceManager]
-        DM[DaemonManager]
-    end
-    
-    SIGTERM --> ASH
-    SIGINT --> ASH
-    SIGUSR1 --> ASH
-    SIGHUP --> ASH
-    CLI_STOP --> SC
-    
-    ASH --> SC
-    SC --> TM
-    TM --> CT
-    GSM --> CT
-    
-    LD --> ASH
-    LD --> TM
-    LD --> SC
-    HMS --> CT
-    SHMT --> CT
-    
-    SC --> HMS
-    SC --> SM
-    SC --> DM
+    SIG[Signals / CLI stop] --> ASH[AsyncSignalHandler]
+    ASH --> SC[ShutdownCoordinator]
+    SC --> TM[TaskManager]
+    TM --> CT[CooperativeTasks]
+    SC --> HMS[HealthMonitorScheduler]
+    SC --> SM[ServiceManager]
 ```
 
-### Multi-Phase Shutdown Process
+Shutdown proceeds through four bounded phases; if a phase times out, the
+coordinator advances to the next one so shutdown always terminates:
 
-```mermaid
-sequenceDiagram
-    participant Signal as Signal Source
-    participant ASH as AsyncSignalHandler
-    participant SC as ShutdownCoordinator
-    participant TM as TaskManager
-    participant HMS as HealthMonitorScheduler
-    participant SM as ServiceManager
-    participant CT as CooperativeTask
-    
-    Signal->>ASH: SIGTERM/SIGINT
-    ASH->>ASH: Deduplicate signals
-    ASH->>SC: initiate_shutdown()
-    
-    Note over SC: Phase 1: Stop New Work (2s)
-    SC->>TM: stop_accepting_new_tasks()
-    SC->>HMS: stop_new_monitoring()
-    
-    Note over SC: Phase 2: Complete Current (8s)
-    SC->>TM: wait_for_current_tasks()
-    SC->>HMS: complete_current_checks()
-    
-    Note over SC: Phase 3: Cancel Tasks (15s)
-    SC->>TM: cancel_all_tasks()
-    TM->>CT: request_shutdown()
-    CT->>CT: cooperative_cleanup()
-    CT-->>TM: shutdown_complete
-    
-    Note over SC: Phase 4: Force Cleanup (5s)
-    SC->>TM: force_cleanup()
-    SC->>SM: emergency_stop()
-    
-    SC-->>ASH: shutdown_complete
-```
+| Phase | Timeout | Purpose |
+|-------|---------|---------|
+| Stop New Work | 2s | Stop accepting new tasks, monitoring, and service starts |
+| Complete Current | 8s | Let in-flight operations and health checks finish |
+| Cancel Tasks | 15s | Cooperatively cancel remaining tasks |
+| Force Cleanup | 5s | Force-terminate tasks and emergency-stop services |
 
-### Thread-Safe Signal Handling
+Total shutdown is bounded to under 30 seconds and typically completes in a few
+seconds.
 
-```mermaid
-sequenceDiagram
-    participant OS as Operating System
-    participant SH as Signal Handler
-    participant ASH as AsyncSignalHandler
-    participant EL as Event Loop
-    participant SC as ShutdownCoordinator
-    
-    OS->>SH: SIGTERM (signal context)
-    SH->>SH: Check signal deduplication
-    
-    alt Unix Platform
-        SH->>EL: add_signal_handler()
-        EL->>ASH: _async_signal_handler()
-    else Windows Platform
-        SH->>EL: call_soon_threadsafe()
-        EL->>ASH: _handle_signal_async()
-    end
-    
-    ASH->>ASH: Thread-safe coordination
-    ASH->>SC: Signal event set
-    SC->>SC: Begin shutdown process
-```
+## Future Considerations
 
-### Cooperative Task Architecture
-
-```mermaid
-classDiagram
-    class CooperativeTask {
-        +name: str
-        +check_interval: float
-        +shutdown_requested: bool
-        +start() async
-        +stop() async
-        +request_shutdown() async
-        +_run_loop() async
-        +_execute_iteration() async
-        +_handle_iteration_error() async
-    }
-    
-    class ServiceHealthMonitorTask {
-        +service: Service
-        +health_scheduler: HealthMonitorScheduler
-        +check_interval: float
-        +_execute_iteration() async
-        +_handle_iteration_error() async
-    }
-    
-    class TaskManager {
-        +register_task() async
-        +cancel_all_tasks() async
-        +wait_for_completion() async
-        +get_task_status() dict
-        +force_cleanup() async
-    }
-    
-    class GracefulShutdownMixin {
-        +shutdown_timeout: float
-        +shutdown_callbacks: list
-        +register_shutdown_callback()
-        +graceful_shutdown() async
-    }
-    
-    CooperativeTask <|-- ServiceHealthMonitorTask
-    TaskManager --> CooperativeTask : manages
-    GracefulShutdownMixin --> CooperativeTask : provides patterns
-```
-
-### Health Monitor Shutdown Integration
-
-```mermaid
-sequenceDiagram
-    participant SC as ShutdownCoordinator
-    participant HMS as HealthMonitorScheduler
-    participant SHMT as ServiceHealthMonitorTask
-    participant TM as TaskManager
-    participant HC as HealthChecker
-    
-    Note over SC: Shutdown signal received
-    SC->>HMS: stop_monitoring()
-    HMS->>SHMT: request_shutdown()
-    
-    loop Health Check Iteration
-        SHMT->>SHMT: Check shutdown_requested
-        alt Shutdown requested
-            SHMT->>SHMT: Break monitoring loop
-            SHMT->>TM: Task cleanup
-            SHMT-->>HMS: Shutdown complete
-        else Continue monitoring
-            SHMT->>HC: perform_health_check()
-            HC-->>SHMT: health_result
-            SHMT->>SHMT: Process result
-        end
-    end
-    
-    HMS-->>SC: All monitoring stopped
-```
-
-### Task Manager Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Initializing
-    Initializing --> Running : start()
-    
-    Running --> Stopping : shutdown_signal
-    Running --> Running : register_task()
-    Running --> Running : task_completion
-    
-    Stopping --> StopNewWork : Phase 1
-    StopNewWork --> CompleteCurrent : timeout_or_complete
-    CompleteCurrent --> CancelTasks : timeout_or_complete
-    CancelTasks --> ForceCleanup : timeout_or_complete
-    ForceCleanup --> Stopped : cleanup_complete
-    
-    Stopped --> [*]
-    
-    note right of Running
-        - Accept new tasks
-        - Monitor task health
-        - Track resource usage
-    end note
-    
-    note right of Stopping
-        Multi-phase shutdown:
-        1. Stop New Work (2s)
-        2. Complete Current (8s)
-        3. Cancel Tasks (15s)
-        4. Force Cleanup (5s)
-    end note
-```
-
-### Signal Handler State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> Initialized
-    Initialized --> Listening : setup_signal_handlers()
-    
-    Listening --> SignalReceived : SIGTERM/SIGINT
-    Listening --> ReloadRequested : SIGUSR1/SIGHUP
-    Listening --> StatusRequested : SIGUSR2
-    
-    SignalReceived --> ShutdownInitiated : deduplicate_and_process
-    ReloadRequested --> ConfigReloading : process_reload
-    StatusRequested --> StatusReporting : process_status
-    
-    ConfigReloading --> Listening : reload_complete
-    StatusReporting --> Listening : status_complete
-    
-    ShutdownInitiated --> ShuttingDown : coordinate_shutdown
-    ShuttingDown --> Cleanup : shutdown_phases_complete
-    Cleanup --> [*] : cleanup_complete
-    
-    note right of SignalReceived
-        Thread-safe deduplication
-        prevents multiple shutdown
-        tasks from signal spam
-    end note
-```
-
-### Resource Cleanup Flow
-
-```mermaid
-flowchart TD
-    A[Shutdown Signal] --> B{Signal Type}
-    B -->|SIGTERM/SIGINT| C[Graceful Shutdown]
-    B -->|SIGUSR1/SIGHUP| D[Config Reload]
-    B -->|SIGUSR2| E[Status Report]
-    
-    C --> F[Phase 1: Stop New Work]
-    F --> G[Phase 2: Complete Current]
-    G --> H[Phase 3: Cancel Tasks]
-    H --> I[Phase 4: Force Cleanup]
-    
-    F --> F1[Stop accepting new tasks]
-    F --> F2[Stop new health monitoring]
-    F --> F3[Stop new service starts]
-    
-    G --> G1[Wait for current operations]
-    G --> G2[Complete health checks]
-    G --> G3[Finish service operations]
-    
-    H --> H1[Cancel background tasks]
-    H --> H2[Stop health monitoring]
-    H --> H3[Cancel cooperative tasks]
-    
-    I --> I1[Force task termination]
-    I --> I2[Emergency service stop]
-    I --> I3[Resource cleanup verification]
-    
-    I --> J[Shutdown Complete]
-    
-    style C fill:#e1f5fe
-    style F fill:#f3e5f5
-    style G fill:#e8f5e8
-    style H fill:#fff3e0
-    style I fill:#ffebee
-```
-
-### Performance Characteristics
-
-The shutdown infrastructure provides the following performance characteristics:
-
-| Phase | Timeout | Purpose | Performance Target |
-|-------|---------|---------|-------------------|
-| **Stop New Work** | 2 seconds | Prevent new operations | <100ms typical |
-| **Complete Current** | 8 seconds | Finish ongoing work | <2s typical |
-| **Cancel Tasks** | 15 seconds | Cooperative cancellation | <1s typical |
-| **Force Cleanup** | 5 seconds | Emergency cleanup | <500ms typical |
-| **Total Shutdown** | <30 seconds | Complete process | **2.84s achieved** |
-
-### Error Handling and Recovery
-
-```mermaid
-flowchart TD
-    A[Shutdown Error] --> B{Error Type}
-    
-    B -->|Signal Handler Error| C[Log and Continue]
-    B -->|Task Cancellation Error| D[Force Termination]
-    B -->|Resource Cleanup Error| E[Emergency Cleanup]
-    B -->|Timeout Error| F[Next Phase]
-    
-    C --> G[Fallback Signal Handling]
-    D --> H[Process Termination]
-    E --> I[Resource Leak Logging]
-    F --> J[Emergency Shutdown]
-    
-    G --> K[Shutdown Continues]
-    H --> K
-    I --> K
-    J --> K
-    
-    K --> L[Cleanup Verification]
-    L --> M[Shutdown Complete]
-    
-    style A fill:#ffebee
-    style B fill:#fff3e0
-    style M fill:#e8f5e8
-```
-
-## Future Architecture Considerations
-
-### 1. Plugin System
-- Dynamic adapter loading
-- Third-party health check plugins
-- Custom output formatter plugins
-
-### 2. Distributed Deployment
-- Multi-node daemon coordination
-- Shared configuration management
-- Load balancing and failover
-
-### 3. API Integration
-- REST API for programmatic access
-- WebSocket for real-time updates
-- GraphQL for flexible querying
-
-### 4. Enhanced Shutdown Features
-- Custom shutdown phases
-- Pluggable shutdown strategies
-- Distributed shutdown coordination
-- Shutdown metrics and monitoring
-
-This architecture provides a solid foundation for LocalPort's current functionality while maintaining flexibility for future enhancements and community contributions. The v0.3.7 shutdown infrastructure specifically addresses Mac service stability issues through enterprise-grade lifecycle management.
+Possible future directions include a plugin system for adapters, health checks,
+and formatters; distributed multi-node daemon coordination; and a
+programmatic API. These are aspirational and not yet implemented.
