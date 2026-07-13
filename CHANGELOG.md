@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-13
+
 ### Removed
 - **`cluster events` and `cluster pods` commands**: these were never functional — they queried the daemon's in-memory monitor state, which a standalone CLI process cannot reach, and one was an explicit stub. Removed the commands and the now-dead public `get_cluster_events` API they relied on. `cluster status` (which queries kubectl directly) is unaffected.
 
