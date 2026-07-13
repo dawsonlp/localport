@@ -1,5 +1,8 @@
 # Design Decisions
 
+This is an append-only log of significant design decisions, newest entries added
+over time. Existing entries are kept for historical context and are not edited.
+
 ## Service Management Redesign (2025-01-03)
 
 ### Problem

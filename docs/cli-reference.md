@@ -297,6 +297,9 @@ localport config add [OPTIONS]
 | `--ssh-port PORT` | | SSH port (ssh) | `22` |
 
 Run `localport config add` with no flags to be prompted for the missing values.
+For kubectl connections, the resource, namespace, and target port are auto-discovered
+from the cluster when omitted. The config file is backed up automatically before any
+`config add` or `config remove` change.
 
 ### `localport config remove`
 

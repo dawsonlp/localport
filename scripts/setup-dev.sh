@@ -6,10 +6,10 @@ echo "Setting up LocalPort development environment..."
 
 # Check Python version
 python_version=$(python3 --version | cut -d' ' -f2)
-required_version="3.13"
+required_version="3.11"
 
-if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 13) else 1)"; then
-    echo "Error: Python 3.13+ required, found $python_version"
+if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)"; then
+    echo "Error: Python 3.11+ required, found $python_version"
     exit 1
 fi
 
@@ -22,7 +22,7 @@ fi
 
 # Create virtual environment
 echo "Creating virtual environment..."
-uv venv --python 3.13
+uv venv --python 3.11
 
 # Activate virtual environment
 source .venv/bin/activate

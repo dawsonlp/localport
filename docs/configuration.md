@@ -1,303 +1,235 @@
 # Configuration Guide
 
-This guide provides comprehensive documentation for LocalPort's YAML configuration format, covering all available options and advanced features.
+The single reference for LocalPort's YAML configuration format. For commands and
+flags, see the [CLI Reference](cli-reference.md).
 
-## Configuration File Structure
-
-LocalPort uses YAML configuration files with the following top-level structure:
+## File Structure
 
 ```yaml
-version: "1.0"                    # Configuration format version
-defaults:                         # Global default settings (optional)
+version: "1.0"          # Configuration format version (required)
+defaults:               # Global defaults inherited by every service (optional)
   health_check: { ... }
   restart_policy: { ... }
-services:                         # List of port forwarding services
-  - name: service1
-    # ... service configuration
-  - name: service2
-    # ... service configuration
+  cluster_health: { ... }
+services:               # List of port-forwarding services (required)
+  - name: postgres
+    # ...
+cluster_contexts:       # Per-context cluster_health overrides (optional)
+  production:
+    cluster_health: { ... }
 ```
 
-## Configuration File Locations
+## File Locations
 
-LocalPort searches for configuration files in the following order:
+When `--config`/`-c` is not given, LocalPort resolves the config file in this order
+(first match wins):
 
-1. `./localport.yaml` (current directory)
-2. `~/.config/localport/config.yaml`
-3. `~/.localport.yaml`
-4. `/etc/localport/config.yaml`
+1. `--config` / `-c` flag
+2. `$LOCALPORT_CONFIG_FILE`
+3. `./localport.yaml`
+4. `./localport.yml`
+5. `./.localport.yaml`
+6. `~/.localport.yaml`
+7. `~/.config/localport/config.yaml`
+8. `/etc/localport/config.yaml`
 
-You can also specify a custom location:
+## Services
 
-```bash
-localport --config /path/to/config.yaml start --all
-```
+Each entry in `services` describes one port forward.
 
-## Service Configuration
-
-Each service in the `services` list requires these core fields:
-
-### Required Fields
+### Required fields
 
 ```yaml
 services:
-  - name: my-service              # Unique service name
-    technology: kubectl           # Technology: 'kubectl' or 'ssh'
-    local_port: 5432             # Local port to bind
-    remote_port: 5432            # Remote port to forward to
-    connection:                  # Technology-specific connection details
-      # ... connection configuration
+  - name: my-service       # Unique service name
+    technology: kubectl    # 'kubectl' or 'ssh'
+    local_port: 5432       # Local port to bind (1-65535)
+    remote_port: 5432      # Remote port to forward to (1-65535)
+    connection: { ... }    # Technology-specific connection block
 ```
 
-### Optional Fields
+### Optional fields
 
 ```yaml
-services:
-  - name: my-service
-    # ... required fields ...
-    enabled: true                # Enable/disable service (default: true)
-    tags: [database, essential]  # Tags for grouping services
-    description: "My service"    # Human-readable description
-    health_check:               # Health monitoring configuration
-      # ... health check options
-    restart_policy:             # Restart behavior configuration
-      # ... restart policy options
+    enabled: true              # Enable/disable service (default: true)
+    tags: [database, essential]  # Tags for grouping (see Tags)
+    description: "..."         # Human-readable description
+    health_check: { ... }      # Health monitoring (see Health Checks)
+    restart_policy: { ... }    # Restart behavior (see Restart Policy)
 ```
 
-## Connection Configuration
-
-Connection configuration varies by technology:
+## Connection
 
 ### Kubernetes (kubectl)
 
 ```yaml
-services:
-  - name: postgres
-    technology: kubectl
-    local_port: 5432
-    remote_port: 5432
-    connection:
-      resource_type: service      # 'service', 'deployment', or 'pod'
-      resource_name: postgres     # Name of the Kubernetes resource
-      namespace: default          # Kubernetes namespace
-      context: minikube          # kubectl context (optional)
+connection:
+  resource_name: postgres   # Resource to forward to (required)
+  resource_type: service    # 'service', 'deployment', or 'pod' (default: service)
+  namespace: default        # Kubernetes namespace (default: default)
+  context: minikube         # kubectl context (optional; uses current if omitted)
 ```
 
-**Connection Fields:**
-- `resource_type` (optional): Type of Kubernetes resource. Default: `service`
-- `resource_name` (required): Name of the resource to forward to
-- `namespace` (optional): Kubernetes namespace. Default: `default`
-- `context` (optional): kubectl context to use. Uses current context if not specified
-
-### SSH Tunnels
+### SSH
 
 ```yaml
-services:
-  - name: redis
-    technology: ssh
-    local_port: 6379
-    remote_port: 6379
-    connection:
-      host: redis.example.com     # Remote host
-      user: deploy               # SSH username (optional)
-      port: 22                   # SSH port (optional, default: 22)
-      key_file: ~/.ssh/id_rsa    # SSH private key file (optional)
-      remote_host: db.internal   # Bastion/jump-host target (optional)
-      password: secret           # SSH password (optional, not recommended)
+connection:
+  host: bastion.example.com  # Remote host or bastion (required)
+  user: deploy               # SSH username (optional; falls back to SSH config/agent)
+  port: 22                   # SSH port (default: 22)
+  key_file: ~/.ssh/id_rsa    # Private key file (optional)
+  remote_host: db.internal   # Target host when `host` is a bastion/jump server (optional)
+  password: secret           # SSH password (optional, not recommended — prefer keys)
 ```
 
-**Connection Fields:**
-- `host` (required): Remote hostname or IP address
-- `user` (optional): SSH username. Falls back to your SSH config / agent if omitted
-- `port` (optional): SSH port. Default: `22`
-- `key_file` (optional): Path to SSH private key file
-- `remote_host` (optional): Target host to tunnel to when `host` is a bastion/jump server
-- `password` (optional): SSH password. **Not recommended** - use key-based authentication
+For SSH key generation, agent setup, and bastion mechanics, see [SSH Setup](ssh-setup.md).
 
-## Health Check Configuration
+## Health Checks
 
-LocalPort supports multiple health check types for automatic service monitoring, including cluster-aware health checking for Kubernetes services.
+LocalPort can monitor each service and restart it when checks fail.
 
-### Basic Health Check Configuration
+```yaml
+health_check:
+  type: tcp                # tcp | http | https | postgres | postgresql | kafka (required)
+  interval: 30             # Seconds between checks (1-3600, default: 30)
+  timeout: 5.0             # Per-check timeout in seconds (0.1-300, default: 5.0)
+  failure_threshold: 3     # Consecutive failures before restart (1-100, default: 3)
+  success_threshold: 1     # Consecutive successes to mark healthy (1-100, default: 1)
+  cluster_aware: false     # Consider cluster health before restarting (kubectl only)
+  config: { ... }          # Type-specific settings (below)
+```
+
+`postgres` and `postgresql` are equivalent. `cluster_aware` is covered under
+[Cluster Health Monitoring](#cluster-health-monitoring).
+
+### TCP
+
+No `config` block needed — a successful TCP connect passes.
 
 ```yaml
 health_check:
   type: tcp
-  interval: 30                   # Check interval in seconds
-  timeout: 5.0                   # Timeout in seconds
-  failure_threshold: 3           # Failures before restart
-  success_threshold: 1           # Successes to mark healthy
-  cluster_aware: false           # Enable cluster-aware health checking (v0.3.6+)
 ```
 
-### Cluster-Aware Health Checking (v0.3.6+)
-
-For Kubernetes services, enable cluster-aware health checking to prevent unnecessary restarts when cluster connectivity issues are detected:
+### HTTP / HTTPS
 
 ```yaml
 health_check:
-  type: tcp
-  cluster_aware: true            # Consider cluster health in decisions
-  interval: 30
-  failure_threshold: 3
-```
-
-When `cluster_aware: true` is enabled:
-- LocalPort checks cluster health before performing service health checks
-- Services won't restart if cluster connectivity is the issue
-- Particularly beneficial for Mac users experiencing idle-state connection drops
-
-### TCP Health Check
-
-Basic connectivity testing:
-
-```yaml
-health_check:
-  type: tcp
-  interval: 30                   # Check interval in seconds
-  timeout: 5.0                   # Timeout in seconds
-  failure_threshold: 3           # Failures before restart
-  success_threshold: 1           # Successes to mark healthy
-```
-
-### HTTP Health Check
-
-Web service health endpoints:
-
-```yaml
-health_check:
-  type: http                     # or 'https'
-  interval: 30
-  timeout: 5.0
-  failure_threshold: 3
-  success_threshold: 1
+  type: http               # or 'https'
   config:
-    url: "http://localhost:8080/health"
-    method: GET                  # HTTP method (default: GET)
-    expected_status: 200         # Expected status code
-    headers:                     # Optional headers
-      User-Agent: "LocalPort-HealthCheck/1.0"
+    url: "http://localhost:8080/health"   # required
+    method: GET                           # default: GET
+    expected_status_codes: [200]          # default: [200, 201, 202, 204]
+    expected_content: "ok"                # optional substring match
+    verify_ssl: true                      # default: true
+    headers:                              # optional request headers
       Authorization: "Bearer ${API_TOKEN}"
 ```
 
-### PostgreSQL Health Check
+### PostgreSQL
 
-Database connectivity testing (requires `psycopg`):
+Requires the `psycopg` extra.
 
 ```yaml
 health_check:
   type: postgres
-  interval: 30
-  timeout: 10.0
-  failure_threshold: 3
   config:
-    database: postgres           # Database name
-    user: postgres              # Database user
-    password: ${DB_PASSWORD}    # Database password (REQUIRED)
-    host: localhost             # Database host (default: localhost)
-    port: 5432                  # Database port (default: 5432)
+    host: localhost          # default: localhost
+    port: 5432               # default: 5432
+    database: postgres       # default: postgres
+    user: postgres           # default: postgres
+    password: ${DB_PASSWORD} # required — auth fails without it
+    sslmode: require         # optional (e.g. disable, require)
 ```
 
-> **⚠️ Important**: PostgreSQL health checks require a password to be configured. Use environment variables to keep passwords secure:
-> ```bash
-> export DB_PASSWORD=your-secure-password
-> ```
-> Without a password, the health check will fail with authentication errors.
+Keep the password in an environment variable rather than in the file.
 
-### Kafka Health Check
+### Kafka
 
-Message broker connectivity (requires `kafka-python`):
+Requires the `kafka-python` extra.
 
 ```yaml
 health_check:
   type: kafka
-  interval: 45                    # Longer interval recommended
-  timeout: 15.0
-  failure_threshold: 3            # Higher threshold recommended
+  interval: 45               # longer interval recommended
+  failure_threshold: 3       # higher threshold recommended
   config:
-    bootstrap_servers: "localhost:9092"  # Kafka bootstrap servers
+    bootstrap_servers: "localhost:9092"   # default: localhost:9092
 ```
 
-> **⚠️ Known Issue**: The Kafka health check may be too aggressive in detecting failures. Consider using:
-> - Longer intervals (45-60 seconds)
-> - Higher failure thresholds (3-5 failures)
-> - TCP health checks as an alternative for basic connectivity testing
+The Kafka check can be aggressive at detecting failures; prefer longer intervals and
+higher thresholds, or fall back to a `tcp` check for basic connectivity.
 
-## Restart Policy Configuration
+## Restart Policy
 
-Configure automatic restart behavior when services fail:
+Controls automatic restarts when a service fails.
 
 ```yaml
 restart_policy:
-  enabled: true                  # Enable automatic restart
-  max_attempts: 5               # Maximum restart attempts
-  backoff_multiplier: 2.0       # Exponential backoff multiplier
-  initial_delay: 1              # Initial delay in seconds
-  max_delay: 300                # Maximum delay in seconds
+  enabled: true            # Enable automatic restart (default: true)
+  max_attempts: 5          # Max restart attempts (1-100, default: 5)
+  backoff_multiplier: 2.0  # Exponential backoff multiplier (1.0-10.0, default: 2.0)
+  initial_delay: 1         # Initial delay in seconds (1-3600, default: 1)
+  max_delay: 300           # Max delay between restarts in seconds (1-86400, default: 300)
 ```
 
-**Restart Policy Fields:**
-- `enabled` (optional): Enable automatic restart. Default: `true`
-- `max_attempts` (optional): Maximum restart attempts. Default: `5`
-- `backoff_multiplier` (optional): Exponential backoff multiplier. Default: `2.0`
-- `initial_delay` (optional): Initial delay before first restart. Default: `1` second
-- `max_delay` (optional): Maximum delay between restarts. Default: `300` seconds
+Delay grows exponentially, capped at `max_delay`:
+`delay = min(initial_delay * backoff_multiplier ^ attempt, max_delay)`.
 
-**Restart Delay Calculation:**
-```
-delay = min(initial_delay * (backoff_multiplier ^ attempt), max_delay)
-```
+## Cluster Health Monitoring
 
-## Cluster Health Monitoring Configuration (v0.3.6+)
+Kubernetes port-forwards can drop when the *cluster* — not the service — has a
+transient problem (a Mac waking from sleep, a VPN reconnect, brief API-server
+unavailability). Cluster-aware monitoring checks cluster reachability before
+restarting a service, so a healthy service isn't needlessly restarted for a
+cluster-side blip.
 
-Configure cluster health monitoring to prevent unnecessary service restarts when cluster connectivity issues are detected:
+Enable it per service with the `cluster_aware` health-check flag, and configure the
+monitor under `defaults.cluster_health`:
 
 ```yaml
 defaults:
   cluster_health:
-    enabled: true                # Enable cluster health monitoring
-    interval: 240               # Monitoring interval in seconds (4 minutes)
-    timeout: 30                 # Timeout for kubectl commands
-    retry_attempts: 2           # Number of retries for failed commands
-    failure_threshold: 3        # Consecutive failures before marking unhealthy
-    
-    # Commands to execute for health checking
-    commands:
-      cluster_info: true        # kubectl cluster-info
+    enabled: true          # Enable cluster health monitoring (default: true)
+    interval: 240          # Seconds between cluster checks (60-3600, default: 240)
+    timeout: 30            # Timeout per kubectl command, must be < interval (5-300, default: 30)
+    retry_attempts: 2      # Retries for a failed command (0-10, default: 2)
+    failure_threshold: 3   # Consecutive failures before cluster is unhealthy (1-100, default: 3)
+    commands:              # Which kubectl checks to run (each defaults to true)
+      cluster_info: true       # kubectl cluster-info
       pod_status: true         # kubectl get pods
       node_status: true        # kubectl get nodes
-      events_on_failure: true  # kubectl get events (only on failures)
+      events_on_failure: true  # kubectl get events (only after a failure)
+```
 
-# Per-cluster context overrides
+LocalPort monitors only the contexts used by active kubectl services. View status with
+`localport cluster status` (see the [CLI Reference](cli-reference.md)).
+
+### Per-context overrides
+
+`cluster_contexts.<context>.cluster_health` overrides the defaults for a specific
+kubectl context. Values (including `commands`) are merged over `defaults.cluster_health`:
+
+```yaml
 cluster_contexts:
   production:
     cluster_health:
-      interval: 120            # More frequent for production
-      timeout: 60
+      interval: 120         # check production more often
       failure_threshold: 5
-  
   development:
     cluster_health:
-      interval: 600            # Less frequent for development
+      interval: 600         # check development less often
       commands:
-        node_status: false     # Skip node checking
+        node_status: false  # skip node checks here
 ```
 
-**Cluster Health Configuration Fields:**
-- `enabled` (optional): Enable cluster health monitoring. Default: `true`
-- `interval` (optional): Monitoring interval in seconds. Default: `240` (4 minutes)
-- `timeout` (optional): Timeout for kubectl commands. Default: `30` seconds
-- `retry_attempts` (optional): Retry attempts for failed commands. Default: `2`
-- `failure_threshold` (optional): Consecutive failures before unhealthy. Default: `3`
-- `commands.*` (optional): Enable/disable specific kubectl commands
+## Defaults
 
-## Default Configuration
-
-Use the `defaults` section to set global defaults for all services:
+`defaults` supplies values inherited by every service; a service overrides only the
+fields it sets. The built-in defaults are:
 
 ```yaml
 version: "1.0"
-
 defaults:
   health_check:
     type: tcp
@@ -305,135 +237,83 @@ defaults:
     timeout: 5.0
     failure_threshold: 3
     success_threshold: 1
-    cluster_aware: true         # Enable cluster-aware health checking
-  
+    cluster_aware: true
   restart_policy:
     enabled: true
     max_attempts: 5
     backoff_multiplier: 2.0
     initial_delay: 1
     max_delay: 300
-  
-  cluster_health:               # Cluster health monitoring configuration
+  cluster_health:
     enabled: true
     interval: 240
     timeout: 30
+    retry_attempts: 2
     failure_threshold: 3
-
-services:
-  - name: postgres
-    technology: kubectl
-    local_port: 5432
-    remote_port: 5432
-    connection:
-      resource_name: postgres
-      namespace: default
-    # Inherits defaults, can override specific fields
-    health_check:
-      type: postgres
-      config:
-        database: postgres
-        user: postgres
-        password: ${POSTGRES_PASSWORD}
+    commands:
+      cluster_info: true
+      pod_status: true
+      node_status: true
+      events_on_failure: true
 ```
 
-## Environment Variable Substitution
+## Environment Variables
 
-LocalPort supports environment variable substitution using `${VAR}` or `${VAR:default}` syntax:
-
-### Basic Substitution
-
-```yaml
-services:
-  - name: postgres
-    technology: kubectl
-    local_port: 5432
-    remote_port: 5432
-    connection:
-      resource_name: postgres
-      namespace: ${KUBE_NAMESPACE}        # Required variable
-      context: ${KUBE_CONTEXT:minikube}   # Optional with default
-```
-
-### With Default Values
+Any string value supports `${VAR}` and `${VAR:default}` substitution, applied before
+the YAML is parsed:
 
 ```yaml
 connection:
-  host: ${DB_HOST:localhost}
-  user: ${DB_USER:postgres}
-  password: ${DB_PASSWORD}
-  key_file: ${SSH_KEY_FILE:~/.ssh/id_rsa}
-```
-
-### In Health Check Configuration
-
-```yaml
+  namespace: ${KUBE_NAMESPACE}          # required — left as-is if unset (logs a warning)
+  context: ${KUBE_CONTEXT:minikube}     # uses "minikube" if KUBE_CONTEXT is unset
 health_check:
-  type: postgres
   config:
-    database: ${DB_NAME:postgres}
-    user: ${DB_USER:postgres}
     password: ${DB_PASSWORD}
     host: ${DB_HOST:localhost}
-    port: ${DB_PORT:5432}
 ```
 
-## Service Tags
+Use this to keep passwords and environment-specific values out of the file.
 
-Use tags to group and manage related services:
+## Tags
+
+Tags are free-form labels for grouping related services:
 
 ```yaml
 services:
   - name: postgres
-    tags: [database, essential, backend]
-    # ... configuration
-
+    tags: [database, essential]
   - name: redis
-    tags: [cache, essential, backend]
-    # ... configuration
-
-  - name: prometheus
-    tags: [monitoring, optional]
-    # ... configuration
+    tags: [cache, essential]
 ```
 
-**Using Tags:**
+Commands that act on tags (e.g. `localport start --tag essential`) are documented in the
+[CLI Reference](cli-reference.md).
 
-```bash
-# Start all essential services
-localport start --tag essential
-
-# Start all database services
-localport start --tag database
-
-# Export monitoring services
-localport config export --tag monitoring
-```
-
-## Complete Example Configuration
-
-Here's a comprehensive example showing all features:
+## Complete Example
 
 ```yaml
 version: "1.0"
 
-# Global defaults
 defaults:
   health_check:
     type: tcp
     interval: 30
     timeout: 5.0
     failure_threshold: 3
-    success_threshold: 1
+    cluster_aware: true
   restart_policy:
     enabled: true
     max_attempts: 5
     backoff_multiplier: 2.0
     initial_delay: 1
     max_delay: 300
+  cluster_health:
+    enabled: true
+    interval: 240
+    timeout: 30
 
 services:
-  # PostgreSQL database with custom health check
+  # PostgreSQL over kubectl with a database health check
   - name: postgres
     technology: kubectl
     local_port: 5432
@@ -443,14 +323,12 @@ services:
       resource_name: postgres
       namespace: ${KUBE_NAMESPACE:default}
       context: ${KUBE_CONTEXT:minikube}
-    enabled: true
     tags: [database, essential]
-    description: "PostgreSQL database for development"
+    description: "PostgreSQL database"
     health_check:
       type: postgres
       interval: 30
       timeout: 10.0
-      failure_threshold: 3
       config:
         database: ${DB_NAME:postgres}
         user: ${DB_USER:postgres}
@@ -459,45 +337,7 @@ services:
       max_attempts: 3
       initial_delay: 2
 
-  # Kafka message broker
-  - name: kafka
-    technology: kubectl
-    local_port: 9092
-    remote_port: 9092
-    connection:
-      resource_name: kafka
-      namespace: kafka
-    enabled: true
-    tags: [messaging, essential]
-    description: "Kafka message broker"
-    health_check:
-      type: kafka
-      interval: 45
-      timeout: 15.0
-      failure_threshold: 2
-      config:
-        bootstrap_servers: "localhost:9092"
-
-  # Redis cache via SSH
-  - name: redis
-    technology: ssh
-    local_port: 6379
-    remote_port: 6379
-    connection:
-      host: ${REDIS_HOST:redis.example.com}
-      user: ${SSH_USER:deploy}
-      key_file: ${SSH_KEY_FILE:~/.ssh/id_rsa}
-      port: 22
-    enabled: true
-    tags: [cache, essential]
-    description: "Redis cache server"
-    health_check:
-      type: tcp
-      interval: 20
-      timeout: 3.0
-      failure_threshold: 5
-
-  # Web API with HTTP health check
+  # Web API over kubectl with an HTTP health check
   - name: api
     technology: kubectl
     local_port: 8080
@@ -506,22 +346,30 @@ services:
       resource_type: deployment
       resource_name: api-server
       namespace: default
-    enabled: true
     tags: [web, api]
-    description: "Main API server"
     health_check:
       type: http
       interval: 15
-      timeout: 5.0
-      failure_threshold: 3
       config:
         url: "http://localhost:8080/health"
-        method: GET
-        expected_status: 200
-        headers:
-          User-Agent: "LocalPort-HealthCheck/1.0"
+        expected_status_codes: [200]
 
-  # Monitoring service (disabled by default)
+  # Redis over an SSH bastion
+  - name: redis
+    technology: ssh
+    local_port: 6379
+    remote_port: 6379
+    connection:
+      host: ${BASTION_HOST:bastion.example.com}
+      user: ${SSH_USER:deploy}
+      key_file: ${SSH_KEY_FILE:~/.ssh/id_rsa}
+      remote_host: redis.internal
+    tags: [cache, essential]
+    health_check:
+      type: tcp
+      interval: 20
+
+  # Monitoring service, disabled by default
   - name: prometheus
     technology: kubectl
     local_port: 9090
@@ -531,189 +379,29 @@ services:
       namespace: monitoring
     enabled: false
     tags: [monitoring, optional]
-    description: "Prometheus monitoring server"
     health_check:
       type: http
       interval: 60
-      timeout: 10.0
-      failure_threshold: 2
       config:
         url: "http://localhost:9090/-/healthy"
     restart_policy:
       enabled: false
 ```
 
-## Configuration Validation
-
-LocalPort provides comprehensive configuration validation:
-
-```bash
-# Validate current configuration
-localport config validate
-
-# Validate specific file
-localport config validate --config /path/to/config.yaml
-```
-
-**Common Validation Errors:**
-
-- **Missing required fields**: Service name, technology, ports, connection details
-- **Invalid port numbers**: Must be between 1 and 65535
-- **Duplicate service names**: Each service must have a unique name
-- **Port conflicts**: Each service must use a unique local port
-- **Invalid health check configuration**: Missing required config fields
-- **Invalid restart policy values**: Out of range values for delays, attempts
-
-## Configuration Export and Import
-
-### Export Configuration
-
-```bash
-# Export all services
-localport config export
-
-# Export to file
-localport config export --output backup.yaml
-
-# Export specific services
-localport config export --service postgres redis
-
-# Export by tags
-localport config export --tag essential
-
-# Export in JSON format
-localport config export --format json
-
-# Export without defaults
-localport config export --no-defaults
-
-# Export including disabled services
-localport config export --include-disabled
-```
-
-### Import Configuration
-
-LocalPort automatically loads configuration from the standard locations. To use a different configuration file:
-
-```bash
-localport --config /path/to/config.yaml start --all
-```
-
 ## Best Practices
 
-### Security
+- **Secrets:** keep passwords, tokens, and keys in environment variables; never commit
+  them. Restrict the config file with `chmod 600 localport.yaml`.
+- **Health checks:** prefer a specific check (`postgres`, `http`) over `tcp` when
+  available; set intervals and timeouts to match the service, not so tight that they add
+  overhead.
+- **Cluster-aware:** enable `cluster_aware: true` for kubectl services to avoid needless
+  restarts during transient cluster issues.
+- **Restart policy:** enable it for production services and bound `max_attempts` to avoid
+  infinite restart loops.
+- **Organization:** use descriptive names, consistent tags, and `description` fields.
 
-1. **Use environment variables** for sensitive data like passwords and API keys
-2. **Use SSH key authentication** instead of passwords
-3. **Set appropriate file permissions** on configuration files: `chmod 600 localport.yaml`
-4. **Don't commit secrets** to version control
-
-### Organization
-
-1. **Use descriptive service names** that clearly identify the service
-2. **Group related services** with consistent tags
-3. **Add descriptions** to document service purposes
-4. **Use consistent naming conventions** across environments
-
-### Health Monitoring
-
-1. **Configure appropriate intervals** - not too frequent to avoid overhead
-2. **Set reasonable timeouts** based on service characteristics
-3. **Use specific health checks** (postgres, http) over generic TCP when possible
-4. **Test health check endpoints** before deploying
-
-### Restart Policies
-
-1. **Enable restart policies** for production services
-2. **Set appropriate max_attempts** to avoid infinite restart loops
-3. **Use exponential backoff** to avoid overwhelming failing services
-4. **Monitor restart patterns** to identify underlying issues
-
-## Service Logging Configuration
-
-LocalPort v0.3.4+ includes comprehensive service logging that captures raw output from kubectl and SSH processes. While service logging works automatically, you can access and manage logs through the CLI.
-
-### Log Access Commands
-
-```bash
-# List all available service logs
-localport logs --list
-
-# View logs for specific service
-localport logs --service postgres
-
-# Get log file path for external tools
-localport logs --service postgres --path
-
-# Filter logs with grep
-localport logs --service postgres --grep "error"
-
-# Show log directory locations
-localport logs --location
-```
-
-### Log File Locations
-
-Service logs are automatically stored in:
-- **Service logs**: `~/.local/share/localport/logs/services/`
-- **Daemon logs**: `~/.local/share/localport/logs/daemon.log`
-- **Log format**: `<service-name>_<unique-id>.log`
-
-### Log Content
-
-Each service log file contains:
-- **Metadata headers** with service configuration and diagnostic information
-- **Raw subprocess output** from kubectl/ssh processes
-- **Connection events**, errors, and reconnections
-- **Platform-specific diagnostic information**
-
-### Log Rotation and Retention
-
-LocalPort automatically manages log files:
-- **Size-based rotation**: Logs rotate when they reach 10MB
-- **Time-based cleanup**: Logs older than 3 days are automatically removed
-- **Cross-platform support**: Works on Windows, macOS, and Linux
-
-## Troubleshooting Configuration
-
-### Common Issues
-
-**Service won't start:**
-- Check port availability: `lsof -i :5432`
-- Verify connection details (kubectl context, SSH connectivity)
-- Check service logs: `localport logs --service service-name`
-- Look for specific errors: `localport logs --service service-name --grep "error"`
-
-**Health checks failing:**
-- Test connectivity manually
-- Verify health check configuration
-- Check timeout values
-- Review health check logs: `localport logs --service service-name --grep "health"`
-
-**Environment variables not substituted:**
-- Verify variable names and syntax
-- Check if variables are exported: `echo $VAR_NAME`
-- Use default values for optional variables
-
-**Configuration validation errors:**
-- Run `localport config validate` for detailed error messages
-- Check YAML syntax with a YAML validator
-- Verify all required fields are present
-
-### Using Service Logs for Troubleshooting
-
-```bash
-# Check recent service activity
-localport logs --service postgres | tail -50
-
-# Look for connection issues
-localport logs --service postgres --grep "connection\|error\|failed"
-
-# Monitor logs in real-time with external tools
-tail -f $(localport logs --service postgres --path)
-
-# Search for specific patterns
-grep -E "(error|timeout|refused)" $(localport logs --service postgres --path)
-```
-
-For comprehensive troubleshooting guidance, see the [Troubleshooting Guide](troubleshooting.md).
+For validation and troubleshooting, run `localport config validate` (see the
+[CLI Reference](cli-reference.md)) and consult the [Troubleshooting Guide](troubleshooting.md).
+</content>
+</invoke>
