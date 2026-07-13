@@ -109,8 +109,6 @@ jobs:
             asset_name: localport-linux-x86_64
           - os: macos-latest
             asset_name: localport-macos-x86_64
-          - os: windows-latest
-            asset_name: localport-windows-x86_64
     
     steps:
     - uses: actions/checkout@v4
@@ -134,32 +132,14 @@ jobs:
     - name: Create distribution archive
       run: |
         mkdir -p release-assets
-        
-        # Copy built packages
         cp dist/* release-assets/
-        
-        # Create platform-specific archive
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          cd release-assets
-          7z a ../localport-${{ github.ref_name }}-${{ matrix.asset_name }}.zip *
-        else
-          tar -czf localport-${{ github.ref_name }}-${{ matrix.asset_name }}.tar.gz -C release-assets .
-        fi
+        tar -czf localport-${{ github.ref_name }}-${{ matrix.asset_name }}.tar.gz -C release-assets .
       shell: bash
-    
+
     - name: Upload Release Asset (tar.gz)
-      if: matrix.os != 'windows-latest'
       run: |
         gh release upload ${{ needs.create-release.outputs.tag_name }} \
           ./localport-${{ github.ref_name }}-${{ matrix.asset_name }}.tar.gz
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Upload Release Asset (zip)
-      if: matrix.os == 'windows-latest'
-      run: |
-        gh release upload ${{ needs.create-release.outputs.tag_name }} \
-          ./localport-${{ github.ref_name }}-${{ matrix.asset_name }}.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
