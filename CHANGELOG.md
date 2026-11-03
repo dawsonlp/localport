@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-03
+
+### Changed
+- **Dependencies updated to latest releases**: minimum versions raised for all runtime dependencies (`typer` 0.27, `rich` 15, `pydantic` 2.14, `pydantic-settings` 2.16, `pyyaml` 6.0.3, `aiohttp` 3.14, `psutil` 7.2, `structlog` 26.1, `watchdog` 7), optional extras (`kafka-python` 3.0, `psycopg` 3.3), and dev tooling (`pytest` 9, `pytest-asyncio` 1.4, `pytest-cov` 7, `mypy` 2.4, `pre-commit` 4.7, `pip-audit` 2.10, `bandit` 1.9). Build backend raised to `setuptools` 84 / `setuptools_scm` 10. Picks up upstream security fixes.
+- **Pinned linters bumped**: `black` 26.10.1 and `ruff` 0.17.3 (pyproject and pre-commit). One file reformatted under black 26; no new ruff findings.
+- **CI actions updated**: `actions/checkout` v7, `astral-sh/setup-uv` v10, `actions/upload-artifact` v7, `codecov/codecov-action` v7 (`file` → `files` input), and the GitHub Pages actions to their current majors.
+- **pytest-asyncio loop scope set explicitly** (`asyncio_default_fixture_loop_scope = "function"`) to remove the 1.x deprecation warning.
+
 ## [1.2.0] - 2026-07-13
 
 ### Removed
