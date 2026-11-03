@@ -715,7 +715,9 @@ def _display_cluster_health_section(cluster_data: dict) -> None:
     from datetime import datetime
 
     # Create cluster health table
-    table = Table(title="🏗️  Cluster Health", show_header=True, header_style="bold blue")
+    table = Table(
+        title="🏗️  Cluster Health", show_header=True, header_style="bold blue"
+    )
     table.add_column("Context", style="bold blue", width=20)
     table.add_column("Status", style="bold", width=15)
     table.add_column("Nodes", style="green", width=8)

@@ -17,7 +17,7 @@ jobs:
       is_prerelease: ${{ steps.tag_info.outputs.is_prerelease }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     
@@ -111,12 +111,12 @@ jobs:
             asset_name: localport-macos-x86_64
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     
     - name: Install UV
-      uses: astral-sh/setup-uv@v3
+      uses: astral-sh/setup-uv@v10
       with:
         version: "latest"
     
@@ -149,12 +149,12 @@ jobs:
     if: "contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')"
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     
     - name: Install UV
-      uses: astral-sh/setup-uv@v3
+      uses: astral-sh/setup-uv@v10
     
     - name: Set up Python
       run: uv python install 3.13
@@ -193,12 +193,12 @@ jobs:
     if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     
     - name: Install UV
-      uses: astral-sh/setup-uv@v3
+      uses: astral-sh/setup-uv@v10
     
     - name: Set up Python
       run: uv python install 3.13
@@ -235,7 +235,7 @@ jobs:
     
     steps:
     - name: Install UV
-      uses: astral-sh/setup-uv@v3
+      uses: astral-sh/setup-uv@v10
       with:
         version: "latest"
     

@@ -26,10 +26,10 @@ jobs:
       SETUPTOOLS_SCM_PRETEND_VERSION_FOR_LOCALPORT: ${{ inputs.version }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     
     - name: Install UV
-      uses: astral-sh/setup-uv@v3
+      uses: astral-sh/setup-uv@v10
       with:
         version: "latest"
     
@@ -149,14 +149,14 @@ jobs:
     
     - name: Upload test report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-pypi-report-${{ inputs.version }}
         path: test_report.md
     
     - name: Upload build artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-pypi-dist-${{ inputs.version }}
         path: dist/
